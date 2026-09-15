@@ -1,10 +1,17 @@
 {
-  "package": "LEXA Phase 2 Catalog",
-  "version": "0.4.0",
-  "base": "LEXA Phase 1 v0.3",
-  "destructive": false,
-  "migration": "migrations/004_catalog_and_rbac_hardening.sql",
-  "workflow_input_directory": "incoming/",
-  "delete_manifest_files": ["DELETE.txt", ".lexa-delete"],
-  "notes": "Apply migrations using a version-controlled migration tool and test on a Neon branch before production promotion."
+  "package": "LEXA deployment readiness",
+  "version": "0.5.0",
+  "changes": [
+    "Render FastAPI deployment configuration",
+    "Vercel Next.js deployment-ready frontend shell",
+    "FastAPI CORS configuration",
+    "Refresh token lifetime configuration",
+    "Python version pin",
+    "Environment templates",
+    "Deployment runbook"
+  ],
+  "non_destructive": true,
+  "database_reset": false,
+  "seed_reset": false,
+  "product_deletion": false
 }
