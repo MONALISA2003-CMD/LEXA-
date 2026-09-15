@@ -33,3 +33,18 @@ Catalog mutations create their audit record and outbox event in the same SQL tra
 ## Workflow package extraction
 
 The included `.github/workflows/lexa-zip-extract.yml` expects future implementation ZIPs under `incoming/`. It safely extracts them, optionally deletes explicitly listed obsolete paths from `DELETE.txt` or `.lexa-delete`, removes the processed ZIP, and commits the result.
+
+## Deployment fix v0.5.2 — SQLAlchemy/psycopg3 audit
+
+- PostgreSQL runtime is standardized on psycopg 3.
+- SQLAlchemy's reserved Declarative attribute `metadata` is not used as a Python ORM attribute.
+- The existing PostgreSQL column name `metadata` is preserved for products and product variants.
+- Product ORM attribute: `product_metadata` → database column `metadata`.
+- Product variant ORM attribute: `variant_metadata` → database column `metadata`.
+- Public API request/response field remains `metadata`.
+- Render root/build/start/health contract remains unchanged.
+- No database reset, destructive migration, or data deletion is introduced.
+
+### Pre-zip audit
+
+The package must pass the complete local test suite, Python compilation, deployment contract checks, and static reserved-name/dependency audit before packaging.

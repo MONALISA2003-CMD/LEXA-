@@ -53,14 +53,14 @@ class ProductIn(BaseModel):
 class ProductPatch(BaseModel):
     name: str | None = None; category_id: UUID | None = None; brand_id: UUID | None = None; description: str | None = None; status: str | None = None; has_variants: bool | None = None; tax_category_id: UUID | None = None; metadata: dict[str, Any] | None = None
 class ProductOut(ORM):
-    id: UUID; tenant_id: UUID; category_id: UUID; brand_id: UUID | None; name: str; description: str | None; product_type: str; status: str; has_variants: bool; tax_category_id: UUID | None; metadata: dict
+    id: UUID; tenant_id: UUID; category_id: UUID; brand_id: UUID | None; name: str; description: str | None; product_type: str; status: str; has_variants: bool; tax_category_id: UUID | None; metadata: dict = Field(validation_alias="product_metadata")
 
 class VariantIn(BaseModel):
     product_id: UUID; name: str; sku: str; base_unit_id: UUID; track_inventory: bool = True; allow_fractional_quantity: bool = False; costing_method: str | None = None; metadata: dict[str, Any] = Field(default_factory=dict)
 class VariantPatch(BaseModel):
     name: str | None = None; base_unit_id: UUID | None = None; track_inventory: bool | None = None; allow_fractional_quantity: bool | None = None; status: str | None = None; costing_method: str | None = None; metadata: dict[str, Any] | None = None
 class VariantOut(ORM):
-    id: UUID; tenant_id: UUID; product_id: UUID; name: str; sku: str; base_unit_id: UUID; track_inventory: bool; allow_fractional_quantity: bool; status: str; costing_method: str | None; metadata: dict
+    id: UUID; tenant_id: UUID; product_id: UUID; name: str; sku: str; base_unit_id: UUID; track_inventory: bool; allow_fractional_quantity: bool; status: str; costing_method: str | None; metadata: dict = Field(validation_alias="variant_metadata")
 
 class BarcodeIn(BaseModel):
     variant_id: UUID; barcode: str; barcode_type: str = "OTHER"; is_primary: bool = False
@@ -223,7 +223,7 @@ def create_product(body: ProductIn, ctx=Depends(require_permission("catalog.mana
     if body.brand_id and not db.scalar(select(Brand.id).where(Brand.id == body.brand_id, Brand.tenant_id == tenant_id, Brand.deleted_at.is_(None))): raise HTTPException(400, "Brand does not belong to tenant")
     try: name = normalize_text(body.name, "Product name"); product_type = normalize_code(body.product_type, "Product type")
     except CatalogValidation as exc: raise HTTPException(422, str(exc)) from exc
-    row = Product(tenant_id=tenant_id, category_id=body.category_id, brand_id=body.brand_id, name=name, description=body.description, product_type=product_type, has_variants=body.has_variants, tax_category_id=body.tax_category_id, metadata=body.metadata); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product.created", target_type="product", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductCreated", aggregate_type="product", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "name": name, "category_id": str(body.category_id), "brand_id": str(body.brand_id) if body.brand_id else None}); db.commit(); db.refresh(row); return row
+    row = Product(tenant_id=tenant_id, category_id=body.category_id, brand_id=body.brand_id, name=name, description=body.description, product_type=product_type, has_variants=body.has_variants, tax_category_id=body.tax_category_id, product_metadata=body.metadata); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product.created", target_type="product", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductCreated", aggregate_type="product", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "name": name, "category_id": str(body.category_id), "brand_id": str(body.brand_id) if body.brand_id else None}); db.commit(); db.refresh(row); return row
 
 @router.patch("/products/{product_id}", response_model=ProductOut)
 def patch_product(product_id: UUID, body: ProductPatch, ctx=Depends(require_permission("catalog.manage"))):
@@ -233,9 +233,12 @@ def patch_product(product_id: UUID, body: ProductPatch, ctx=Depends(require_perm
     if body.brand_id is not None and not db.scalar(select(Brand.id).where(Brand.id == body.brand_id, Brand.tenant_id == tenant_id, Brand.deleted_at.is_(None))): raise HTTPException(400, "Brand does not belong to tenant")
     try:
         if body.name is not None: row.name = normalize_text(body.name, "Product name")
-        for attr in ("category_id", "brand_id", "description", "status", "has_variants", "tax_category_id", "metadata"):
+        for attr in ("category_id", "brand_id", "description", "status", "has_variants", "tax_category_id"):
             value = getattr(body, attr)
             if value is not None: setattr(row, attr, value)
+        if body.metadata is not None:
+            row.product_metadata = body.metadata
+        # metadata is a public API field; product_metadata is the ORM-safe attribute.
     except CatalogValidation as exc: raise HTTPException(422, str(exc)) from exc
     db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product.updated", target_type="product", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductUpdated", aggregate_type="product", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "status": row.status}); db.commit(); db.refresh(row); return row
 
@@ -267,7 +270,7 @@ def create_variant(body: VariantIn, ctx=Depends(require_permission("catalog.mana
     try: name = normalize_text(body.name, "Variant name"); sku = normalize_code(body.sku, "SKU")
     except CatalogValidation as exc: raise HTTPException(422, str(exc)) from exc
     if body.allow_fractional_quantity and not unit.allows_fraction: raise HTTPException(422, "Variant cannot allow fractional quantity with a non-fractional base unit")
-    row = ProductVariant(tenant_id=tenant_id, product_id=body.product_id, name=name, sku=sku, base_unit_id=body.base_unit_id, track_inventory=body.track_inventory, allow_fractional_quantity=body.allow_fractional_quantity, costing_method=body.costing_method, metadata=body.metadata); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.variant.created", target_type="product_variant", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductVariantCreated", aggregate_type="product_variant", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "product_id": str(body.product_id), "sku": sku}); commit_or_409(db, "SKU already exists for this tenant"); db.refresh(row); return row
+    row = ProductVariant(tenant_id=tenant_id, product_id=body.product_id, name=name, sku=sku, base_unit_id=body.base_unit_id, track_inventory=body.track_inventory, allow_fractional_quantity=body.allow_fractional_quantity, costing_method=body.costing_method, variant_metadata=body.metadata); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.variant.created", target_type="product_variant", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductVariantCreated", aggregate_type="product_variant", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "product_id": str(body.product_id), "sku": sku}); commit_or_409(db, "SKU already exists for this tenant"); db.refresh(row); return row
 
 @router.patch("/variants/{variant_id}", response_model=VariantOut)
 def patch_variant(variant_id: UUID, body: VariantPatch, ctx=Depends(require_permission("catalog.manage"))):
@@ -279,9 +282,12 @@ def patch_variant(variant_id: UUID, body: VariantPatch, ctx=Depends(require_perm
         if row.allow_fractional_quantity and not unit.allows_fraction: raise HTTPException(422, "Variant cannot use a non-fractional base unit")
     try:
         if body.name is not None: row.name = normalize_text(body.name, "Variant name")
-        for attr in ("base_unit_id", "track_inventory", "allow_fractional_quantity", "status", "costing_method", "metadata"):
+        for attr in ("base_unit_id", "track_inventory", "allow_fractional_quantity", "status", "costing_method"):
             value = getattr(body, attr)
             if value is not None: setattr(row, attr, value)
+        if body.metadata is not None:
+            row.variant_metadata = body.metadata
+        # metadata is a public API field; variant_metadata is the ORM-safe attribute.
         unit2 = db.scalar(select(Unit).where(Unit.id == row.base_unit_id, (Unit.tenant_id == tenant_id) | (Unit.tenant_id.is_(None))))
         if row.allow_fractional_quantity and (not unit2 or not unit2.allows_fraction): raise CatalogValidation("Variant cannot allow fractional quantity with a non-fractional base unit")
     except CatalogValidation as exc: raise HTTPException(422, str(exc)) from exc
