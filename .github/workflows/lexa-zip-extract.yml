@@ -1,12 +1,12 @@
 name: LEXA ZIP Extractor
 
 on:
-  workflow_dispatch:
   push:
     paths:
       - "incoming/**/*.zip"
       - "incoming/*.zip"
-      - ".github/workflows/lexa-zip-extract.yml"
+
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,90 +17,194 @@ concurrency:
 
 jobs:
   extract:
+    name: Extract incoming LEXA ZIPs
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[lexa-extractor]') }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Extract all incoming LEXA ZIPs safely
+      - name: Find and extract incoming ZIPs
         shell: bash
         run: |
           set -euo pipefail
+
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
-          import os
+          import shutil
 
           incoming = Path("incoming")
-          zips = sorted(incoming.rglob("*.zip")) if incoming.exists() else []
-          if not zips:
-              print("No ZIP files found in incoming/.")
+
+          if not incoming.exists():
+              print("incoming/ does not exist.")
               raise SystemExit(0)
 
-          def safe_member(name: str) -> Path:
-              p = Path(name)
-              if p.is_absolute() or ".." in p.parts:
-                  raise RuntimeError(f"Unsafe ZIP path: {name}")
-              return p
+          archives = sorted(incoming.rglob("*.zip"))
 
-          for archive in zips:
-              print(f"Processing {archive}")
+          if not archives:
+              print("No incoming ZIP files found.")
+              raise SystemExit(0)
+
+          def safe_path(value: str) -> Path:
+              path = Path(value)
+
+              if path.is_absolute():
+                  raise RuntimeError(
+                      f"Unsafe absolute ZIP path: {value}"
+                  )
+
+              if ".." in path.parts:
+                  raise RuntimeError(
+                      f"Unsafe parent traversal path: {value}"
+                  )
+
+              return path
+
+          for archive in archives:
+              print("")
+              print("=" * 70)
+              print(f"PROCESSING: {archive}")
+              print("=" * 70)
+
               delete_entries = []
-              with ZipFile(archive) as zf:
+
+              with ZipFile(archive, "r") as zf:
                   names = zf.namelist()
+
+                  # -------------------------------------------------
+                  # 1. Validate every ZIP path before extracting
+                  # -------------------------------------------------
                   for name in names:
-                      safe_member(name)
-                  for manifest_name in ("DELETE.txt", ".lexa-delete", f"{archive.stem}/DELETE.txt", f"{archive.stem}/.lexa-delete"):
-                      if manifest_name in names:
-                          raw = zf.read(manifest_name).decode("utf-8")
-                          delete_entries.extend(
-                              line.strip() for line in raw.splitlines()
-                              if line.strip() and not line.lstrip().startswith("#")
+                      safe_path(name)
+
+                  # -------------------------------------------------
+                  # 2. Look for deletion manifests
+                  #
+                  # Supported:
+                  #   DELETE.txt
+                  #   .lexa-delete
+                  #   <zip-folder>/DELETE.txt
+                  #   <zip-folder>/.lexa-delete
+                  # -------------------------------------------------
+                  manifest_names = {
+                      "DELETE.txt",
+                      ".lexa-delete",
+                      f"{archive.stem}/DELETE.txt",
+                      f"{archive.stem}/.lexa-delete",
+                  }
+
+                  for manifest in manifest_names:
+                      if manifest in names:
+                          print(f"Found deletion manifest: {manifest}")
+
+                          content = zf.read(manifest).decode(
+                              "utf-8"
                           )
+
+                          for line in content.splitlines():
+                              line = line.strip()
+
+                              if not line:
+                                  continue
+
+                              if line.startswith("#"):
+                                  continue
+
+                              delete_entries.append(line)
+
+                  # -------------------------------------------------
+                  # 3. Extract ZIP contents
+                  # -------------------------------------------------
                   for name in names:
-                      target = Path(name)
-                      # Do not extract deletion manifests into the repository.
-                      if target.name in {"DELETE.txt", ".lexa-delete"}:
+                      target = safe_path(name)
+
+                      # Skip directories
+                      if name.endswith("/"):
                           continue
-                      target_path = Path(".") / target
-                      target_path.parent.mkdir(parents=True, exist_ok=True)
-                      with zf.open(name) as src, open(target_path, "wb") as dst:
-                          dst.write(src.read())
 
+                      # Never extract deletion manifests
+                      if target.name in {
+                          "DELETE.txt",
+                          ".lexa-delete",
+                      }:
+                          continue
+
+                      destination = Path(".") / target
+
+                      destination.parent.mkdir(
+                          parents=True,
+                          exist_ok=True
+                      )
+
+                      print(f"Extracting: {destination}")
+
+                      with zf.open(name, "r") as source:
+                          with open(destination, "wb") as output:
+                              shutil.copyfileobj(source, output)
+
+              # -----------------------------------------------------
+              # 4. Delete ONLY explicitly listed obsolete files
+              # -----------------------------------------------------
               for entry in delete_entries:
-                  target = safe_member(entry)
-                  target_path = Path(".") / target
-                  if target_path.is_file():
-                      print(f"Deleting obsolete file: {target_path}")
-                      target_path.unlink()
-                  elif target_path.is_dir():
-                      print(f"Deleting obsolete directory: {target_path}")
-                      import shutil
-                      shutil.rmtree(target_path)
-                  else:
-                      print(f"Delete target not present (skipped): {target_path}")
+                  target = safe_path(entry)
+                  destination = Path(".") / target
 
+                  if destination.is_file():
+                      print(
+                          f"Deleting obsolete file: "
+                          f"{destination}"
+                      )
+                      destination.unlink()
+
+                  elif destination.is_dir():
+                      print(
+                          f"Deleting obsolete directory: "
+                          f"{destination}"
+                      )
+                      shutil.rmtree(destination)
+
+                  else:
+                      print(
+                          f"Delete target not found, skipping: "
+                          f"{destination}"
+                      )
+
+              # -----------------------------------------------------
+              # 5. Delete the processed ZIP
+              # -----------------------------------------------------
               archive.unlink()
-              print(f"Removed processed ZIP: {archive}")
+
+              print(f"Processed and removed: {archive}")
+
+          print("")
+          print("All incoming ZIPs processed successfully.")
           PY
 
-      - name: Check repository changes
-        run: git status --short
+      - name: Show repository changes
+        shell: bash
+        run: |
+          git status --short
 
       - name: Commit extracted files
         shell: bash
         run: |
           set -euo pipefail
+
           git config user.name "lexa-automation[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add -A
+
           if git diff --cached --quiet; then
-            echo "No changes to commit."
+            echo "No repository changes detected."
             exit 0
           fi
-          git commit -m "chore: extract LEXA package [lexa-extractor]"
+
+          git commit \
+            -m "chore: automatically extract LEXA package [lexa-extractor]"
+
           git push
-          
