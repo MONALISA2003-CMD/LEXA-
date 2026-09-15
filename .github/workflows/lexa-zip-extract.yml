@@ -17,6 +17,10 @@ concurrency:
 jobs:
   extract:
     name: Detect and extract LEXA ZIPs
+
+    # Prevent the extractor's own commit from starting another extraction run.
+    if: "!contains(github.event.head_commit.message, '[lexa-extractor]')"
+
     runs-on: ubuntu-latest
 
     steps:
@@ -25,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect and extract ZIP files
+      - name: Detect and extract LEXA ZIPs
         shell: bash
         run: |
           set -euo pipefail
@@ -37,8 +41,10 @@ jobs:
 
           ROOT = Path(".").resolve()
 
+          # ------------------------------------------------------------
           # Find ZIP files anywhere in the repository.
-          # Ignore .git because GitHub Actions metadata is not package input.
+          # ------------------------------------------------------------
+
           archives = []
 
           for path in ROOT.rglob("*.zip"):
@@ -52,7 +58,7 @@ jobs:
           archives = sorted(archives)
 
           print("=" * 70)
-          print("LEXA ZIP DETECTION")
+          print("LEXA ZIP DETECTOR")
           print("=" * 70)
 
           if not archives:
@@ -65,7 +71,41 @@ jobs:
           for archive in archives:
               print(f"  - {archive.relative_to(ROOT)}")
 
-          def validate_path(name: str):
+          # ------------------------------------------------------------
+          # Protected repository paths.
+          #
+          # LEXA application packages must NOT replace GitHub
+          # automation.
+          # ------------------------------------------------------------
+
+          PROTECTED_PREFIXES = (
+              Path(".github/workflows"),
+          )
+
+          PROTECTED_FILES = {
+              Path(".github/dependabot.yml"),
+          }
+
+          def is_protected(path: Path) -> bool:
+              path = Path(path)
+
+              if path in PROTECTED_FILES:
+                  return True
+
+              for prefix in PROTECTED_PREFIXES:
+                  try:
+                      path.relative_to(prefix)
+                      return True
+                  except ValueError:
+                      pass
+
+              return False
+
+          # ------------------------------------------------------------
+          # Validate ZIP paths.
+          # ------------------------------------------------------------
+
+          def validate_path(name: str) -> Path:
               path = Path(name)
 
               if path.is_absolute():
@@ -80,6 +120,10 @@ jobs:
 
               return path
 
+          # ------------------------------------------------------------
+          # Process every ZIP.
+          # ------------------------------------------------------------
+
           for archive in archives:
 
               print("")
@@ -91,33 +135,36 @@ jobs:
               print("=" * 70)
 
               try:
+
                   with ZipFile(archive, "r") as zf:
 
                       names = zf.namelist()
 
                       # ------------------------------------------------
-                      # Validate ALL ZIP paths before extraction.
+                      # Validate all paths before extraction.
                       # ------------------------------------------------
 
                       for name in names:
                           validate_path(name)
 
                       # ------------------------------------------------
-                      # Find optional deletion manifests.
+                      # Find deletion manifests.
+                      #
+                      # Supported anywhere inside the package:
+                      # DELETE.txt
+                      # .lexa-delete
                       # ------------------------------------------------
 
                       manifests = []
 
                       for name in names:
-                          normalized = name.rstrip("/")
 
-                          if normalized in {
-                              "DELETE.txt",
-                              ".lexa-delete",
-                          }:
-                              manifests.append(name)
+                          if name.endswith("/"):
+                              continue
 
-                          elif Path(normalized).name in {
+                          path = Path(name)
+
+                          if path.name in {
                               "DELETE.txt",
                               ".lexa-delete",
                           }:
@@ -166,6 +213,21 @@ jobs:
                           }:
                               continue
 
+                          # ------------------------------------------------
+                          # IMPORTANT:
+                          # Never allow a ZIP to overwrite GitHub
+                          # Actions workflows.
+                          # ------------------------------------------------
+
+                          if is_protected(safe_name):
+
+                              print(
+                                  "WARNING: Skipping protected "
+                                  f"path: {safe_name}"
+                              )
+
+                              continue
+
                           destination = ROOT / safe_name
 
                           destination.parent.mkdir(
@@ -179,54 +241,79 @@ jobs:
                           )
 
                           with zf.open(name, "r") as source:
-                              with open(destination, "wb") as target:
+
+                              with open(
+                                  destination,
+                                  "wb"
+                              ) as target:
+
                                   shutil.copyfileobj(
                                       source,
                                       target
                                   )
 
               except BadZipFile:
+
                   raise RuntimeError(
                       f"Invalid ZIP archive: {archive}"
                   )
 
               # --------------------------------------------------------
-              # Delete ONLY paths explicitly listed in DELETE.txt.
+              # Delete explicitly listed obsolete files.
+              #
+              # NEVER allow DELETE.txt to remove protected automation.
               # --------------------------------------------------------
 
               for entry in delete_entries:
 
                   target_path = validate_path(entry)
-                  target = ROOT / target_path
 
-                  if not target.exists():
+                  if is_protected(target_path):
+
                       print(
-                          f"Delete target does not exist, "
-                          f"skipping: {entry}"
+                          "WARNING: Refusing to delete protected "
+                          f"path: {target_path}"
                       )
+
                       continue
 
-                  # Safety check: never allow deletion outside repo.
+                  target = ROOT / target_path
+
+                  # Safety check.
                   try:
                       target.resolve().relative_to(ROOT)
                   except ValueError:
+
                       raise RuntimeError(
                           f"Deletion outside repository blocked: "
                           f"{entry}"
                       )
 
-                  if target.is_dir():
+                  if not target.exists():
+
                       print(
-                          f"Deleting directory: "
+                          f"Delete target not found, skipping: "
                           f"{entry}"
                       )
+
+                      continue
+
+                  if target.is_dir():
+
+                      print(
+                          f"Deleting obsolete directory: "
+                          f"{entry}"
+                      )
+
                       shutil.rmtree(target)
 
                   else:
+
                       print(
-                          f"Deleting file: "
+                          f"Deleting obsolete file: "
                           f"{entry}"
                       )
+
                       target.unlink()
 
               # --------------------------------------------------------
@@ -246,10 +333,13 @@ jobs:
           print("=" * 70)
           PY
 
-      - name: Show changes
+      - name: Show repository changes
         shell: bash
         run: |
-          echo "Repository changes:"
+          echo "========================================"
+          echo "REPOSITORY CHANGES"
+          echo "========================================"
+
           git status --short
 
       - name: Commit extracted files
@@ -258,6 +348,7 @@ jobs:
           set -euo pipefail
 
           git config user.name "lexa-automation[bot]"
+
           git config user.email \
             "41898282+github-actions[bot]@users.noreply.github.com"
 
