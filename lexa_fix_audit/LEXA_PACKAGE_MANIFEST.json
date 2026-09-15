@@ -1,0 +1,17 @@
+{
+  "package": "LEXA deployment readiness",
+  "version": "0.5.0",
+  "changes": [
+    "Render FastAPI deployment configuration",
+    "Vercel Next.js deployment-ready frontend shell",
+    "FastAPI CORS configuration",
+    "Refresh token lifetime configuration",
+    "Python version pin",
+    "Environment templates",
+    "Deployment runbook"
+  ],
+  "non_destructive": true,
+  "database_reset": false,
+  "seed_reset": false,
+  "product_deletion": false
+}

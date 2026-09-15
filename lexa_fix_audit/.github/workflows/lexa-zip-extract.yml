@@ -1,0 +1,98 @@
+name: LEXA ZIP Extractor
+
+on:
+  push:
+    paths:
+      - "**/*.zip"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lexa-zip-extract
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[lexa-extractor]') }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract LEXA ZIPs safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import shutil
+
+          zips = sorted(p for p in Path('.').rglob('*.zip') if '.git' not in p.parts)
+          if not zips:
+              print('No ZIP files found.')
+              raise SystemExit(0)
+
+          protected_prefixes = (Path('.github/workflows'), Path('.github/dependabot.yml'))
+
+          def safe_member(name: str) -> Path:
+              p = Path(name)
+              if p.is_absolute() or '..' in p.parts:
+                  raise RuntimeError(f'Unsafe ZIP path: {name}')
+              return p
+
+          def is_protected(p: Path) -> bool:
+              return any(p == prefix or prefix in p.parents for prefix in protected_prefixes)
+
+          for archive in zips:
+              print(f'Processing {archive}')
+              delete_entries = []
+              with ZipFile(archive) as zf:
+                  names = zf.namelist()
+                  for name in names:
+                      safe_member(name)
+                  for manifest_name in ('DELETE.txt', '.lexa-delete', f'{archive.stem}/DELETE.txt', f'{archive.stem}/.lexa-delete'):
+                      if manifest_name in names:
+                          raw = zf.read(manifest_name).decode('utf-8')
+                          delete_entries.extend(line.strip() for line in raw.splitlines() if line.strip() and not line.lstrip().startswith('#'))
+                  for name in names:
+                      target = safe_member(name)
+                      if target.name in {'DELETE.txt', '.lexa-delete'} or is_protected(target):
+                          continue
+                      target_path = Path('.') / target
+                      target_path.parent.mkdir(parents=True, exist_ok=True)
+                      with zf.open(name) as src, open(target_path, 'wb') as dst:
+                          dst.write(src.read())
+
+              for entry in delete_entries:
+                  target = safe_member(entry)
+                  if is_protected(target):
+                      print(f'Skipping protected delete target: {target}')
+                      continue
+                  target_path = Path('.') / target
+                  if target_path.is_file():
+                      target_path.unlink()
+                  elif target_path.is_dir():
+                      shutil.rmtree(target_path)
+
+              archive.unlink()
+              print(f'Removed processed ZIP: {archive}')
+          PY
+
+      - name: Commit extracted files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "lexa-automation[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: extract LEXA package [lexa-extractor]"
+          git push
