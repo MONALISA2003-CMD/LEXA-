@@ -1,27 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
-
-type Health = { status: string; service?: string; environment?: string };
+import { getHealth, type ApiHealth } from "../lib/api";
 
 export default function HomePage() {
-  const [health, setHealth] = useState<Health | null>(null);
+  const [health, setHealth] = useState<ApiHealth | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!apiUrl) {
-      setError("NEXT_PUBLIC_API_URL is not configured.");
-      return;
-    }
-    fetch(`${apiUrl}/health`, { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`API returned HTTP ${response.status}`);
-        return response.json() as Promise<Health>;
+    const controller = new AbortController();
+
+    getHealth(controller.signal)
+      .then((result) => {
+        setHealth(result);
+        setError(null);
       })
-      .then(setHealth)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "API health check failed."));
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setHealth(null);
+        setError(err instanceof Error ? err.message : "LEXA API health check failed.");
+      });
+
+    return () => controller.abort();
   }, []);
 
   return (
@@ -29,10 +29,14 @@ export default function HomePage() {
       <section className="card">
         <p className="eyebrow">LEXA</p>
         <h1>Business operating system</h1>
-        <p className="muted">Frontend deployment is connected to the LEXA API.</p>
-        <div className="status">
+        <p className="muted">
+          Vercel is serving the Next.js frontend and Render is serving the LEXA API.
+        </p>
+        <div className="status" role="status" aria-live="polite">
           <span className={health ? "dot online" : "dot"} />
-          {health ? `API online — ${health.environment ?? "environment unknown"}` : error ?? "Checking API…"}
+          {health
+            ? `API online — ${health.environment ?? "environment unknown"}`
+            : error ?? "Checking LEXA API…"}
         </div>
       </section>
     </main>

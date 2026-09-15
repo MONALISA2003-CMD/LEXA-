@@ -52,3 +52,12 @@ After the Vercel URL is known, put that URL in the Render API's `CORS_ORIGINS`. 
 ## Important security rule
 
 Never commit production `DATABASE_URL`, `REDIS_URL`, or `JWT_SECRET`. The source specification requires production secrets to stay out of source control and ordinary developer environment files.
+
+## Runtime probes
+
+- Liveness: `GET /health`
+- Compatibility alias: `GET /api/health`
+- Readiness: `GET /ready`
+- Compatibility readiness alias: `GET /api/ready`
+
+`/health` is intentionally dependency-independent so Render can determine whether the process is alive. `/ready` verifies PostgreSQL and Redis/Valkey without exposing connection details.
