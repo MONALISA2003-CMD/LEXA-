@@ -1,6 +1,6 @@
 {
   "package": "LEXA deployment integration",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "layout": "repository-root",
   "changes": [
     "Flattened package root so ZIP contents map directly to repository paths",
@@ -17,5 +17,6 @@
   "non_destructive": true,
   "database_reset": false,
   "seed_reset": false,
-  "product_deletion": false
+  "product_deletion": false,
+  "description": "Visible frontend implementation workspace for feedback; preserves existing API and deployment architecture."
 }
