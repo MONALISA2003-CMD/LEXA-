@@ -1,14 +1,11 @@
-# LEXA Migrations
+# LEXA migrations
 
-Migrations are version-controlled, deterministic, reviewed, additive/non-destructive by default, and tested against representative data.
-
-## Order
+Apply in order. Migration 005 is additive and introduces the inventory foundation.
 
 1. `001_phase1_foundation.sql`
 2. `002_identity_rbac_organization.sql`
 3. `003_rbac_sessions_organization_completion.sql`
 4. `004_catalog_and_rbac_hardening.sql`
+5. `005_inventory_foundation.sql`
 
-`004` introduces Catalog and repairs the original Phase 1 permission model by adding the explicit `role_permissions` relation.
-
-For Neon production, use the direct/unpooled database connection for schema migrations. Test the migration on a Neon branch before promotion.
+Do not rerun migrations against an already-provisioned database unless the statements are designed to be safely repeatable. Migration 005 uses `IF NOT EXISTS`, conflict-safe permission inserts and explicit tenant constraints/RLS. It contains no `DROP TABLE`, `TRUNCATE`, product deletion or database reset.

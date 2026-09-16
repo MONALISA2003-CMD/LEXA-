@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .health import check_database
-from .routes import auth, organization, rbac, catalog
+from .routes import auth, organization, rbac, catalog, inventory
 
 app = FastAPI(title="LEXA API", version="0.1.2")
 
@@ -19,6 +19,7 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(organization.router, prefix="/api/v1")
 app.include_router(rbac.router, prefix="/api/v1")
 app.include_router(catalog.router, prefix="/api/v1")
+app.include_router(inventory.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["system"])

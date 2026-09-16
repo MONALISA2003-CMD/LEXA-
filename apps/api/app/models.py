@@ -295,3 +295,131 @@ class OutboxEvent(Base):
     correlation_id: Mapped[str | None] = mapped_column(String(100))
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class IdempotencyKey(Base):
+    __tablename__ = "idempotency_keys"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    operation: Mapped[str] = mapped_column(String(160), nullable=False)
+    key: Mapped[str] = mapped_column(String(200), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    response_status: Mapped[int] = mapped_column(default=200, nullable=False)
+    response_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+class InventoryBalance(Base):
+    __tablename__ = "inventory_balances"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    location_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False)
+    variant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("product_variants.id", ondelete="RESTRICT"), nullable=False)
+    on_hand: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    reserved: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    inbound: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    average_cost: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    stock_value: Mapped[Decimal] = mapped_column(Numeric(24, 6), nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+class InventoryTransaction(Base):
+    __tablename__ = "inventory_transactions"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    location_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False)
+    variant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("product_variants.id", ondelete="RESTRICT"), nullable=False)
+    transaction_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    quantity_delta: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    unit_cost: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    total_cost: Mapped[Decimal] = mapped_column(Numeric(24, 6), nullable=False, default=0)
+    balance_after: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    reference_type: Mapped[str | None] = mapped_column(String(80))
+    reference_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    source_transaction_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("inventory_transactions.id", ondelete="RESTRICT"))
+    idempotency_key: Mapped[str | None] = mapped_column(String(200))
+    actor_user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    inventory_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict, nullable=False)
+
+class InventoryAdjustment(Base):
+    __tablename__ = "inventory_adjustments"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    location_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False)
+    reason_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT")
+    idempotency_key: Mapped[str | None] = mapped_column(String(200))
+    created_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    approved_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    posted_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+class InventoryAdjustmentLine(Base):
+    __tablename__ = "inventory_adjustment_lines"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    adjustment_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("inventory_adjustments.id", ondelete="CASCADE"), nullable=False)
+    variant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("product_variants.id", ondelete="RESTRICT"), nullable=False)
+    quantity_delta: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    unit_cost: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    notes: Mapped[str | None] = mapped_column(Text)
+
+class StockCount(Base):
+    __tablename__ = "stock_counts"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    location_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT")
+    scope_description: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    submitted_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    approved_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    posted_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class StockCountLine(Base):
+    __tablename__ = "stock_count_lines"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    stock_count_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("stock_counts.id", ondelete="CASCADE"), nullable=False)
+    variant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("product_variants.id", ondelete="RESTRICT"), nullable=False)
+    expected_quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    counted_quantity: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    variance_quantity: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    unit_cost: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+
+class InventoryTransfer(Base):
+    __tablename__ = "inventory_transfers"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    source_location_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False)
+    destination_location_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT")
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    approved_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    dispatched_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    received_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    completed_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+class InventoryTransferLine(Base):
+    __tablename__ = "inventory_transfer_lines"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    transfer_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("inventory_transfers.id", ondelete="CASCADE"), nullable=False)
+    variant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("product_variants.id", ondelete="RESTRICT"), nullable=False)
+    requested_quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    dispatched_quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    received_quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    unit_cost: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
