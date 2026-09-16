@@ -1,6 +1,6 @@
 {
-  "package": "LEXA deployment integration",
-  "version": "0.7.0",
+  "package": "LEXA visible product integration",
+  "version": "0.7.1",
   "layout": "repository-root",
   "changes": [
     "Flattened package root so ZIP contents map directly to repository paths",
@@ -9,7 +9,12 @@
     "Psycopg 3 database driver and URL normalization",
     "SQLAlchemy reserved metadata attribute remediation",
     "Render deployment configuration and health check",
-    "Deployment documentation and audit tests"
+    "Deployment documentation and audit tests",
+    "Same-origin Next.js API proxy removes browser-to-Render CORS dependency for frontend API calls",
+    "Real authentication entry point using existing FastAPI register/login endpoints",
+    "Products workspace reads authenticated tenant catalog from live API",
+    "Removed invented preview product records and demo/build-preview language",
+    "Overview now describes LEXA as a multi-purpose multi-tenant operating system"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -18,5 +23,5 @@
   "database_reset": false,
   "seed_reset": false,
   "product_deletion": false,
-  "description": "Visible frontend implementation workspace for feedback; preserves existing API and deployment architecture."
+  "description": "Real product-facing frontend integration. No fabricated live business data. Backend remains authoritative."
 }
