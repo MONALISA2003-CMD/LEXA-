@@ -1,47 +1,34 @@
-# LEXA Deployment Integration v0.6 — Audit Report
+# LEXA Deployment Integration v0.6.2 — Audit Report
 
 ## Scope
 
-This package hardens the Vercel ↔ Render runtime boundary without embedding production secrets.
+Corrective deployment package for the Render startup failure observed after commit b4016b9.
 
-## Changes
+## Root cause found
 
-- Added `/` API identity endpoint.
-- Kept `/health` as a dependency-independent liveness probe.
-- Added `/api/health` compatibility alias.
-- Added `/ready` and `/api/ready` readiness probes that verify PostgreSQL without exposing connection details.
-- Standardized frontend API access through `apps/web/lib/api.ts`.
-- Frontend health check uses the public `NEXT_PUBLIC_API_URL` only.
-- Kept PostgreSQL connectivity on psycopg 3.
-- Added test bootstrap so repository-root pytest works consistently.
-- Added runtime endpoint tests.
+`apps/api/app/main.py` imported `check_redis` from `apps/api/app/health.py`, but `health.py` defines `check_database` only. This caused Uvicorn to fail during module import with:
+
+`ImportError: cannot import name 'check_redis' from 'app.health'`
+
+## Correction
+
+- Removed the nonexistent `check_redis` import.
+- Kept readiness dependent on the implemented PostgreSQL `check_database()` helper.
+- Preserved `/`, `/health`, `/api/health`, `/ready`, and `/api/ready`.
+- Added regression tests for the import contract and system routes.
+- Kept the ZIP flat at repository root; no wrapper directory.
+- Removed Python/test cache artifacts from the package.
 
 ## Verification
 
 - Python compilation: PASS
-- Python tests: PASS (21 tests)
-- Reserved SQLAlchemy metadata audit: PASS
-- psycopg2 reference audit: PASS
-- Production secret scan: PASS
-- Render configuration audit: PASS
-- ZIP structure/integrity audit: PASS
+- Static AST parsing: PASS
+- Deployment audit tests: PASS
+- ZIP path safety: PASS
+- Flat repository structure: PASS
+- No `__pycache__`, `.pyc`, or `.pytest_cache`: PASS
+- No production secrets added: PASS
 
-The local environment in this execution session did not have the Next.js CLI installed, so a local Next.js build could not be repeated here. The previously supplied Vercel build log showed the production Next.js build completing successfully.
+## Deployment safety
 
-## Required deployment variables
-
-### Render API
-
-- `DATABASE_URL` — real Neon connection string
-- `REDIS_URL` — Render Key Value/Valkey connection URL
-- `JWT_SECRET` — production secret stored only in Render
-- `CORS_ORIGINS` — Vercel production origin
-- fixed non-secret runtime variables remain defined in `render.yaml`
-
-### Vercel
-
-- `NEXT_PUBLIC_API_URL` — public Render API URL
-
-## Safety
-
-No production Neon database mutation, reset, destructive migration, or credential insertion is performed by this package.
+No Neon database mutation, reset, destructive migration, reseed, or credential insertion is performed by this package.

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .health import check_database, check_redis
+from .health import check_database
 from .routes import auth, organization, rbac, catalog
 
 app = FastAPI(title="LEXA API", version="0.1.2")

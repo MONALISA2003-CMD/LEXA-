@@ -48,3 +48,8 @@ The included `.github/workflows/lexa-zip-extract.yml` expects future implementat
 ### Pre-zip audit
 
 The package must pass the complete local test suite, Python compilation, deployment contract checks, and static reserved-name/dependency audit before packaging.
+
+
+## v0.6.2 deployment correction
+
+This package corrects the v0.6.1 startup import contract: `app.main` imports only the health helper that actually exists (`check_database`). Redis is not probed by the readiness endpoint until a concrete Redis health implementation is introduced.
