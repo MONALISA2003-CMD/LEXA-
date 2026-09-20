@@ -7,7 +7,7 @@ const proxy = fs.readFileSync(new URL('../app/api/lexa/[...path]/route.ts', impo
 
 assert.match(api, /fetch\(`\/api\/lexa\$\{path\}`/);
 assert.match(page, /getProducts/);
-assert.match(page, /Sign in to access your tenant catalog/);
+assert.match(page, /Sign in to manage the authenticated tenant's products/);
 assert.doesNotMatch(page, /PREVIEW-SKU/);
 assert.doesNotMatch(page, /BUILD PREVIEW/);
 assert.match(proxy, /LEXA_API_URL \|\| process\.env\.NEXT_PUBLIC_API_URL/);

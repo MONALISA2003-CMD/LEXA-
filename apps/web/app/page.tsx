@@ -6,8 +6,9 @@ import {
   createStockCount, createTransfer, dispatchTransfer, getAdjustments, getHealth, getInventoryBalances,
   getInventoryIntegrity, getInventoryLedger, getLocations, getReadiness, getStockCounts, getTransfers, getVariantOptions,
   login, postAdjustment, postStockCount, receiveTransfer, register, submitStockCount, updateCountLines,
-  type ApiHealth, type ApiReadiness, type InventoryAdjustment, type InventoryBalance, type InventoryLedger,
-  type Location, type StockCount, type Transfer, type VariantOption,
+  createProduct, createVariant, getBrands, getCategories, getPriceLists, getProducts, getUnits, getVariants,
+  type ApiHealth, type ApiReadiness, type Brand, type Category, type InventoryAdjustment, type InventoryBalance, type InventoryLedger,
+  type Location, type PriceList, type Product, type StockCount, type Transfer, type Unit, type Variant, type VariantOption,
 } from "../lib/api";
 
 const modules = [
@@ -71,6 +72,22 @@ export default function HomePage() {
   const [newWarehouseCode, setNewWarehouseCode] = useState("");
   const [newLocationName, setNewLocationName] = useState("");
   const [newLocationCode, setNewLocationCode] = useState("");
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
+  const [catalogCategories, setCatalogCategories] = useState<Category[]>([]);
+  const [catalogBrands, setCatalogBrands] = useState<Brand[]>([]);
+  const [catalogUnits, setCatalogUnits] = useState<Unit[]>([]);
+  const [catalogPriceLists, setCatalogPriceLists] = useState<PriceList[]>([]);
+  const [catalogVariants, setCatalogVariants] = useState<Variant[]>([]);
+  const [catalogBusy, setCatalogBusy] = useState(false);
+  const [catalogMessage, setCatalogMessage] = useState<string | null>(null);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductCategory, setNewProductCategory] = useState("");
+  const [newProductBrand, setNewProductBrand] = useState("");
+  const [newVariantProduct, setNewVariantProduct] = useState("");
+  const [newVariantName, setNewVariantName] = useState("");
+  const [newVariantSku, setNewVariantSku] = useState("");
+  const [newVariantUnit, setNewVariantUnit] = useState("");
 
   async function refreshSystem() {
     try { const [h, r] = await Promise.all([getHealth(), getReadiness()]); setHealth(h); setReadiness(r); setError(null); }
@@ -85,8 +102,24 @@ export default function HomePage() {
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to load inventory."); }
     finally { setInvBusy(false); }
   }
+  async function refreshCatalog() {
+    if (!token) return;
+    setCatalogBusy(true); setCatalogMessage(null);
+    try {
+      const [products, categories, brands, units, priceLists] = await Promise.all([getProducts(catalogSearch), getCategories(), getBrands(), getUnits(), getPriceLists()]);
+      setCatalogProducts(products.items); setCatalogCategories(categories.items); setCatalogBrands(brands.items); setCatalogUnits(units.items); setCatalogPriceLists(priceLists);
+      const variants = (await Promise.all(products.items.slice(0, 20).map(p => getVariants(p.id)))).flat();
+      setCatalogVariants(variants);
+      if (!newProductCategory && categories.items[0]) setNewProductCategory(categories.items[0].id);
+      if (!newVariantProduct && products.items[0]) setNewVariantProduct(products.items[0].id);
+      if (!newVariantUnit && units.items[0]) setNewVariantUnit(units.items[0].id);
+    } catch (e) { setCatalogMessage(e instanceof Error ? e.message : "Unable to load catalog."); }
+    finally { setCatalogBusy(false); }
+  }
+
   useEffect(() => { refreshSystem(); const saved = window.sessionStorage.getItem("lexa_access_token"); if (saved) setToken(saved); }, []);
   useEffect(() => { if (token && active === "Inventory") refreshInventory(); }, [token, active, invTab, locationFilter]);
+  useEffect(() => { if (token && active === "Products") refreshCatalog(); }, [token, active, catalogSearch]);
 
   const variantMap = useMemo(() => new Map(variants.map(v => [v.id, v])), [variants]);
   const locationMap = useMemo(() => new Map(locations.map(l => [l.id, l])), [locations]);
@@ -97,6 +130,17 @@ export default function HomePage() {
     const out = balances.filter(b => Number(b.available) <= 0).length;
     return { totalUnits, value, low, out };
   }, [balances]);
+
+  async function submitProduct(e: React.FormEvent) {
+    e.preventDefault(); setCatalogMessage(null);
+    try { const p = await createProduct({ name:newProductName, category_id:newProductCategory, brand_id:newProductBrand || null }); setCatalogMessage(`Product ${short(p.id)} created.`); setNewProductName(""); await refreshCatalog(); }
+    catch (e) { setCatalogMessage(e instanceof Error ? e.message : "Product creation failed."); }
+  }
+  async function submitVariant(e: React.FormEvent) {
+    e.preventDefault(); setCatalogMessage(null);
+    try { const v = await createVariant({ product_id:newVariantProduct, name:newVariantName, sku:newVariantSku, base_unit_id:newVariantUnit }); setCatalogMessage(`SKU ${v.sku} created.`); setNewVariantName(""); setNewVariantSku(""); await refreshCatalog(); }
+    catch (e) { setCatalogMessage(e instanceof Error ? e.message : "Variant creation failed."); }
+  }
 
   async function submitAuth(event: React.FormEvent) {
     event.preventDefault(); setAuthError(null); setAuthBusy(true);
@@ -150,12 +194,25 @@ export default function HomePage() {
         </>}
 
         {active === "Inventory" && <InventoryWorkspace token={token} invTab={invTab} setInvTab={setInvTab} locations={locations} variants={variants} balances={balances} ledger={ledger} adjustments={adjustments} counts={counts} transfers={transfers} locationMap={locationMap} variantMap={variantMap} stats={inventoryStats} integrity={integrity} busy={invBusy} message={invMessage} setMessage={setInvMessage} search={stockSearch} setSearch={setStockSearch} locationFilter={locationFilter} setLocationFilter={setLocationFilter} onRefresh={refreshInventory} onAdjustment={submitAdjustment} approveAdjustment={approveAdjustment} postAdjustment={postAdjustment} approveStockCount={approveStockCount} submitStockCount={submitStockCount} postStockCount={postStockCount} approveTransfer={approveTransfer} dispatchTransfer={dispatchTransfer} receiveTransfer={receiveTransfer} completeTransfer={completeTransfer} adjustLocation={adjustLocation} setAdjustLocation={setAdjustLocation} adjustVariant={adjustVariant} setAdjustVariant={setAdjustVariant} adjustQty={adjustQty} setAdjustQty={setAdjustQty} adjustCost={adjustCost} setAdjustCost={setAdjustCost} adjustReason={adjustReason} setAdjustReason={setAdjustReason} act={act} onTransfer={submitTransfer} transferFrom={transferFrom} setTransferFrom={setTransferFrom} transferTo={transferTo} setTransferTo={setTransferTo} transferVariant={transferVariant} setTransferVariant={setTransferVariant} transferQty={transferQty} setTransferQty={setTransferQty} onCount={submitCount} countLocation={countLocation} setCountLocation={setCountLocation} countVariantIds={countVariantIds} setCountVariantIds={setCountVariantIds} selectedCount={selectedCount} setSelectedCount={setSelectedCount} countValues={countValues} setCountValues={setCountValues} saveCount={saveCount} newWarehouseName={newWarehouseName} setNewWarehouseName={setNewWarehouseName} newWarehouseCode={newWarehouseCode} setNewWarehouseCode={setNewWarehouseCode} newLocationName={newLocationName} setNewLocationName={setNewLocationName} newLocationCode={newLocationCode} setNewLocationCode={setNewLocationCode} createWarehouse={createWarehouse} createLocation={createLocation} />}
-        {active !== "Overview" && active !== "Inventory" && <section className="module-page"><span className="tag">WORKSPACE</span><h2>{active}</h2><p>{modules.find(m => m.name === active)?.desc}</p><div className="notice"><strong>Real product domain</strong><p>This workspace is part of the LEXA operating model. Its transactional capabilities will be connected to the same tenant-safe domain layer rather than populated with fake records.</p></div></section>}
+        {active === "Products" && <CatalogWorkspace token={token} products={catalogProducts} categories={catalogCategories} brands={catalogBrands} units={catalogUnits} variants={catalogVariants} priceLists={catalogPriceLists} busy={catalogBusy} message={catalogMessage} search={catalogSearch} setSearch={setCatalogSearch} onRefresh={refreshCatalog} newProductName={newProductName} setNewProductName={setNewProductName} newProductCategory={newProductCategory} setNewProductCategory={setNewProductCategory} newProductBrand={newProductBrand} setNewProductBrand={setNewProductBrand} onProduct={submitProduct} newVariantProduct={newVariantProduct} setNewVariantProduct={setNewVariantProduct} newVariantName={newVariantName} setNewVariantName={setNewVariantName} newVariantSku={newVariantSku} setNewVariantSku={setNewVariantSku} newVariantUnit={newVariantUnit} setNewVariantUnit={setNewVariantUnit} onVariant={submitVariant} />}
+        {active !== "Overview" && active !== "Inventory" && active !== "Products" && <section className="module-page"><span className="tag">WORKSPACE</span><h2>{active}</h2><p>{modules.find(m => m.name === active)?.desc}</p><div className="notice"><strong>Real product domain</strong><p>This workspace is part of the LEXA operating model. Its transactional capabilities will be connected to the same tenant-safe domain layer rather than populated with fake records.</p></div></section>}
       </section>
 
       {authOpen && <div className="modal-backdrop" onClick={() => setAuthOpen(false)}><div className="modal" onClick={e => e.stopPropagation()}><div className="modal-head"><div><p className="eyebrow">WORKSPACE ACCESS</p><h2>{authMode === "login" ? "Sign in to LEXA" : "Create a workspace"}</h2></div><button className="close" onClick={() => setAuthOpen(false)}>×</button></div><div className="tabs"><button className={authMode === "login" ? "selected" : ""} onClick={() => setAuthMode("login")}>Sign in</button><button className={authMode === "register" ? "selected" : ""} onClick={() => setAuthMode("register")}>Create workspace</button></div><form onSubmit={submitAuth}><label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required /></label><label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} required /><small>Minimum 12 characters.</small></label>{authMode === "register" ? <label>Business name<input value={tenantName} onChange={e => setTenantName(e.target.value)} required /></label> : <label>Workspace ID<input value={tenantId} onChange={e => setTenantId(e.target.value)} required /></label>}{authError && <div className="form-error">{authError}</div>}<button className="primary full" disabled={authBusy}>{authBusy ? "Working…" : authMode === "login" ? "Sign in" : "Create workspace"}</button></form></div></div>}
     </main>
   );
+}
+
+type CatalogProps = any;
+function CatalogWorkspace(p: CatalogProps) {
+  if (!p.token) return <section className="module-page"><span className="tag">CATALOG</span><h2>Your product catalog</h2><p>Sign in to manage the authenticated tenant's products, variants, SKUs and pricing foundation.</p><div className="notice"><strong>No demo catalog is shown.</strong><p>Only tenant-owned catalog records are loaded.</p></div></section>;
+  return <>
+    <section className="inventory-summary"><div><span className="eyebrow">CATALOG CONTROL</span><h2>Products and SKUs</h2><p>Tenant-scoped product identity that becomes the foundation for inventory, sales and purchasing.</p></div><div className="inventory-actions"><button className="secondary" onClick={p.onRefresh}>{p.busy ? "Refreshing…" : "Refresh catalog"}</button></div></section>
+    {p.message && <div className="inline-message">{p.message}</div>}
+    <section className="stat-grid"><div className="stat-card"><span>PRODUCTS</span><strong>{p.products.length}</strong><small>Active catalog records loaded</small></div><div className="stat-card"><span>SKUS</span><strong>{p.variants.length}</strong><small>Variant identities loaded</small></div><div className="stat-card"><span>CATEGORIES</span><strong>{p.categories.length}</strong><small>Tenant taxonomy</small></div><div className="stat-card"><span>PRICE LISTS</span><strong>{p.priceLists.length}</strong><small>Commercial pricing sets</small></div></section>
+    <section className="split-panel"><form className="command-form" onSubmit={p.onProduct}><div><p className="eyebrow">NEW PRODUCT</p><h3>Create product identity</h3><p>Product identity is separated from SKU identity.</p></div><label>Name<input value={p.newProductName} onChange={e=>p.setNewProductName(e.target.value)} required /></label><label>Category<select value={p.newProductCategory} onChange={e=>p.setNewProductCategory(e.target.value)} required><option value="">Select category</option>{p.categories.map((x:Category)=><option key={x.id} value={x.id}>{x.name} · {x.code}</option>)}</select></label><label>Brand<select value={p.newProductBrand} onChange={e=>p.setNewProductBrand(e.target.value)}><option value="">No brand</option>{p.brands.map((x:Brand)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><button className="primary">Create product</button></form><form className="command-form" onSubmit={p.onVariant}><div><p className="eyebrow">NEW SKU</p><h3>Add sellable variant</h3><p>Each SKU must belong to a tenant product and valid unit.</p></div><label>Product<select value={p.newVariantProduct} onChange={e=>p.setNewVariantProduct(e.target.value)} required><option value="">Select product</option>{p.products.map((x:Product)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label>Variant name<input value={p.newVariantName} onChange={e=>p.setNewVariantName(e.target.value)} required /></label><label>SKU<input value={p.newVariantSku} onChange={e=>p.setNewVariantSku(e.target.value)} required /></label><label>Base unit<select value={p.newVariantUnit} onChange={e=>p.setNewVariantUnit(e.target.value)} required><option value="">Select unit</option>{p.units.map((x:Unit)=><option key={x.id} value={x.id}>{x.name} ({x.symbol})</option>)}</select></label><button className="primary">Create SKU</button></form></section>
+    <section className="section"><div className="section-head compact"><div><h2>Catalog records</h2><p className="section-sub">Search the live tenant catalog.</p></div><input placeholder="Search products" value={p.search} onChange={e=>p.setSearch(e.target.value)} /></div><div className="table-wrap"><table><thead><tr><th>Product</th><th>Status</th><th>Variants / SKUs</th><th>Category</th><th>Brand</th></tr></thead><tbody>{p.products.length?p.products.map((x:Product)=>{const vars=p.variants.filter((v:Variant)=>v.product_id===x.id);const cat=p.categories.find((c:Category)=>c.id===x.category_id);const brand=p.brands.find((b:Brand)=>b.id===x.brand_id);return <tr key={x.id}><td><strong>{x.name}</strong><small>{short(x.id)}</small></td><td><span className="status good">{x.status}</span></td><td>{vars.length?vars.map((v:Variant)=><span key={v.id} className="movement">{v.sku}</span>):"No SKU yet"}</td><td>{cat?.name||short(x.category_id)}</td><td>{brand?.name||"—"}</td></tr>}):<tr><td colSpan={5}><div className="empty-inline">No products found for this tenant.</div></td></tr>}</tbody></table></div></section>
+  </>;
 }
 
 type InvProps = any;

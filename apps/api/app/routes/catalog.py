@@ -7,13 +7,14 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..catalog import CatalogValidation, emit_event, normalize_code, normalize_text, utc_now, validate_minimum_quantity, validate_price, write_audit
+from ..catalog import CatalogValidation, begin_idempotency, emit_event, finish_idempotency, normalize_code, normalize_text, utc_now, validate_minimum_quantity, validate_price, write_audit
 from ..dependencies import require_permission
 from ..models import (
     Barcode, Brand, Category, PriceList, Product, ProductAttributeDefinition,
@@ -217,13 +218,21 @@ def catalog_lookup(q: str = Query(..., min_length=1), limit: int = Query(20, ge=
     return [{"variant_id": v.id, "product_id": v.product_id, "product_name": product_name, "variant_name": v.name, "sku": v.sku} for v, product_name in rows]
 
 @router.post("/products", response_model=ProductOut, status_code=201)
-def create_product(body: ProductIn, ctx=Depends(require_permission("catalog.manage"))):
+def create_product(body: ProductIn, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("catalog.manage"))):
     db, actor, tenant_id, _ = ctx
+    try:
+        idem, replay = begin_idempotency(db, tenant_id=tenant_id, operation_type="catalog.product.create", key=idempotency_key, payload=body.model_dump(mode="json"))
+    except CatalogValidation as exc:
+        db.rollback(); raise HTTPException(409 if "different" in str(exc) else 422, str(exc)) from exc
+    if replay:
+        return JSONResponse(status_code=replay[0], content=replay[1])
     if not db.scalar(select(Category.id).where(Category.id == body.category_id, Category.tenant_id == tenant_id, Category.deleted_at.is_(None))): raise HTTPException(400, "Category does not belong to tenant")
     if body.brand_id and not db.scalar(select(Brand.id).where(Brand.id == body.brand_id, Brand.tenant_id == tenant_id, Brand.deleted_at.is_(None))): raise HTTPException(400, "Brand does not belong to tenant")
     try: name = normalize_text(body.name, "Product name"); product_type = normalize_code(body.product_type, "Product type")
-    except CatalogValidation as exc: raise HTTPException(422, str(exc)) from exc
-    row = Product(tenant_id=tenant_id, category_id=body.category_id, brand_id=body.brand_id, name=name, description=body.description, product_type=product_type, has_variants=body.has_variants, tax_category_id=body.tax_category_id, product_metadata=body.metadata); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product.created", target_type="product", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductCreated", aggregate_type="product", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "name": name, "category_id": str(body.category_id), "brand_id": str(body.brand_id) if body.brand_id else None}); db.commit(); db.refresh(row); return row
+    except CatalogValidation as exc: db.rollback(); raise HTTPException(422, str(exc)) from exc
+    row = Product(tenant_id=tenant_id, category_id=body.category_id, brand_id=body.brand_id, name=name, description=body.description, product_type=product_type, has_variants=body.has_variants, tax_category_id=body.tax_category_id, product_metadata=body.metadata); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product.created", target_type="product", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductCreated", aggregate_type="product", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "name": name, "category_id": str(body.category_id), "brand_id": str(body.brand_id) if body.brand_id else None});
+    finish_idempotency(db, idem, status_code=201, response_body=ProductOut.model_validate(row).model_dump(mode="json"), resource_type="product", resource_id=row.id)
+    db.commit(); db.refresh(row); return row
 
 @router.patch("/products/{product_id}", response_model=ProductOut)
 def patch_product(product_id: UUID, body: ProductPatch, ctx=Depends(require_permission("catalog.manage"))):
@@ -262,15 +271,23 @@ def product_variants(product_id: UUID, ctx=Depends(require_permission("catalog.r
     return list(db.scalars(select(ProductVariant).where(ProductVariant.product_id == product_id, ProductVariant.tenant_id == tenant_id, ProductVariant.deleted_at.is_(None)).order_by(ProductVariant.id)))
 
 @router.post("/variants", response_model=VariantOut, status_code=201)
-def create_variant(body: VariantIn, ctx=Depends(require_permission("catalog.manage"))):
+def create_variant(body: VariantIn, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("catalog.manage"))):
     db, actor, tenant_id, _ = ctx
+    try:
+        idem, replay = begin_idempotency(db, tenant_id=tenant_id, operation_type="catalog.variant.create", key=idempotency_key, payload=body.model_dump(mode="json"))
+    except CatalogValidation as exc:
+        db.rollback(); raise HTTPException(409 if "different" in str(exc) else 422, str(exc)) from exc
+    if replay:
+        return JSONResponse(status_code=replay[0], content=replay[1])
     if not db.scalar(select(Product.id).where(Product.id == body.product_id, Product.tenant_id == tenant_id, Product.deleted_at.is_(None))): raise HTTPException(400, "Product does not belong to tenant")
     unit = db.scalar(select(Unit).where(Unit.id == body.base_unit_id, (Unit.tenant_id == tenant_id) | (Unit.tenant_id.is_(None))))
     if not unit: raise HTTPException(400, "Unit does not belong to tenant")
     try: name = normalize_text(body.name, "Variant name"); sku = normalize_code(body.sku, "SKU")
-    except CatalogValidation as exc: raise HTTPException(422, str(exc)) from exc
-    if body.allow_fractional_quantity and not unit.allows_fraction: raise HTTPException(422, "Variant cannot allow fractional quantity with a non-fractional base unit")
-    row = ProductVariant(tenant_id=tenant_id, product_id=body.product_id, name=name, sku=sku, base_unit_id=body.base_unit_id, track_inventory=body.track_inventory, allow_fractional_quantity=body.allow_fractional_quantity, costing_method=body.costing_method, variant_metadata=body.metadata); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.variant.created", target_type="product_variant", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductVariantCreated", aggregate_type="product_variant", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "product_id": str(body.product_id), "sku": sku}); commit_or_409(db, "SKU already exists for this tenant"); db.refresh(row); return row
+    except CatalogValidation as exc: db.rollback(); raise HTTPException(422, str(exc)) from exc
+    if body.allow_fractional_quantity and not unit.allows_fraction: db.rollback(); raise HTTPException(422, "Variant cannot allow fractional quantity with a non-fractional base unit")
+    row = ProductVariant(tenant_id=tenant_id, product_id=body.product_id, name=name, sku=sku, base_unit_id=body.base_unit_id, track_inventory=body.track_inventory, allow_fractional_quantity=body.allow_fractional_quantity, costing_method=body.costing_method, variant_metadata=body.metadata); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.variant.created", target_type="product_variant", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductVariantCreated", aggregate_type="product_variant", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "product_id": str(body.product_id), "sku": sku});
+    finish_idempotency(db, idem, status_code=201, response_body=VariantOut.model_validate(row).model_dump(mode="json"), resource_type="product_variant", resource_id=row.id)
+    commit_or_409(db, "SKU already exists for this tenant"); db.refresh(row); return row
 
 @router.patch("/variants/{variant_id}", response_model=VariantOut)
 def patch_variant(variant_id: UUID, body: VariantPatch, ctx=Depends(require_permission("catalog.manage"))):

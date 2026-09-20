@@ -23,6 +23,20 @@ async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
 function key() { return crypto.randomUUID(); }
 export function getHealth(signal?: AbortSignal) { return getJson<ApiHealth>("/health", { signal }); }
 export function getReadiness() { return getJson<ApiReadiness>("/ready"); }
+
+export type Category = { id:string; tenant_id:string; parent_id?:string|null; name:string; code:string; description?:string|null; status:string; sort_order:number };
+export type Brand = { id:string; tenant_id:string; name:string; code?:string|null; description?:string|null; status:string };
+export type Unit = { id:string; tenant_id?:string|null; name:string; code:string; symbol:string; unit_type:string; allows_fraction:boolean; precision_scale:number; is_system:boolean };
+export type PriceList = { id:string; tenant_id:string; name:string; currency:string; price_type:string; status:string; effective_from:string; effective_to?:string|null };
+export type ProductPrice = { id:string; tenant_id:string; price_list_id:string; variant_id:string; unit_price:string; minimum_quantity:string; effective_from:string; effective_to?:string|null };
+export function getCategories() { return getJson<Page<Category>>('/api/v1/catalog/categories?limit=100'); }
+export function getBrands() { return getJson<Page<Brand>>('/api/v1/catalog/brands?limit=100'); }
+export function getUnits() { return getJson<Page<Unit>>('/api/v1/catalog/units?limit=100'); }
+export function createProduct(body: {name:string; category_id:string; brand_id?:string|null; description?:string|null; product_type?:string; has_variants?:boolean}) { return getJson<Product>('/api/v1/catalog/products', { method:'POST', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify(body) }); }
+export function createVariant(body: {product_id:string; name:string; sku:string; base_unit_id:string; track_inventory?:boolean; allow_fractional_quantity?:boolean}) { return getJson<Variant>('/api/v1/catalog/variants', { method:'POST', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify(body) }); }
+export function getPriceLists() { return getJson<PriceList[]>('/api/v1/catalog/price-lists'); }
+export function getPrices(params: {variant_id?:string; price_list_id?:string}={}) { const q=new URLSearchParams(); Object.entries(params).forEach(([k,v])=>v&&q.set(k,v)); return getJson<ProductPrice[]>(`/api/v1/catalog/prices?${q}`); }
+
 export function getProducts(query = "", signal?: AbortSignal) { const params = new URLSearchParams({ limit: "50" }); if (query.trim()) params.set("q", query.trim()); return getJson<Page<Product>>(`/api/v1/catalog/products?${params.toString()}`, { signal }); }
 export function getVariants(productId: string) { return getJson<Variant[]>(`/api/v1/catalog/products/${productId}/variants`); }
 

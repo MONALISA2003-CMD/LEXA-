@@ -284,17 +284,38 @@ class ProductPrice(Base):
 class OutboxEvent(Base):
     __tablename__ = "outbox_events"
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False)
     event_type: Mapped[str] = mapped_column(String(120), nullable=False)
     event_version: Mapped[int] = mapped_column(default=1, nullable=False)
     aggregate_type: Mapped[str] = mapped_column(String(80), nullable=False)
     aggregate_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    payload: Mapped[dict] = mapped_column(JSON, default=dict)
-    actor_user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
-    correlation_id: Mapped[str | None] = mapped_column(String(100))
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    actor_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    correlation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    causation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    idempotency_key: Mapped[str | None] = mapped_column(String(200))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="PENDING", nullable=False)
+    attempt_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class IdempotencyRecord(Base):
+    __tablename__ = "idempotency_records"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    operation_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    response_status: Mapped[int | None] = mapped_column()
+    response_body: Mapped[dict | None] = mapped_column(JSON)
+    resource_type: Mapped[str | None] = mapped_column(String(100))
+    resource_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 class IdempotencyKey(Base):
     __tablename__ = "idempotency_keys"

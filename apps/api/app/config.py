@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str
+    database_app_role: str = ""
     redis_url: str
     jwt_secret: str
     jwt_issuer: str = "lexa"

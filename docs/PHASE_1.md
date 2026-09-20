@@ -32,10 +32,14 @@ This slice extends the Phase 1 foundation without resetting or deleting existing
 - Composite tenant foreign keys are added for branch/warehouse/location/POS relationships where cross-tenant references are a risk.
 - RLS is enabled for devices and sessions as well as the existing tenant-owned tables.
 
-## Still pending before Phase 1 can be called complete
-- Run the migrations and full integration suite against a real PostgreSQL instance.
-- Add explicit RLS integration tests proving tenant A cannot read/write tenant B rows.
+## Neon Phase 1 implementation status
+
+The LEXA Neon development branch now contains the Phase 1 database/security foundation, including forced RLS, the restricted `lexa_app` role, audit protection, idempotency records, transactional outbox, and event-consumption records. See `docs/PHASE_1_NEON_STATUS.md` for the exact branch and verification record.
+
+## Still pending before Phase 1 is production-ready
+- Run the application itself against the LEXA development branch in a connected integration environment.
 - Add Alembic environment/revision integration and migration CI checks.
 - Add richer user/membership management APIs and session/device management endpoints.
 - Add audit/outbox service boundaries for critical writes.
-- Continue into Catalog foundation after the identity/organization boundary is verified.
+- Review and execute the controlled production migration procedure.
+- Continue into Catalog/Inventory hardening only after the foundation gate is accepted.
