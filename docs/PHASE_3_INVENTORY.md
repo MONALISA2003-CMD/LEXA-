@@ -1,3 +1,5 @@
+> **Release status:** Inventory source implementation is present for the next LEXA product phase. The inventory database migration is not applied as part of Experience Foundation v1.4.0, so this phase is not treated as deployed in that release.
+
 # LEXA Phase 3 — Inventory Foundation
 
 This phase adds the real inventory transaction layer to the existing LEXA implementation.

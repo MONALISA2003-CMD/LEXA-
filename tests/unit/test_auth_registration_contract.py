@@ -50,14 +50,12 @@ def test_registration_hardening_migration_is_additive():
     assert "TRUNCATE" not in source.upper()
 
 
-def test_proxy_forwards_request_id():
+def test_proxy_keeps_internal_diagnostics_out_of_browser_responses():
     proxy = ROOT / "apps/web/app/api/lexa/[...path]/route.ts"
     source = proxy.read_text()
-    assert 'response.headers.get("x-request-id")' in source
-    assert 'out.headers.set("x-request-id", responseRequestId)' in source
+    assert 'response.headers.get("x-request-id")' not in source
+    assert 'out.headers.set("x-request-id", responseRequestId)' not in source
+    assert 'response.status >= 500' in source
+    assert 'LEXA is temporarily unavailable. Please try again shortly.' in source
 
 
-def test_frontend_surfaces_request_id_on_api_errors():
-    source = API.read_text()
-    assert 'response.headers.get("x-request-id")' in source
-    assert "Request ID" in source

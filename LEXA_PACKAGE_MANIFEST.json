@@ -1,27 +1,24 @@
 {
-  "package": "LEXA Workspace Registration + Runtime Hardening",
-  "version": "1.3.0",
+  "package": "LEXA Experience Foundation + Workspace Authentication",
+  "version": "1.4.0",
   "layout": "repository-root",
   "changes": [
-    "Hardened catalog schema on the LEXA development branch",
-    "Added database-enforced tenant consistency across catalog references",
-    "Added category hierarchy cycle protection",
-    "Added database-enforced unit/fraction rules",
-    "Added database-enforced temporal price overlap protection",
-    "Forced RLS across catalog tables and hardened system-unit access",
-    "Synchronized ORM outbox model with the deployed Phase 1 outbox contract",
-    "Added catalog idempotency records and product/variant idempotent creation",
-    "Connected the Products workspace to live tenant catalog APIs",
-    "Verified production branch remained untouched",
-    "workspace registration bootstrap now creates business_profiles",
-    "pre-tenant registration idempotency and replay protection",
-    "workspace creation audit and transactional outbox event",
-    "request ID propagation from FastAPI through Vercel proxy to frontend errors",
-    "registration hardening migration 008",
-    "registration now uses validated middleware request ID as outbox correlation ID",
-    "outbox correlation parsing now tolerates non-UUID external request IDs without failing workspace creation",
-    "registration failures emit structured server logs keyed by request ID",
-    "registration database and unexpected failure responses include stable error codes and request IDs"
+    "Rebuilt the public LEXA landing experience around the supplied brand identity",
+    "Added LEXA mark, wordmark and browser icon assets",
+    "Added responsive authenticated workspace shell with desktop sidebar and mobile navigation",
+    "Added branded sign-in and create-workspace flows",
+    "Removed workspace ID entry from normal sign-in",
+    "Added automatic workspace resolution for single-workspace accounts",
+    "Added workspace picker for multi-workspace accounts",
+    "Added friendly frontend error normalization for authentication and service failures",
+    "Removed developer-facing infrastructure diagnostics from the customer-facing frontend",
+    "Updated browser metadata and favicon assets to the LEXA brand",
+    "Added workspace registration hardening migration 008",
+    "Added workspace selection migration 009",
+    "Applied and verified migrations 008 and 009 on the LEXA development branch",
+    "Verified the LEXA production branch remained untouched",
+    "Kept existing catalog functionality connected to tenant-scoped live APIs",
+    "Kept the existing inventory implementation in source for the subsequent product phase without deploying its database migration"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -30,5 +27,5 @@
   "database_reset": false,
   "seed_reset": false,
   "product_deletion": false,
-  "description": "Deep LEXA registration and runtime hardening. Production remains isolated; deployment still requires the corrected source to be shipped to the live Vercel/Render stack."
+  "description": "LEXA customer experience and workspace authentication foundation. Development database changes are limited to additive migrations 008 and 009; the production branch remains isolated."
 }

@@ -35,7 +35,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
-    tenant_id: UUID
+    tenant_id: UUID | None = None
     device_key: str | None = None
     device_name: str | None = None
     platform: str | None = None
@@ -195,22 +195,70 @@ def register(
 
 
 @router.post("/login")
-def login(body: LoginRequest, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.email == body.email.lower()))
-    db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(body.tenant_id)})
-    membership = None if not user else db.scalar(select(TenantMembership).where(TenantMembership.user_id == user.id, TenantMembership.tenant_id == body.tenant_id, TenantMembership.status == "ACTIVE"))
-    if not user or not membership or not user.is_active or not verify_password(body.password, user.password_hash):
+def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    email = body.email.lower().strip()
+    user = db.scalar(select(User).where(User.email == email))
+    if not user or not user.is_active or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "Invalid credentials")
+
+    tenant_id = body.tenant_id
+    if tenant_id is None:
+        rows = db.execute(
+            text("SELECT tenant_id, tenant_name, membership_id FROM public.lexa_list_user_workspaces(:user_id)"),
+            {"user_id": str(user.id)},
+        ).mappings().all()
+        if len(rows) == 0:
+            raise HTTPException(401, "Invalid credentials")
+        if len(rows) > 1:
+            raise HTTPException(409, detail={
+                "code": "WORKSPACE_SELECTION_REQUIRED",
+                "message": "Choose a workspace to continue",
+                "workspaces": [
+                    {"tenant_id": str(row["tenant_id"]), "tenant_name": row["tenant_name"]}
+                    for row in rows
+                ],
+            })
+        tenant_id = UUID(str(rows[0]["tenant_id"]))
+
+    request_id = getattr(request.state, "request_id", None) or "untracked"
+    db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant_id)})
+    membership = db.scalar(
+        select(TenantMembership).where(
+            TenantMembership.user_id == user.id,
+            TenantMembership.tenant_id == tenant_id,
+            TenantMembership.status == "ACTIVE",
+        )
+    )
+    if not membership:
+        raise HTTPException(401, "Invalid credentials")
+
     device = None
     if body.device_key:
-        device = db.scalar(select(Device).where(Device.tenant_id == body.tenant_id, Device.device_key == body.device_key))
+        device = db.scalar(select(Device).where(Device.tenant_id == tenant_id, Device.device_key == body.device_key))
         if not device:
-            device = Device(tenant_id=body.tenant_id, user_id=user.id, device_key=body.device_key, name=body.device_name, platform=body.platform)
-            db.add(device); db.flush()
+            device = Device(tenant_id=tenant_id, user_id=user.id, device_key=body.device_key, name=body.device_name, platform=body.platform)
+            db.add(device)
+            db.flush()
     refresh = new_refresh_token()
-    session = AuthSession(tenant_id=body.tenant_id, user_id=user.id, device_id=device.id if device else None, refresh_token_hash=hash_refresh_token(refresh), expires_at=datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_days))
-    db.add(session); db.commit()
-    return {"access_token": create_access_token(user.id, body.tenant_id, session.id), "refresh_token": refresh, "token_type": "bearer", "session_id": session.id}
+    session = AuthSession(
+        tenant_id=tenant_id,
+        user_id=user.id,
+        device_id=device.id if device else None,
+        refresh_token_hash=hash_refresh_token(refresh),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_days),
+    )
+    db.add(session)
+    db.commit()
+    logger.info("workspace_login_success", extra={"request_id": request_id, "tenant_id": str(tenant_id)})
+    tenant = db.get(Tenant, tenant_id)
+    return {
+        "access_token": create_access_token(user.id, tenant_id, session.id),
+        "refresh_token": refresh,
+        "token_type": "bearer",
+        "session_id": session.id,
+        "tenant_id": str(tenant_id),
+        "tenant_name": tenant.name if tenant else "Your workspace",
+    }
 
 
 @router.post("/refresh")

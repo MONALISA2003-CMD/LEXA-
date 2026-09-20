@@ -8,7 +8,7 @@ import {
   login, postAdjustment, postStockCount, receiveTransfer, register, submitStockCount, updateCountLines,
   createProduct, createVariant, getBrands, getCategories, getPriceLists, getProducts, getUnits, getVariants,
   type ApiHealth, type ApiReadiness, type Brand, type Category, type InventoryAdjustment, type InventoryBalance, type InventoryLedger,
-  type Location, type PriceList, type Product, type StockCount, type Transfer, type Unit, type Variant, type VariantOption,
+  type Location, type PriceList, type Product, type StockCount, type Transfer, type Unit, type Variant, type VariantOption, type WorkspaceChoice, WorkspaceSelectionError,
 } from "../lib/api";
 
 const modules = [
@@ -31,13 +31,15 @@ function short(id: string) { return `${id.slice(0, 8)}…`; }
 export default function HomePage() {
   const [health, setHealth] = useState<ApiHealth | null>(null);
   const [readiness, setReadiness] = useState<ApiReadiness | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [active, setActive] = useState("Overview");
   const [token, setToken] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
+  const [authWorkspaces, setAuthWorkspaces] = useState<WorkspaceChoice[]>([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [tenantId, setTenantId] = useState("");
@@ -117,7 +119,7 @@ export default function HomePage() {
     finally { setCatalogBusy(false); }
   }
 
-  useEffect(() => { refreshSystem(); const saved = window.sessionStorage.getItem("lexa_access_token"); if (saved) setToken(saved); }, []);
+  useEffect(() => { refreshSystem(); const saved = window.sessionStorage.getItem("lexa_access_token"); const savedWorkspace = window.sessionStorage.getItem("lexa_workspace_id"); if (saved) setToken(saved); if (savedWorkspace) setTenantId(savedWorkspace); }, []);
   useEffect(() => { if (token && active === "Inventory") refreshInventory(); }, [token, active, invTab, locationFilter]);
   useEffect(() => { if (token && active === "Products") refreshCatalog(); }, [token, active, catalogSearch]);
 
@@ -145,11 +147,34 @@ export default function HomePage() {
   async function submitAuth(event: React.FormEvent) {
     event.preventDefault(); setAuthError(null); setAuthBusy(true);
     try {
-      let tid = tenantId;
-      if (authMode === "register") { const created = await register({ email, password, tenant_name: tenantName }); tid = created.tenant_id; setTenantId(tid); }
+      let tid = tenantId || undefined;
+      if (authMode === "register") {
+        const created = await register({ email, password, tenant_name: tenantName });
+        tid = created.tenant_id;
+        setTenantId(created.tenant_id);
+        window.sessionStorage.setItem("lexa_workspace_id", created.tenant_id);
+      }
       const session = await login({ email, password, tenant_id: tid });
-      window.sessionStorage.setItem("lexa_access_token", session.access_token); setToken(session.access_token); setAuthOpen(false); setActive("Overview");
-    } catch (e) { setAuthError(e instanceof Error ? e.message : "Authentication failed."); }
+      window.sessionStorage.setItem("lexa_access_token", session.access_token);
+      window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
+      setTenantId(session.tenant_id); setTenantName(session.tenant_name);
+      setToken(session.access_token); setAuthOpen(false); setAuthWorkspaces([]); setActive("Overview");
+    } catch (e) {
+      if (e instanceof WorkspaceSelectionError) { setAuthWorkspaces(e.workspaces); setAuthError("Choose a workspace to continue."); }
+      else { setAuthError(e instanceof Error ? e.message : "We couldn't sign you in. Please try again."); }
+    } finally { setAuthBusy(false); }
+  }
+  async function chooseWorkspace(workspaceId: string) {
+    setAuthBusy(true); setAuthError(null);
+    try {
+      const session = await login({ email, password, tenant_id: workspaceId });
+      setTenantId(workspaceId);
+      window.sessionStorage.setItem("lexa_workspace_id", workspaceId);
+      window.sessionStorage.setItem("lexa_access_token", session.access_token);
+      window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
+      setTenantId(session.tenant_id); setTenantName(session.tenant_name);
+      setToken(session.access_token); setAuthOpen(false); setAuthWorkspaces([]); setActive("Overview");
+    } catch (e) { setAuthError(e instanceof Error ? e.message : "We couldn't open that workspace. Please try again."); }
     finally { setAuthBusy(false); }
   }
   function signOut() { window.sessionStorage.removeItem("lexa_access_token"); setToken(null); setBalances([]); setLocations([]); setVariants([]); setActive("Overview"); }
@@ -177,47 +202,116 @@ export default function HomePage() {
     catch (e) { setInvMessage(e instanceof Error ? e.message : "Unable to save count."); }
   }
 
+  const logo = <img className="lexa-logo" src="/lexa-wordmark.png" alt="LEXA" />;
+  const mark = <img className="lexa-mark" src="/lexa-mark.png" alt="" aria-hidden="true" />;
+  const activeDescription = modules.find(item => item.name === active)?.desc || "Business operations";
+
+  if (!token) {
+    return (
+      <main className="public-page">
+        <header className="public-header">
+          <a href="#top" className="public-brand" aria-label="LEXA home">{logo}</a>
+          <nav className="public-nav" aria-label="Primary navigation">
+            <a href="#platform">Platform</a><a href="#capabilities">Capabilities</a><a href="#intelligence">Intelligence</a>
+          </nav>
+          <button className="button button-dark" onClick={() => { setAuthMode("login"); setAuthOpen(true); }}>Sign in</button>
+        </header>
+
+        <section className="public-hero" id="top">
+          <div className="hero-copy">
+            <div className="hero-kicker"><span className="kicker-dot" /> Business operating system</div>
+            <h1>Run your business from one intelligent place.</h1>
+            <p>LEXA brings products, inventory, sales, purchasing, customers, reporting and business intelligence into a single workspace built for growing businesses.</p>
+            <div className="hero-actions"><button className="button button-dark button-large" onClick={() => { setAuthMode("register"); setAuthOpen(true); }}>Create your workspace</button><a className="text-link" href="#platform">See how it works <span>→</span></a></div>
+            <div className="hero-trust"><span>One workspace</span><span>Clear operations</span><span>Built to scale</span></div>
+          </div>
+          <div className="hero-visual" aria-label="LEXA workspace preview">
+            <div className="preview-window">
+              <div className="preview-top"><div className="preview-brand">{mark}<span>LEXA</span></div><span className="preview-status"><i /> Workspace ready</span></div>
+              <div className="preview-grid">
+                <div className="preview-side"><span className="side-active">Overview</span><span>Products</span><span>Inventory</span><span>Sales</span><span>Purchasing</span><span>Reports</span></div>
+                <div className="preview-main"><div className="preview-title"><span>Business command center</span><b>Today</b></div><div className="preview-metrics"><div><small>Products</small><strong>Catalog</strong><em>Organise your range</em></div><div><small>Inventory</small><strong>Stock</strong><em>Track every movement</em></div><div><small>Sales</small><strong>Orders</strong><em>Keep revenue visible</em></div></div><div className="preview-chart"><div className="chart-head"><span>Business activity</span><small>Live workspace</small></div><div className="bars"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div></div></div>
+              </div>
+            </div>
+            <div className="floating-card floating-card-a"><span>Stock control</span><strong>Everything in one view</strong></div>
+            <div className="floating-card floating-card-b"><span>LEXA Intelligence</span><strong>Turn data into action</strong></div>
+          </div>
+        </section>
+
+        <section className="platform-section" id="platform">
+          <div className="section-intro"><span className="section-label">THE PLATFORM</span><h2>Everything your team needs to keep the business moving.</h2><p>Each area works together so your people can act from the same information, instead of stitching separate tools together.</p></div>
+          <div className="capability-grid" id="capabilities">
+            {modules.slice(1, 7).map((item, index) => <article className="capability-card" key={item.name}><span className="capability-index">0{index + 1}</span><h3>{item.name}</h3><p>{item.desc}.</p><span className="capability-arrow">↗</span></article>)}
+          </div>
+        </section>
+
+        <section className="intelligence-section" id="intelligence">
+          <div className="intelligence-copy"><span className="section-label">LEXA INTELLIGENCE</span><h2>From business data to useful decisions.</h2><p>LEXA is designed to help teams see what is happening, understand why it matters and act with confidence. Intelligence sits alongside day to day operations rather than apart from them.</p><div className="intelligence-points"><span><b>01</b> Understand performance</span><span><b>02</b> Spot opportunities and risks</span><span><b>03</b> Turn insight into action</span></div></div>
+          <div className="intelligence-card"><div className="intelligence-top"><span>{mark}</span><div><strong>LEXA Intelligence</strong><small>Your business, clearly explained.</small></div></div><div className="insight"><span>INSIGHT</span><strong>Inventory movement is changing across your active locations.</strong><p>See the products, locations and time periods behind the change.</p></div><div className="insight-row"><span>Business signal</span><b>Ready for review</b></div><div className="insight-row"><span>Next step</span><b>Open Inventory</b></div></div>
+        </section>
+
+        <section className="public-cta"><div><span className="section-label">LEXA</span><h2>Give your business one place to operate.</h2><p>Create a workspace and bring the day to day together.</p></div><button className="button button-light button-large" onClick={() => { setAuthMode("register"); setAuthOpen(true); }}>Create your workspace</button></section>
+        <footer className="public-footer"><div className="footer-brand">{logo}</div><p>Business operations, connected.</p><span>© {new Date().getFullYear()} LEXA</span></footer>
+
+        {authOpen && <AuthModal authMode={authMode} setAuthMode={(mode) => { setAuthMode(mode); setAuthError(null); setAuthWorkspaces([]); }} email={email} setEmail={setEmail} password={password} setPassword={setPassword} tenantName={tenantName} setTenantName={setTenantName} authError={authError} authBusy={authBusy} onSubmit={submitAuth} onClose={() => { setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); }} workspaces={authWorkspaces} onChooseWorkspace={chooseWorkspace} />}
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">L</span><div><strong>LEXA</strong><small>Business Operating System</small></div></div>
-        <nav aria-label="Main navigation">{modules.map(item => <button key={item.name} className={`nav-item ${active === item.name ? "active" : ""}`} onClick={() => setActive(item.name)}><span>{item.name}</span></button>)}</nav>
-        <div className="sidebar-note"><strong>One platform. Many businesses.</strong><p>Tenant-isolated operations for different business models, categories and workflows.</p></div>
+      <aside className={`sidebar ${mobileMenuOpen ? "open" : ""}`}>
+        <div className="sidebar-brand"><a href="#" className="sidebar-brand-link" onClick={(e) => { e.preventDefault(); setActive("Overview"); setMobileMenuOpen(false); }}><img className="lexa-sidebar-mark" src="/lexa-mark.png" alt="LEXA" /><span>LEXA</span></a><button className="mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">×</button></div>
+        <div className="sidebar-workspace"><span className="workspace-avatar">{tenantName ? tenantName.slice(0, 1).toUpperCase() : "L"}</span><div><strong>{tenantName || "Your workspace"}</strong><small>Business workspace</small></div></div>
+        <nav className="sidebar-nav" aria-label="Workspace navigation">{modules.map(item => <button key={item.name} className={`sidebar-item ${active === item.name ? "active" : ""}`} onClick={() => { setActive(item.name); setMobileMenuOpen(false); }}><span className="sidebar-icon"><NavIcon name={item.name} /></span><span className="sidebar-text"><b>{item.name}</b><small>{item.desc}</small></span></button>)}</nav>
+        <div className="sidebar-bottom"><div className="sidebar-note"><span className="note-dot" /><div><strong>{health && readiness?.status === "ready" ? "Workspace ready" : "We're updating your workspace"}</strong><p>{health && readiness?.status === "ready" ? "Your business tools are ready to use." : "Please give us a moment, then refresh."}</p></div></div><button className="sidebar-account" onClick={signOut}><span className="avatar-small">{email.slice(0,1).toUpperCase() || "L"}</span><span><b>{email || "Account"}</b><small>Sign out</small></span></button></div>
       </aside>
+
       <section className="workspace">
-        <header className="topbar"><div><p className="eyebrow">LEXA / {active.toUpperCase()}</p><h1>{active === "Overview" ? "Business command center" : active}</h1></div><div className="top-actions"><button className="secondary" onClick={active === "Inventory" ? refreshInventory : refreshSystem}>Refresh</button>{token ? <button className="secondary" onClick={signOut}>Sign out</button> : <button className="primary" onClick={() => setAuthOpen(true)}>Sign in</button>}</div></header>
-        <div className="connection-strip"><span className={`pulse ${health ? "good" : "bad"}`} /><div><strong>{health ? "LEXA services online" : "Connection unavailable"}</strong><span>{readiness?.dependencies?.database === "ok" ? "Business database ready" : readiness?.database_error_type ? `Database: ${readiness.database_error_type}` : "Checking business services"}</span></div>{error && <span className="connection-error">{error}</span>}</div>
+        <header className="workspace-header"><button className="mobile-menu" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">☰</button><div><span className="workspace-breadcrumb">LEXA · {active}</span><h1>{active === "Overview" ? "Business command center" : active}</h1><p>{activeDescription}</p></div><div className="header-actions"><button className="button button-soft" onClick={active === "Inventory" ? refreshInventory : active === "Products" ? refreshCatalog : refreshSystem}>Refresh</button><button className="button button-dark desktop-only" onClick={signOut}>Sign out</button></div></header>
+        <div className={`workspace-banner ${health && readiness?.status === "ready" ? "positive" : "attention"}`}><span className="banner-icon">{health && readiness?.status === "ready" ? "✓" : "i"}</span><div><strong>{health && readiness?.status === "ready" ? "Everything is ready" : "Your workspace is taking a moment to connect"}</strong><p>{health && readiness?.status === "ready" ? "You can move between your business areas and keep work moving." : "Refresh in a moment. Your workspace and information remain safe."}</p></div></div>
 
         {active === "Overview" && <>
-          <section className="hero-grid"><article className="hero-card"><span className="tag">OPERATING SYSTEM</span><h2>Run the business on trusted operational data.</h2><p>LEXA is a real multi-purpose, multi-tenant SaaS platform. Each tenant operates its own business data, workflows and permissions while sharing the same product foundation.</p><div className="architecture"><span>Catalog</span><b>→</b><span>Inventory</span><b>→</b><span>Sales</span><b>→</b><span>Purchasing</span><b>→</b><span>Analytics</span><b>→</b><span>Intelligence</span></div></article><article className="metric-card"><span>SERVICES</span><strong>{health ? "Online" : "Offline"}</strong><small>LEXA API</small></article><article className="metric-card"><span>DATA</span><strong>{readiness?.dependencies?.database === "ok" ? "Ready" : "Checking"}</strong><small>Transactional database</small></article><article className="metric-card"><span>WORKSPACE</span><strong>{token ? "Active" : "Guest"}</strong><small>{token ? "Tenant session" : "Sign in to operate"}</small></article></section>
-          <section className="section"><div className="section-head"><div><p className="eyebrow">WORKSPACES</p><h2>Operate every part of the business</h2></div></div><div className="cards-grid">{modules.slice(1).map(item => <button className="module-card" key={item.name} onClick={() => setActive(item.name)}><h3>{item.name}</h3><p>{item.desc}</p><span>Open →</span></button>)}</div></section>
+          <section className="command-hero"><div><span className="section-label">YOUR WORKSPACE</span><h2>One place for the work that keeps your business moving.</h2><p>Use the areas below to manage products, stock, sales, purchasing, customers and reports. LEXA keeps the pieces connected as your business grows.</p><div className="hero-quick-actions"><button className="button button-dark" onClick={() => setActive("Products")}>Manage products</button><button className="button button-soft" onClick={() => setActive("Inventory")}>Open inventory</button></div></div><div className="command-orbit"><div className="orbit-core">{mark}<span>LEXA</span></div><div className="orbit-item orbit-a">Products</div><div className="orbit-item orbit-b">Inventory</div><div className="orbit-item orbit-c">Sales</div><div className="orbit-item orbit-d">Insights</div></div></section>
+          <section className="workspace-section"><div className="section-head"><div><span className="section-label">YOUR BUSINESS</span><h2>Workspaces that stay connected</h2></div></div><div className="module-grid">{modules.slice(1).map(item => <button className="module-tile" key={item.name} onClick={() => setActive(item.name)}><span className="tile-icon"><NavIcon name={item.name} /></span><div><h3>{item.name}</h3><p>{item.desc}.</p></div><span className="tile-arrow">→</span></button>)}</div></section>
+          <section className="workspace-section two-column"><div className="insight-panel"><span className="section-label">LEXA INTELLIGENCE</span><h2>Insight beside the work.</h2><p>As your workspace grows, intelligence can help your team understand movement, spot patterns and prepare the next action.</p><button className="button button-dark" onClick={() => setActive("LEXA Intelligence")}>Open Intelligence</button></div><div className="trust-panel"><span className="section-label">BUILT AROUND YOUR BUSINESS</span><div className="trust-items"><div><strong>Shared information</strong><span>Keep teams working from the same business picture.</span></div><div><strong>Clear permissions</strong><span>Give each person the right access for their role.</span></div><div><strong>Ready to grow</strong><span>Add products, locations and workflows as you expand.</span></div></div></div></section>
         </>}
-
         {active === "Inventory" && <InventoryWorkspace token={token} invTab={invTab} setInvTab={setInvTab} locations={locations} variants={variants} balances={balances} ledger={ledger} adjustments={adjustments} counts={counts} transfers={transfers} locationMap={locationMap} variantMap={variantMap} stats={inventoryStats} integrity={integrity} busy={invBusy} message={invMessage} setMessage={setInvMessage} search={stockSearch} setSearch={setStockSearch} locationFilter={locationFilter} setLocationFilter={setLocationFilter} onRefresh={refreshInventory} onAdjustment={submitAdjustment} approveAdjustment={approveAdjustment} postAdjustment={postAdjustment} approveStockCount={approveStockCount} submitStockCount={submitStockCount} postStockCount={postStockCount} approveTransfer={approveTransfer} dispatchTransfer={dispatchTransfer} receiveTransfer={receiveTransfer} completeTransfer={completeTransfer} adjustLocation={adjustLocation} setAdjustLocation={setAdjustLocation} adjustVariant={adjustVariant} setAdjustVariant={setAdjustVariant} adjustQty={adjustQty} setAdjustQty={setAdjustQty} adjustCost={adjustCost} setAdjustCost={setAdjustCost} adjustReason={adjustReason} setAdjustReason={setAdjustReason} act={act} onTransfer={submitTransfer} transferFrom={transferFrom} setTransferFrom={setTransferFrom} transferTo={transferTo} setTransferTo={setTransferTo} transferVariant={transferVariant} setTransferVariant={setTransferVariant} transferQty={transferQty} setTransferQty={setTransferQty} onCount={submitCount} countLocation={countLocation} setCountLocation={setCountLocation} countVariantIds={countVariantIds} setCountVariantIds={setCountVariantIds} selectedCount={selectedCount} setSelectedCount={setSelectedCount} countValues={countValues} setCountValues={setCountValues} saveCount={saveCount} newWarehouseName={newWarehouseName} setNewWarehouseName={setNewWarehouseName} newWarehouseCode={newWarehouseCode} setNewWarehouseCode={setNewWarehouseCode} newLocationName={newLocationName} setNewLocationName={setNewLocationName} newLocationCode={newLocationCode} setNewLocationCode={setNewLocationCode} createWarehouse={createWarehouse} createLocation={createLocation} />}
         {active === "Products" && <CatalogWorkspace token={token} products={catalogProducts} categories={catalogCategories} brands={catalogBrands} units={catalogUnits} variants={catalogVariants} priceLists={catalogPriceLists} busy={catalogBusy} message={catalogMessage} search={catalogSearch} setSearch={setCatalogSearch} onRefresh={refreshCatalog} newProductName={newProductName} setNewProductName={setNewProductName} newProductCategory={newProductCategory} setNewProductCategory={setNewProductCategory} newProductBrand={newProductBrand} setNewProductBrand={setNewProductBrand} onProduct={submitProduct} newVariantProduct={newVariantProduct} setNewVariantProduct={setNewVariantProduct} newVariantName={newVariantName} setNewVariantName={setNewVariantName} newVariantSku={newVariantSku} setNewVariantSku={setNewVariantSku} newVariantUnit={newVariantUnit} setNewVariantUnit={setNewVariantUnit} onVariant={submitVariant} />}
-        {active !== "Overview" && active !== "Inventory" && active !== "Products" && <section className="module-page"><span className="tag">WORKSPACE</span><h2>{active}</h2><p>{modules.find(m => m.name === active)?.desc}</p><div className="notice"><strong>Real product domain</strong><p>This workspace is part of the LEXA operating model. Its transactional capabilities will be connected to the same tenant-safe domain layer rather than populated with fake records.</p></div></section>}
+        {active !== "Overview" && active !== "Inventory" && active !== "Products" && <section className="module-page"><div className="module-hero-icon"><NavIcon name={active} /></div><span className="section-label">LEXA WORKSPACE</span><h2>{active}</h2><p>{activeDescription}.</p><div className="module-ready-card"><div><strong>{active === "LEXA Intelligence" ? "See more in less time." : "Built for practical work."}</strong><p>{active === "Sales" ? "Keep sales, payments and returns together." : active === "Purchasing" ? "Keep suppliers, orders and receiving organised." : active === "Customers" ? "Keep relationships, notes and credit visible." : active === "Reports" ? "Bring operational and financial insight together." : "Your workspace keeps the next step close at hand."}</p></div><button className="button button-dark" onClick={() => setActive("Overview")}>Back to overview</button></div></section>}
       </section>
 
-      {authOpen && <div className="modal-backdrop" onClick={() => setAuthOpen(false)}><div className="modal" onClick={e => e.stopPropagation()}><div className="modal-head"><div><p className="eyebrow">WORKSPACE ACCESS</p><h2>{authMode === "login" ? "Sign in to LEXA" : "Create a workspace"}</h2></div><button className="close" onClick={() => setAuthOpen(false)}>×</button></div><div className="tabs"><button className={authMode === "login" ? "selected" : ""} onClick={() => setAuthMode("login")}>Sign in</button><button className={authMode === "register" ? "selected" : ""} onClick={() => setAuthMode("register")}>Create workspace</button></div><form onSubmit={submitAuth}><label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required /></label><label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} required /><small>Minimum 12 characters.</small></label>{authMode === "register" ? <label>Business name<input value={tenantName} onChange={e => setTenantName(e.target.value)} required /></label> : <label>Workspace ID<input value={tenantId} onChange={e => setTenantId(e.target.value)} required /></label>}{authError && <div className="form-error">{authError}</div>}<button className="primary full" disabled={authBusy}>{authBusy ? "Working…" : authMode === "login" ? "Sign in" : "Create workspace"}</button></form></div></div>}
+      <nav className="mobile-nav" aria-label="Mobile navigation">{modules.slice(0, 4).map(item => <button key={item.name} className={active === item.name ? "active" : ""} onClick={() => setActive(item.name)}><NavIcon name={item.name} /><span>{item.name}</span></button>)}<button onClick={() => setMobileMenuOpen(true)}><span className="more-icon">•••</span><span>More</span></button></nav>
+
+      {authOpen && <AuthModal authMode={authMode} setAuthMode={(mode) => { setAuthMode(mode); setAuthError(null); setAuthWorkspaces([]); }} email={email} setEmail={setEmail} password={password} setPassword={setPassword} tenantName={tenantName} setTenantName={setTenantName} authError={authError} authBusy={authBusy} onSubmit={submitAuth} onClose={() => { setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); }} workspaces={authWorkspaces} onChooseWorkspace={chooseWorkspace} />}
     </main>
   );
 }
 
-type CatalogProps = any;
-function CatalogWorkspace(p: CatalogProps) {
-  if (!p.token) return <section className="module-page"><span className="tag">CATALOG</span><h2>Your product catalog</h2><p>Sign in to manage the authenticated tenant's products, variants, SKUs and pricing foundation.</p><div className="notice"><strong>No demo catalog is shown.</strong><p>Only tenant-owned catalog records are loaded.</p></div></section>;
-  return <>
-    <section className="inventory-summary"><div><span className="eyebrow">CATALOG CONTROL</span><h2>Products and SKUs</h2><p>Tenant-scoped product identity that becomes the foundation for inventory, sales and purchasing.</p></div><div className="inventory-actions"><button className="secondary" onClick={p.onRefresh}>{p.busy ? "Refreshing…" : "Refresh catalog"}</button></div></section>
-    {p.message && <div className="inline-message">{p.message}</div>}
-    <section className="stat-grid"><div className="stat-card"><span>PRODUCTS</span><strong>{p.products.length}</strong><small>Active catalog records loaded</small></div><div className="stat-card"><span>SKUS</span><strong>{p.variants.length}</strong><small>Variant identities loaded</small></div><div className="stat-card"><span>CATEGORIES</span><strong>{p.categories.length}</strong><small>Tenant taxonomy</small></div><div className="stat-card"><span>PRICE LISTS</span><strong>{p.priceLists.length}</strong><small>Commercial pricing sets</small></div></section>
-    <section className="split-panel"><form className="command-form" onSubmit={p.onProduct}><div><p className="eyebrow">NEW PRODUCT</p><h3>Create product identity</h3><p>Product identity is separated from SKU identity.</p></div><label>Name<input value={p.newProductName} onChange={e=>p.setNewProductName(e.target.value)} required /></label><label>Category<select value={p.newProductCategory} onChange={e=>p.setNewProductCategory(e.target.value)} required><option value="">Select category</option>{p.categories.map((x:Category)=><option key={x.id} value={x.id}>{x.name} · {x.code}</option>)}</select></label><label>Brand<select value={p.newProductBrand} onChange={e=>p.setNewProductBrand(e.target.value)}><option value="">No brand</option>{p.brands.map((x:Brand)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><button className="primary">Create product</button></form><form className="command-form" onSubmit={p.onVariant}><div><p className="eyebrow">NEW SKU</p><h3>Add sellable variant</h3><p>Each SKU must belong to a tenant product and valid unit.</p></div><label>Product<select value={p.newVariantProduct} onChange={e=>p.setNewVariantProduct(e.target.value)} required><option value="">Select product</option>{p.products.map((x:Product)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label>Variant name<input value={p.newVariantName} onChange={e=>p.setNewVariantName(e.target.value)} required /></label><label>SKU<input value={p.newVariantSku} onChange={e=>p.setNewVariantSku(e.target.value)} required /></label><label>Base unit<select value={p.newVariantUnit} onChange={e=>p.setNewVariantUnit(e.target.value)} required><option value="">Select unit</option>{p.units.map((x:Unit)=><option key={x.id} value={x.id}>{x.name} ({x.symbol})</option>)}</select></label><button className="primary">Create SKU</button></form></section>
-    <section className="section"><div className="section-head compact"><div><h2>Catalog records</h2><p className="section-sub">Search the live tenant catalog.</p></div><input placeholder="Search products" value={p.search} onChange={e=>p.setSearch(e.target.value)} /></div><div className="table-wrap"><table><thead><tr><th>Product</th><th>Status</th><th>Variants / SKUs</th><th>Category</th><th>Brand</th></tr></thead><tbody>{p.products.length?p.products.map((x:Product)=>{const vars=p.variants.filter((v:Variant)=>v.product_id===x.id);const cat=p.categories.find((c:Category)=>c.id===x.category_id);const brand=p.brands.find((b:Brand)=>b.id===x.brand_id);return <tr key={x.id}><td><strong>{x.name}</strong><small>{short(x.id)}</small></td><td><span className="status good">{x.status}</span></td><td>{vars.length?vars.map((v:Variant)=><span key={v.id} className="movement">{v.sku}</span>):"No SKU yet"}</td><td>{cat?.name||short(x.category_id)}</td><td>{brand?.name||"—"}</td></tr>}):<tr><td colSpan={5}><div className="empty-inline">No products found for this tenant.</div></td></tr>}</tbody></table></div></section>
-  </>;
+function NavIcon({ name }: { name: string }) {
+  const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  if (name === "Overview") return <svg {...common}><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>;
+  if (name === "Products") return <svg {...common}><path d="M5 7.5 12 4l7 3.5v9L12 20l-7-3.5z"/><path d="M5 7.5 12 11l7-3.5M12 11v9"/></svg>;
+  if (name === "Inventory") return <svg {...common}><path d="M4 8h16M6 4h12M6 12h12M6 16h12M6 20h8"/></svg>;
+  if (name === "Sales") return <svg {...common}><path d="M4 18V8l8-4 8 4v10"/><path d="M7 18h10M9 14h6M9 10h6"/></svg>;
+  if (name === "Purchasing") return <svg {...common}><path d="M5 6h14l-1 13H6z"/><path d="M9 6a3 3 0 0 1 6 0M8 11h8"/></svg>;
+  if (name === "Customers") return <svg {...common}><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.5-5 6-5s6 2 6 5M16 6.5a3 3 0 1 1 0 5.8"/></svg>;
+  if (name === "Reports") return <svg {...common}><path d="M5 19V9M12 19V5M19 19v-7"/></svg>;
+  return <svg {...common}><path d="M12 3 14 8l5 .5-3.7 3.2 1.1 5.1-4.4-2.8-4.4 2.8 1.1-5.1L5 8.5 10 8z"/><circle cx="12" cy="12" r="2"/></svg>;
+}
+
+type AuthModalProps = { authMode: "login" | "register"; setAuthMode: (mode: "login" | "register") => void; email: string; setEmail: (v: string) => void; password: string; setPassword: (v: string) => void; tenantName: string; setTenantName: (v: string) => void; authError: string | null; authBusy: boolean; onSubmit: (e: React.FormEvent) => void; onClose: () => void; workspaces: WorkspaceChoice[]; onChooseWorkspace: (id: string) => void; };
+function AuthModal(p: AuthModalProps) {
+  const choosing = p.authMode === "login" && p.workspaces.length > 0;
+  return <div className="modal-backdrop" onClick={p.onClose}><div className="auth-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={p.onClose} aria-label="Close">×</button><div className="auth-brand"><img src="/lexa-mark.png" alt="" aria-hidden="true"/><div><strong>LEXA</strong><span>Business workspace</span></div></div>
+    {choosing ? <><span className="section-label">CHOOSE A WORKSPACE</span><h2>Where would you like to work?</h2><p className="auth-subtitle">You have access to more than one workspace.</p><div className="workspace-picker">{p.workspaces.map(ws => <button key={ws.tenant_id} className="workspace-option" disabled={p.authBusy} onClick={() => p.onChooseWorkspace(ws.tenant_id)}><span className="workspace-option-avatar">{ws.tenant_name.slice(0,1).toUpperCase()}</span><span><strong>{ws.tenant_name}</strong><small>Open workspace</small></span><span>→</span></button>)}</div>{p.authError && <div className="auth-error">{p.authError}</div>}</> : <><span className="section-label">{p.authMode === "login" ? "WELCOME BACK" : "START WITH LEXA"}</span><h2>{p.authMode === "login" ? "Sign in to your workspace" : "Create your workspace"}</h2><p className="auth-subtitle">{p.authMode === "login" ? "Use your email and password to continue." : "Set up one place for your business to operate."}</p><div className="auth-tabs"><button className={p.authMode === "login" ? "active" : ""} onClick={() => p.setAuthMode("login")}>Sign in</button><button className={p.authMode === "register" ? "active" : ""} onClick={() => p.setAuthMode("register")}>Create workspace</button></div><form onSubmit={p.onSubmit} className="auth-form"><label>Email<input type="email" value={p.email} onChange={e => p.setEmail(e.target.value)} placeholder="you@business.com" autoComplete="email" required /></label><label>Password<input type="password" value={p.password} onChange={e => p.setPassword(e.target.value)} placeholder="At least 12 characters" autoComplete={p.authMode === "login" ? "current-password" : "new-password"} minLength={12} required /></label>{p.authMode === "register" && <label>Business name<input value={p.tenantName} onChange={e => p.setTenantName(e.target.value)} placeholder="Your business name" autoComplete="organization" required /></label>}{p.authError && <div className="auth-error">{p.authError}</div>}<button className="button button-dark button-full" disabled={p.authBusy}>{p.authBusy ? "Please wait…" : p.authMode === "login" ? "Sign in" : "Create workspace"}</button></form></>}
+    <div className="auth-footnote">Your workspace stays focused on the work that matters.</div></div></div>;
 }
 
 type InvProps = any;
+
 function InventoryWorkspace(p: InvProps) {
-  if (!p.token) return <section className="module-page"><span className="tag">INVENTORY</span><h2>Your inventory workspace</h2><p>Sign in to work with the tenant's actual stock data.</p><div className="notice"><strong>No demo inventory is shown.</strong><p>LEXA will only display products, quantities and movements that belong to the authenticated tenant.</p><p className="section-sub">Use the Sign in button in the top bar to open your tenant workspace.</p></div></section>;
+  if (!p.token) return <section className="module-page"><span className="tag">INVENTORY</span><h2>Your inventory workspace</h2><p>Sign in to work with your stock data.</p><div className="notice"><strong>Your information stays focused on your workspace.</strong><p>LEXA shows the products, quantities and movements available to you.</p><p className="section-sub">Sign in to open your workspace tools.</p></div></section>;
   return <>
     <section className="inventory-summary"><div><span className="eyebrow">INVENTORY CONTROL</span><h2>Stock operations</h2><p>Ledger-backed inventory with location-aware balances, controlled adjustments, counts and transfers.</p></div><div className="inventory-actions"><button className="secondary" onClick={p.onRefresh}>{p.busy ? "Refreshing…" : "Refresh data"}</button></div></section>
     <section className="stat-grid"><div className="stat-card"><span>ON HAND</span><strong>{qty(p.stats.totalUnits)}</strong><small>Across loaded locations</small></div><div className="stat-card"><span>STOCK VALUE</span><strong>{money(p.stats.value)}</strong><small>Weighted-average basis</small></div><div className="stat-card"><span>LOW STOCK</span><strong>{p.stats.low}</strong><small>Available ≤ 5 units</small></div><div className="stat-card"><span>OUT OF STOCK</span><strong>{p.stats.out}</strong><small>Available ≤ 0</small></div><div className="stat-card"><span>LEDGER INTEGRITY</span><strong>{p.integrity.status === "ok" ? "OK" : p.integrity.status === "checking" ? "Checking" : "Review"}</strong><small>{p.integrity.checked} balance records checked</small></div></section>

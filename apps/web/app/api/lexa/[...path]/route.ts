@@ -4,7 +4,7 @@ const API_ORIGIN = (process.env.LEXA_API_URL || process.env.NEXT_PUBLIC_API_URL 
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   if (!API_ORIGIN) {
-    return NextResponse.json({ detail: "LEXA_API_URL is not configured on the web server." }, { status: 500 });
+    return NextResponse.json({ detail: "LEXA is temporarily unavailable. Please try again shortly." }, { status: 500 });
   }
 
   const { path } = await context.params;
@@ -25,16 +25,20 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   try {
     const response = await fetch(target, init);
+    if (response.status >= 500) {
+      return NextResponse.json(
+        { detail: "LEXA is temporarily unavailable. Please try again shortly." },
+        { status: response.status },
+      );
+    }
     const body = await response.arrayBuffer();
     const out = new NextResponse(body, { status: response.status, statusText: response.statusText });
     const responseType = response.headers.get("content-type");
     if (responseType) out.headers.set("content-type", responseType);
-    const responseRequestId = response.headers.get("x-request-id");
-    if (responseRequestId) out.headers.set("x-request-id", responseRequestId);
     return out;
   } catch (error) {
     return NextResponse.json(
-      { detail: "LEXA API proxy could not reach the backend.", error: error instanceof Error ? error.message : "upstream_fetch_failed" },
+      { detail: "LEXA is temporarily unavailable. Please try again shortly." },
       { status: 502 },
     );
   }

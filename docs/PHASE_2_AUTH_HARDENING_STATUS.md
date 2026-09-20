@@ -12,11 +12,14 @@ This hardening is LEXA-only and targets the development implementation branch be
 - Registration request hashes include the request fields but never persist the plaintext password.
 - Workspace creation writes a tenant audit record and transactional `workspace.created` outbox event.
 - Database integrity conflicts are returned as explicit client/service errors instead of generic 500 responses.
-- API responses now expose an `X-Request-ID` for traceability.
-- The Vercel proxy forwards the upstream `X-Request-ID`.
-- The web client includes the request ID in API error messages.
 - The registration client now sends an `Idempotency-Key`.
+- Login no longer requires users to type a workspace identifier for normal use.
+- Accounts with one active workspace enter it automatically.
+- Accounts with multiple active workspaces receive a workspace picker.
+- Browser-facing errors are translated into business-friendly messages.
+- Internal trace identifiers and infrastructure diagnostics are kept out of customer-facing frontend messages.
 - Migration `008_workspace_registration_hardening` was applied to `lexa-phase1-dev`.
+- Migration `009_auth_workspace_picker` was applied to `lexa-phase1-dev`.
 
 ## Environment requirement still external to this source package
 
@@ -24,21 +27,18 @@ The live Vercel deployment uses a separate FastAPI service. Its secret `DATABASE
 
 For development validation, the FastAPI service must point to the LEXA `lexa-phase1-dev` Neon branch. LEXA production remains intentionally untouched and currently contains zero application tables.
 
-The service should expose:
-
-- `GET /health` for process liveness
-- `GET /ready` for PostgreSQL readiness
-- `POST /api/v1/auth/register` for workspace creation
+The service should expose the health and readiness checks used by the deployment environment and the authenticated workspace flows.
 
 ## Verification
 
-- Python source/unit/integration suite: 38 passed.
-- Existing visible-product frontend contract: PASS.
-- Neon migration 008: applied successfully on `lexa-phase1-dev`.
-- Neon registration hardening table: present.
+- Python source/unit/integration suite: 42 passed.
+- Frontend customer-language contract: PASS.
+- TypeScript source transpilation checks: PASS.
+- Python compilation: PASS.
+- Neon migrations 008 and 009: applied successfully on `lexa-phase1-dev`.
 - Production branch: not modified.
 - No production data reset, deletion, or seeding performed.
 
 ## Deployment gate
 
-Do not promote the development database schema to LEXA production until the live FastAPI service has been verified against the intended development branch, registration succeeds end-to-end, login succeeds, and tenant isolation tests remain green.
+Do not promote the development database schema to LEXA production until the live FastAPI service has been verified against the intended development branch, registration succeeds end-to-end, login succeeds, workspace selection succeeds for multi-workspace accounts, and tenant isolation tests remain green.

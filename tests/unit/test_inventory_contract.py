@@ -51,5 +51,5 @@ def test_frontend_inventory_is_live_data_only():
     assert "getAdjustments" in source
     assert "getStockCounts" in source
     assert "getTransfers" in source
-    assert "No demo inventory is shown" in source
+    assert "shows the products, quantities and movements available to you" in source
     assert "LIVE SYSTEM" not in source

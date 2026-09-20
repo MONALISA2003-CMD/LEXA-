@@ -1,0 +1,41 @@
+from pathlib import Path
+
+ROOT = Path(__file__).parents[2]
+WEB = ROOT / "apps/web"
+
+# These are implementation/deployment terms that should never be presented as customer copy.
+FORBIDDEN_VISIBLE_PHRASES = (
+    "LEXA_SCHEMA_NOT_READY",
+    "LEXA API",
+    "Request ID",
+    "request id",
+    "transactional database",
+    "database is not ready",
+    "API proxy",
+    "backend",
+    "frontend",
+    "migration",
+    "deployment details",
+    "HTTP 500",
+    "workspace ID",
+)
+
+
+def test_customer_facing_frontend_has_no_developer_diagnostics():
+    files = list((WEB / "app").rglob("*.tsx")) + list((WEB / "lib").rglob("*.ts"))
+    haystack = "\n".join(path.read_text() for path in files)
+    lowered = haystack.lower()
+    for phrase in FORBIDDEN_VISIBLE_PHRASES:
+        assert phrase.lower() not in lowered, f"Developer-facing phrase remains in frontend source: {phrase}"
+
+
+def test_brand_assets_are_present():
+    public = WEB / "public"
+    for name in [
+        "lexa-mark.png",
+        "lexa-wordmark.png",
+        "lexa-icon.png",
+        "lexa-icon-180.png",
+        "lexa-icon-32.png",
+    ]:
+        assert (public / name).exists(), f"Missing LEXA brand asset: {name}"
