@@ -10,7 +10,13 @@ services:
       - key: PYTHON_VERSION
         value: 3.13.5
       - key: APP_ENV
-        value: production
+        value: development
+      - key: LEXA_OPEN_DEV_MODE
+        value: "true"
+      - key: LEXA_OPEN_DEV_EMAIL
+        value: preview@lexa.local
+      - key: LEXA_OPEN_DEV_WORKSPACE_NAME
+        value: LEXA Workspace
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_APP_ROLE

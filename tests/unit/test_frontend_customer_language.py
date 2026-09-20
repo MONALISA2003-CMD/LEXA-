@@ -41,10 +41,25 @@ def test_brand_assets_are_present():
         assert (public / name).exists(), f"Missing LEXA brand asset: {name}"
 
 
-def test_auth_surface_has_safe_network_and_password_states():
+def test_open_workspace_surface_has_safe_network_states():
     page = (WEB / "app/page.tsx").read_text()
     api = (WEB / "lib/api.ts").read_text()
-    assert "password-toggle" in page
-    assert "Use another account" in page
+    assert "openDevSession" in page
+    assert "Preview" in page
     assert "We couldn't connect to LEXA right now." in api
     assert "Failed to fetch" not in api
+
+
+def test_open_development_mode_is_not_enabled_by_production_guard():
+    config = (ROOT / "apps/api/app/config.py").read_text()
+    auth = (ROOT / "apps/api/app/routes/auth.py").read_text()
+    assert "lexa_open_dev_mode" in config
+    assert 'settings.app_env.strip().lower() == "production"' in auth
+    assert '"/dev-session"' in auth
+
+
+def test_workspace_opens_directly_in_development():
+    page = (WEB / "app/page.tsx").read_text()
+    assert "NEXT_PUBLIC_LEXA_OPEN_MODE" in page
+    assert "openDevSession" in page
+    assert "Preview" in page

@@ -16,7 +16,7 @@ from ..dependencies import get_db
 from ..models import (
     Tenant, TenantMembership, User, Session as AuthSession, Device,
     Role, MembershipRole, Permission, RolePermission, BusinessProfile,
-    RegistrationRequest,
+    RegistrationRequest, Branch, Warehouse, Location, Category, Brand, Unit, Product, ProductVariant, PriceList, ProductPrice,
 )
 from ..catalog import emit_event, write_audit
 from ..health import check_database
@@ -60,6 +60,136 @@ def _registration_hash(body: RegisterRequest) -> str:
         "password": body.password,
         "tenant_name": body.tenant_name.strip(),
     })
+
+
+
+@router.post("/dev-session")
+def dev_session(request: Request, db: Session = Depends(get_db)):
+    """Create or restore a safe development workspace session.
+
+    This route is intentionally unavailable in production and is only used while
+    LEXA is being built. It still issues a normal session token, so tenant-scoped
+    APIs and RLS continue to exercise their real authorization paths.
+    """
+    if settings.app_env.strip().lower() == "production" or not settings.lexa_open_dev_mode:
+        raise HTTPException(404, "Not found")
+
+    database_ready, database_error = check_database()
+    if not database_ready:
+        raise HTTPException(503, f"LEXA database is not ready: {database_error}")
+
+    email = settings.lexa_open_dev_email.lower().strip()
+    workspace_name = settings.lexa_open_dev_workspace_name.strip() or "LEXA Workspace"
+    request_id = getattr(request.state, "request_id", None) or "untracked"
+
+    try:
+        user = db.scalar(select(User).where(User.email == email))
+        tenant = None
+        membership = None
+        owner = None
+        if user:
+            membership = db.scalar(select(TenantMembership).where(TenantMembership.user_id == user.id, TenantMembership.status == "ACTIVE"))
+            if membership:
+                tenant = db.scalar(select(Tenant).where(Tenant.id == membership.tenant_id, Tenant.status == "ACTIVE"))
+
+        if not user or not tenant or not membership:
+            if not user:
+                user = User(email=email, password_hash=hash_password(secrets.token_urlsafe(32)), is_active=True)
+                db.add(user)
+                db.flush()
+            tenant = Tenant(name=workspace_name, status="ACTIVE")
+            db.add(tenant)
+            db.flush()
+            db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant.id)})
+            profile = BusinessProfile(tenant_id=tenant.id, legal_name=workspace_name, display_name=workspace_name, country_code="UG", currency_code="UGX")
+            membership = TenantMembership(tenant_id=tenant.id, user_id=user.id, status="ACTIVE")
+            db.add_all([profile, membership])
+            db.flush()
+            owner = Role(tenant_id=tenant.id, name="Owner", description="Preview workspace owner")
+            db.add(owner)
+            db.flush()
+            db.add(MembershipRole(membership_id=membership.id, role_id=owner.id))
+            permissions = db.scalars(select(Permission)).all()
+            if permissions:
+                db.add_all([RolePermission(role_id=owner.id, permission_id=p.id) for p in permissions])
+            db.flush()
+        else:
+            db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant.id)})
+
+        # Keep one short-lived development session per preview user.
+        now = datetime.now(timezone.utc)
+        db.query(AuthSession).filter(
+            AuthSession.user_id == user.id,
+            AuthSession.tenant_id == tenant.id,
+            AuthSession.revoked_at.is_(None),
+        ).update({"revoked_at": now}, synchronize_session=False)
+        refresh = new_refresh_token()
+        session = AuthSession(
+            tenant_id=tenant.id,
+            user_id=user.id,
+            refresh_token_hash=hash_refresh_token(refresh),
+            expires_at=now + timedelta(days=7),
+        )
+        db.add(session)
+        db.flush()
+
+        # Seed a small, reusable workspace only once. These are ordinary catalog
+        # records and are visible through the same tenant/RLS paths as real data.
+        if not db.scalar(select(Category.id).where(Category.tenant_id == tenant.id, Category.code == "PREVIEW")):
+            category = Category(tenant_id=tenant.id, name="Everyday Products", code="PREVIEW", description="Sample catalog category")
+            brand = Brand(tenant_id=tenant.id, name="LEXA Sample", code="LEXA")
+            db.add_all([category, brand])
+            db.flush()
+            unit = db.scalar(select(Unit).where(Unit.tenant_id.is_(None), Unit.code == "PCS"))
+            if not unit:
+                raise HTTPException(503, "Workspace unit setup is unavailable")
+            products = [
+                ("Everyday Essentials", "Sample item for catalog review", "SKU-PREVIEW-001"),
+                ("Premium Pack", "Sample variant for pricing and catalog review", "SKU-PREVIEW-002"),
+                ("Starter Bundle", "Sample multi-item product", "SKU-PREVIEW-003"),
+                ("Office Supply Set", "Sample business supply item", "SKU-PREVIEW-004"),
+                ("Household Kit", "Sample household item", "SKU-PREVIEW-005"),
+            ]
+            for name, description, sku in products:
+                product = Product(tenant_id=tenant.id, category_id=category.id, brand_id=brand.id, name=name, description=description, product_type="STOCKED", status="ACTIVE", has_variants=True, product_metadata={"preview": True})
+                db.add(product)
+                db.flush()
+                variant = ProductVariant(tenant_id=tenant.id, product_id=product.id, name="Standard", sku=sku, base_unit_id=unit.id, track_inventory=True, allow_fractional_quantity=False, status="ACTIVE", costing_method="WEIGHTED_AVERAGE", variant_metadata={"preview": True})
+                db.add(variant)
+                db.flush()
+                if sku.endswith("001"):
+                    price_list = db.scalar(select(PriceList).where(PriceList.tenant_id == tenant.id, PriceList.name == "Retail"))
+                    if not price_list:
+                        price_list = PriceList(tenant_id=tenant.id, name="Retail", currency="UGX", price_type="RETAIL", status="ACTIVE", effective_from=now)
+                        db.add(price_list)
+                        db.flush()
+                    db.add(ProductPrice(tenant_id=tenant.id, price_list_id=price_list.id, variant_id=variant.id, unit_price=Decimal("15000"), minimum_quantity=Decimal("1"), effective_from=now))
+
+            branch = Branch(tenant_id=tenant.id, name="Main Branch", code="MAIN", status="ACTIVE")
+            db.add(branch)
+            db.flush()
+            warehouse = Warehouse(tenant_id=tenant.id, branch_id=branch.id, name="Main Warehouse", code="MAIN-WH", status="ACTIVE")
+            db.add(warehouse)
+            db.flush()
+            db.add(Location(tenant_id=tenant.id, warehouse_id=warehouse.id, name="Main Shelf", code="SHELF-01", status="ACTIVE"))
+
+        write_audit(db, tenant_id=tenant.id, actor_user_id=user.id, action="workspace.dev_session", target_type="tenant", target_id=tenant.id, outcome="SUCCESS", correlation_id=request_id)
+        db.commit()
+        return {
+            "access_token": create_access_token(user.id, tenant.id, session.id),
+            "refresh_token": refresh,
+            "token_type": "bearer",
+            "session_id": session.id,
+            "tenant_id": str(tenant.id),
+            "tenant_name": tenant.name,
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("development_session_database_failure", extra={"request_id": request_id})
+        raise HTTPException(503, "LEXA could not prepare the workspace right now") from exc
 
 
 @router.post("/register")

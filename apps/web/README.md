@@ -13,3 +13,10 @@ This package contains the customer-facing LEXA web experience.
 - Customer-friendly service and authentication messaging
 
 The public experience does not display internal service diagnostics, request identifiers, database details or release tooling information.
+
+
+## Rapid development mode
+
+During active product development the web app can open the workspace directly. Set `NEXT_PUBLIC_LEXA_OPEN_MODE=true` for the development build. The API must have its guarded development session enabled.
+
+This mode does not remove database isolation or permissions; it only removes the browser authentication interruption.

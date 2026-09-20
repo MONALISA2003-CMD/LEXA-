@@ -1,6 +1,6 @@
 {
   "package": "LEXA Experience Foundation + Workspace Authentication",
-  "version": "1.4.2",
+  "version": "1.5.1",
   "layout": "repository-root",
   "changes": [
     "Rebuilt the public LEXA landing experience around the supplied brand identity",
@@ -26,7 +26,15 @@
     "Renamed the populated Neon branch to lexa-live, removed branch expiry, and made it the LEXA project default branch",
     "Added deployment configuration for the canonical Neon branch id",
     "Fixed CSS flex-end compatibility warnings",
-    "Expanded validation to 44 automated tests"
+    "Expanded validation to 44 automated tests",
+    "Temporarily removed the customer-facing authentication gate from the rapid development experience",
+    "Added guarded open development sessions backed by the real tenant session and RLS path",
+    "Added a dedicated LEXA preview workspace and reusable sample catalog data",
+    "Added development-only workspace bootstrap endpoint guarded against production use",
+    "Kept the real login and registration endpoints available for the later production onboarding pass",
+    "Made inventory loading resilient so incomplete stock services do not block review of the rest of the workspace",
+    "Added open-development configuration and validation contracts",
+    "Flattened the open-development implementation into the repository root so Vercel and Render consume the same source tree."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -35,5 +43,5 @@
   "database_reset": false,
   "seed_reset": false,
   "product_deletion": false,
-  "description": "LEXA customer experience, workspace authentication and canonical database safety foundation. The populated LEXA branch is now the permanent non-expiring project default named lexa-live; the empty legacy production branch remains untouched."
+  "description": "LEXA rapid development experience with a guarded open workspace. Authentication remains implemented server-side for the later production-ready onboarding pass."
 }

@@ -109,3 +109,5 @@ export type AuthResponse = { access_token: string; refresh_token: string; token_
 export type RegisterResponse = { user_id: string; tenant_id: string };
 export function login(body: LoginRequest) { return getJson<AuthResponse>("/api/v1/auth/login", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }); }
 export function register(body: { email:string; password:string; tenant_name:string }) { return getJson<RegisterResponse>("/api/v1/auth/register", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
+
+export function openDevSession() { return getJson<AuthResponse>("/api/v1/auth/dev-session", { method:"POST" }); }

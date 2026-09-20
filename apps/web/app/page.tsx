@@ -5,10 +5,10 @@ import {
   approveAdjustment, approveStockCount, approveTransfer, completeTransfer, createAdjustment, createLocation, createWarehouse,
   createStockCount, createTransfer, dispatchTransfer, getAdjustments, getHealth, getInventoryBalances,
   getInventoryIntegrity, getInventoryLedger, getLocations, getReadiness, getStockCounts, getTransfers, getVariantOptions,
-  login, postAdjustment, postStockCount, receiveTransfer, register, submitStockCount, updateCountLines,
+  openDevSession, postAdjustment, postStockCount, receiveTransfer, submitStockCount, updateCountLines,
   createProduct, createVariant, getBrands, getCategories, getPriceLists, getProducts, getUnits, getVariants,
   type ApiHealth, type ApiReadiness, type Brand, type Category, type InventoryAdjustment, type InventoryBalance, type InventoryLedger,
-  type Location, type PriceList, type Product, type StockCount, type Transfer, type Unit, type Variant, type VariantOption, type WorkspaceChoice, WorkspaceSelectionError,
+  type Location, type PriceList, type Product, type StockCount, type Transfer, type Unit, type Variant, type VariantOption,
 } from "../lib/api";
 
 const modules = [
@@ -22,6 +22,7 @@ const modules = [
   { name: "LEXA Intelligence", desc: "Analysis, recommendations and controlled actions" },
 ];
 const invTabs = ["Stock", "Ledger", "Adjustments", "Counts", "Transfers", "Locations"];
+const OPEN_DEV_MODE = process.env.NEXT_PUBLIC_LEXA_OPEN_MODE !== "false";
 
 function money(value: string | number) { return new Intl.NumberFormat("en-UG", { style: "currency", currency: "UGX", maximumFractionDigits: 0 }).format(Number(value)); }
 function qty(value: string | number) { return new Intl.NumberFormat("en-UG", { maximumFractionDigits: 3 }).format(Number(value)); }
@@ -34,15 +35,7 @@ export default function HomePage() {
   const [, setError] = useState<string | null>(null);
   const [active, setActive] = useState("Overview");
   const [token, setToken] = useState<string | null>(null);
-  const [authOpen, setAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authBusy, setAuthBusy] = useState(false);
-  const [passwordVisible, setPasswordVisible] = useState(false);
-  const [authWorkspaces, setAuthWorkspaces] = useState<WorkspaceChoice[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [tenantId, setTenantId] = useState("");
   const [tenantName, setTenantName] = useState("");
   const [invTab, setInvTab] = useState("Stock");
@@ -99,11 +92,28 @@ export default function HomePage() {
   async function refreshInventory() {
     if (!token) return;
     setInvBusy(true); setInvMessage(null);
-    try {
-      const [loc, vars, bal, led, integ, adj, cnt, tr] = await Promise.all([getLocations(), getVariantOptions(), getInventoryBalances({ location_id: locationFilter || undefined, q: stockSearch || undefined }), getInventoryLedger({ location_id: locationFilter || undefined }), getInventoryIntegrity(), getAdjustments(), getStockCounts(), getTransfers()]);
-      setLocations(loc); setVariants(vars); setBalances(bal); setLedger(led); setIntegrity(integ); setAdjustments(adj); setCounts(cnt); setTransfers(tr);
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to load inventory."); }
-    finally { setInvBusy(false); }
+    const results = await Promise.allSettled([
+      getLocations(),
+      getVariantOptions(),
+      getInventoryBalances({ location_id: locationFilter || undefined, q: stockSearch || undefined }),
+      getInventoryLedger({ location_id: locationFilter || undefined }),
+      getInventoryIntegrity(),
+      getAdjustments(),
+      getStockCounts(),
+      getTransfers(),
+    ]);
+    const [loc, vars, bal, led, integ, adj, cnt, tr] = results;
+    if (loc.status === "fulfilled") setLocations(loc.value);
+    if (vars.status === "fulfilled") setVariants(vars.value);
+    if (bal.status === "fulfilled") setBalances(bal.value);
+    if (led.status === "fulfilled") setLedger(led.value);
+    if (integ.status === "fulfilled") setIntegrity(integ.value);
+    if (adj.status === "fulfilled") setAdjustments(adj.value);
+    if (cnt.status === "fulfilled") setCounts(cnt.value);
+    if (tr.status === "fulfilled") setTransfers(tr.value);
+    const failed = results.filter(x => x.status === "rejected").length;
+    if (failed) setInvMessage("Some inventory areas are still being prepared. You can continue reviewing the workspace.");
+    setInvBusy(false);
   }
   async function refreshCatalog() {
     if (!token) return;
@@ -121,28 +131,31 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    refreshSystem();
-    const saved = window.sessionStorage.getItem("lexa_access_token");
-    const savedWorkspace = window.sessionStorage.getItem("lexa_workspace_id");
-    const savedWorkspaceName = window.sessionStorage.getItem("lexa_workspace_name");
-    const savedEmail = window.sessionStorage.getItem("lexa_email");
-    if (saved) setToken(saved);
-    if (savedWorkspace) setTenantId(savedWorkspace);
-    if (savedWorkspaceName) setTenantName(savedWorkspaceName);
-    if (savedEmail) setEmail(savedEmail);
-  }, []);
-  useEffect(() => {
-    if (!authOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !authBusy) {
-        setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false);
+    let cancelled = false;
+    async function boot() {
+      await refreshSystem();
+      const saved = window.sessionStorage.getItem("lexa_access_token");
+      const savedWorkspace = window.sessionStorage.getItem("lexa_workspace_id");
+      const savedWorkspaceName = window.sessionStorage.getItem("lexa_workspace_name");
+      if (saved && savedWorkspace) {
+        if (!cancelled) { setToken(saved); setTenantId(savedWorkspace); setTenantName(savedWorkspaceName || "LEXA Workspace"); }
+        return;
       }
-    };
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKeyDown);
-    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener("keydown", onKeyDown); };
-  }, [authOpen, authBusy]);
+      if (!OPEN_DEV_MODE || cancelled) return;
+      try {
+        const session = await openDevSession();
+        if (cancelled) return;
+        window.sessionStorage.setItem("lexa_access_token", session.access_token);
+        window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
+        window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
+        setToken(session.access_token); setTenantId(session.tenant_id); setTenantName(session.tenant_name);
+      } catch (e) {
+        if (!cancelled) setCatalogMessage(e instanceof Error ? e.message : "LEXA is preparing your workspace.");
+      }
+    }
+    boot();
+    return () => { cancelled = true; };
+  }, []);
   useEffect(() => { if (token && active === "Inventory") refreshInventory(); }, [token, active, invTab, locationFilter]);
   useEffect(() => { if (token && active === "Products") refreshCatalog(); }, [token, active, catalogSearch]);
 
@@ -167,47 +180,22 @@ export default function HomePage() {
     catch (e) { setCatalogMessage(e instanceof Error ? e.message : "Variant creation failed."); }
   }
 
-  async function submitAuth(event: React.FormEvent) {
-    event.preventDefault();
-    setAuthError(null);
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanBusinessName = tenantName.trim();
-    if (!cleanEmail) { setAuthError("Enter your email address to continue."); return; }
-    if (password.length < 12) { setAuthError("Use a password with at least 12 characters."); return; }
-    if (authMode === "register" && cleanBusinessName.length < 2) { setAuthError("Enter your business name to continue."); return; }
-    setAuthBusy(true);
-    try {
-      let selectedWorkspace = authMode === "register" ? tenantId || undefined : undefined;
-      if (authMode === "register") {
-        const created = await register({ email: cleanEmail, password, tenant_name: cleanBusinessName });
-        selectedWorkspace = created.tenant_id;
-      }
-      const session = await login({ email: cleanEmail, password, tenant_id: selectedWorkspace });
-      window.sessionStorage.setItem("lexa_access_token", session.access_token);
-      window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
-      window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
-      window.sessionStorage.setItem("lexa_email", cleanEmail);
-      setTenantId(session.tenant_id); setTenantName(session.tenant_name); setEmail(cleanEmail);
-      setToken(session.access_token); setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); setActive("Overview");
-    } catch (e) {
-      if (e instanceof WorkspaceSelectionError) { setAuthWorkspaces(e.workspaces); setAuthError(null); }
-      else { setAuthError(e instanceof Error ? e.message : "We couldn't complete that request. Please try again."); }
-    } finally { setAuthBusy(false); }
+  function resetPreview() {
+    window.sessionStorage.removeItem("lexa_access_token");
+    window.sessionStorage.removeItem("lexa_workspace_id");
+    window.sessionStorage.removeItem("lexa_workspace_name");
+    setToken(null); setTenantId(""); setTenantName("");
+    setBalances([]); setLocations([]); setVariants([]); setCatalogProducts([]); setCatalogVariants([]);
+    setActive("Overview"); setMobileMenuOpen(false);
+    if (OPEN_DEV_MODE) {
+      void openDevSession().then(session => {
+        window.sessionStorage.setItem("lexa_access_token", session.access_token);
+        window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
+        window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
+        setToken(session.access_token); setTenantId(session.tenant_id); setTenantName(session.tenant_name);
+      });
+    }
   }
-  async function chooseWorkspace(workspaceId: string) {
-    setAuthBusy(true); setAuthError(null);
-    try {
-      const session = await login({ email: email.trim().toLowerCase(), password, tenant_id: workspaceId });
-      window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
-      window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
-      window.sessionStorage.setItem("lexa_access_token", session.access_token);
-      window.sessionStorage.setItem("lexa_email", email.trim().toLowerCase());
-      setTenantId(session.tenant_id); setTenantName(session.tenant_name);
-      setToken(session.access_token); setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); setActive("Overview");
-    } catch (e) { setAuthError(e instanceof Error ? e.message : "We couldn't open that workspace. Please try again."); }
-    finally { setAuthBusy(false); }
-  }
-  function signOut() { window.sessionStorage.removeItem("lexa_access_token"); window.sessionStorage.removeItem("lexa_workspace_id"); window.sessionStorage.removeItem("lexa_workspace_name"); window.sessionStorage.removeItem("lexa_email"); setToken(null); setTenantId(""); setTenantName(""); setEmail(""); setPassword(""); setAuthWorkspaces([]); setBalances([]); setLocations([]); setVariants([]); setCatalogProducts([]); setCatalogVariants([]); setActive("Overview"); setMobileMenuOpen(false); }
   function clearInvMessage() { setInvMessage(null); setError(null); }
 
   async function submitAdjustment(e: React.FormEvent) {
@@ -236,7 +224,7 @@ export default function HomePage() {
   const mark = <img className="lexa-mark" src="/lexa-mark.png" alt="" aria-hidden="true" />;
   const activeDescription = modules.find(item => item.name === active)?.desc || "Business operations";
 
-  if (!token) {
+  if (!token && !OPEN_DEV_MODE) {
     return (
       <main className="public-page">
         <header className="public-header">
@@ -244,7 +232,7 @@ export default function HomePage() {
           <nav className="public-nav" aria-label="Primary navigation">
             <a href="#platform">Platform</a><a href="#capabilities">Capabilities</a><a href="#intelligence">Intelligence</a>
           </nav>
-          <button className="button button-dark" onClick={() => { setAuthMode("login"); setAuthOpen(true); }}>Sign in</button>
+          <button className="button button-dark" onClick={() => setActive("Overview")}>Open workspace</button>
         </header>
 
         <section className="public-hero" id="top">
@@ -252,7 +240,7 @@ export default function HomePage() {
             <div className="hero-kicker"><span className="kicker-dot" /> Business operating system</div>
             <h1>Run your business from one intelligent place.</h1>
             <p>LEXA brings products, inventory, sales, purchasing, customers, reporting and business intelligence into a single workspace built for growing businesses.</p>
-            <div className="hero-actions"><button className="button button-dark button-large" onClick={() => { setAuthMode("register"); setAuthOpen(true); }}>Create your workspace</button><a className="text-link" href="#platform">See how it works <span>→</span></a></div>
+            <div className="hero-actions"><button className="button button-dark button-large" onClick={() => setActive("Overview")}>Create your workspace</button><a className="text-link" href="#platform">See how it works <span>→</span></a></div>
             <div className="hero-trust"><span>One workspace</span><span>Clear operations</span><span>Built to scale</span></div>
           </div>
           <div className="hero-visual" aria-label="LEXA workspace preview">
@@ -280,10 +268,8 @@ export default function HomePage() {
           <div className="intelligence-card"><div className="intelligence-top"><span>{mark}</span><div><strong>LEXA Intelligence</strong><small>Your business, clearly explained.</small></div></div><div className="insight"><span>INSIGHT</span><strong>Inventory movement is changing across your active locations.</strong><p>See the products, locations and time periods behind the change.</p></div><div className="insight-row"><span>Business signal</span><b>Ready for review</b></div><div className="insight-row"><span>Next step</span><b>Open Inventory</b></div></div>
         </section>
 
-        <section className="public-cta"><div><span className="section-label">LEXA</span><h2>Give your business one place to operate.</h2><p>Create a workspace and bring the day to day together.</p></div><button className="button button-light button-large" onClick={() => { setAuthMode("register"); setAuthOpen(true); }}>Create your workspace</button></section>
+        <section className="public-cta"><div><span className="section-label">LEXA</span><h2>Give your business one place to operate.</h2><p>Create a workspace and bring the day to day together.</p></div><button className="button button-light button-large" onClick={() => setActive("Overview")}>Create your workspace</button></section>
         <footer className="public-footer"><div className="footer-brand">{logo}</div><p>Business operations, connected.</p><span>© {new Date().getFullYear()} LEXA</span></footer>
-
-        {authOpen && <AuthModal authMode={authMode} setAuthMode={(mode) => { setAuthMode(mode); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); }} email={email} setEmail={setEmail} password={password} setPassword={setPassword} tenantName={tenantName} setTenantName={setTenantName} authError={authError} authBusy={authBusy} onSubmit={submitAuth} onClose={() => { setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); }} workspaces={authWorkspaces} onChooseWorkspace={chooseWorkspace} passwordVisible={passwordVisible} setPasswordVisible={setPasswordVisible} />}
       </main>
     );
   }
@@ -294,11 +280,11 @@ export default function HomePage() {
         <div className="sidebar-brand"><a href="#" className="sidebar-brand-link" onClick={(e) => { e.preventDefault(); setActive("Overview"); setMobileMenuOpen(false); }}><img className="lexa-sidebar-mark" src="/lexa-mark.png" alt="LEXA" /><span>LEXA</span></a><button className="mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">×</button></div>
         <div className="sidebar-workspace"><span className="workspace-avatar">{tenantName ? tenantName.slice(0, 1).toUpperCase() : "L"}</span><div><strong>{tenantName || "Your workspace"}</strong><small>Business workspace</small></div></div>
         <nav className="sidebar-nav" aria-label="Workspace navigation">{modules.map(item => <button key={item.name} className={`sidebar-item ${active === item.name ? "active" : ""}`} onClick={() => { setActive(item.name); setMobileMenuOpen(false); }}><span className="sidebar-icon"><NavIcon name={item.name} /></span><span className="sidebar-text"><b>{item.name}</b><small>{item.desc}</small></span></button>)}</nav>
-        <div className="sidebar-bottom"><div className="sidebar-note"><span className="note-dot" /><div><strong>{health && readiness?.status === "ready" ? "Workspace ready" : "We're updating your workspace"}</strong><p>{health && readiness?.status === "ready" ? "Your business tools are ready to use." : "Please give us a moment, then refresh."}</p></div></div><button className="sidebar-account" onClick={signOut}><span className="avatar-small">{email.slice(0,1).toUpperCase() || "L"}</span><span><b>{email || "Account"}</b><small>Sign out</small></span></button></div>
+        <div className="sidebar-bottom"><div className="sidebar-note"><span className="note-dot" /><div><strong>{health && readiness?.status === "ready" ? "Workspace ready" : "Getting things ready"}</strong><p>{health && readiness?.status === "ready" ? "Your business tools are ready to use." : "Your workspace is loading."}</p></div></div><button className="sidebar-account" onClick={resetPreview}><span className="avatar-small">L</span><span><b>Preview workspace</b><small>Reset workspace</small></span></button></div>
       </aside>
 
       <section className="workspace">
-        <header className="workspace-header"><button className="mobile-menu" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">☰</button><div><span className="workspace-breadcrumb">LEXA · {active}</span><h1>{active === "Overview" ? "Business command center" : active}</h1><p>{activeDescription}</p></div><div className="header-actions"><button className="button button-soft" onClick={active === "Inventory" ? refreshInventory : active === "Products" ? refreshCatalog : refreshSystem}>Refresh</button><button className="button button-dark desktop-only" onClick={signOut}>Sign out</button></div></header>
+        <header className="workspace-header"><button className="mobile-menu" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">☰</button><div><span className="workspace-breadcrumb">LEXA · {active}</span><h1>{active === "Overview" ? "Business command center" : active}</h1><p>{activeDescription}</p></div><div className="header-actions"><span className="preview-badge">Preview</span><button className="button button-soft" onClick={active === "Inventory" ? refreshInventory : active === "Products" ? refreshCatalog : refreshSystem}>Refresh</button></div></header>
         <div className={`workspace-banner ${health && readiness?.status === "ready" ? "positive" : "attention"}`}><span className="banner-icon">{health && readiness?.status === "ready" ? "✓" : "i"}</span><div><strong>{health && readiness?.status === "ready" ? "Everything is ready" : "Your workspace is taking a moment to connect"}</strong><p>{health && readiness?.status === "ready" ? "You can move between your business areas and keep work moving." : "Refresh in a moment. Your workspace and information remain safe."}</p></div></div>
 
         {active === "Overview" && <>
@@ -312,8 +298,6 @@ export default function HomePage() {
       </section>
 
       <nav className="mobile-nav" aria-label="Mobile navigation">{modules.slice(0, 4).map(item => <button key={item.name} className={active === item.name ? "active" : ""} onClick={() => setActive(item.name)}><NavIcon name={item.name} /><span>{item.name}</span></button>)}<button onClick={() => setMobileMenuOpen(true)}><span className="more-icon">•••</span><span>More</span></button></nav>
-
-      {authOpen && <AuthModal authMode={authMode} setAuthMode={(mode) => { setAuthMode(mode); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); }} email={email} setEmail={setEmail} password={password} setPassword={setPassword} tenantName={tenantName} setTenantName={setTenantName} authError={authError} authBusy={authBusy} onSubmit={submitAuth} onClose={() => { setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); }} workspaces={authWorkspaces} onChooseWorkspace={chooseWorkspace} passwordVisible={passwordVisible} setPasswordVisible={setPasswordVisible} />}
     </main>
   );
 }
@@ -330,59 +314,9 @@ function NavIcon({ name }: { name: string }) {
   return <svg {...common}><path d="M12 3 14 8l5 .5-3.7 3.2 1.1 5.1-4.4-2.8-4.4 2.8 1.1-5.1L5 8.5 10 8z"/><circle cx="12" cy="12" r="2"/></svg>;
 }
 
-type AuthModalProps = { authMode: "login" | "register"; setAuthMode: (mode: "login" | "register") => void; email: string; setEmail: (v: string) => void; password: string; setPassword: (v: string) => void; tenantName: string; setTenantName: (v: string) => void; authError: string | null; authBusy: boolean; onSubmit: (e: React.FormEvent) => void; onClose: () => void; workspaces: WorkspaceChoice[]; onChooseWorkspace: (id: string) => void; passwordVisible: boolean; setPasswordVisible: (v: boolean) => void; };
-function AuthModal(p: AuthModalProps) {
-  const choosing = p.authMode === "login" && p.workspaces.length > 0;
-  const emailRef = useRef<HTMLInputElement | null>(null);
-  useEffect(() => { const timer = window.setTimeout(() => emailRef.current?.focus(), 40); return () => window.clearTimeout(timer); }, [choosing, p.authMode]);
-  return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !p.authBusy) p.onClose(); }}>
-      <div className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" onMouseDown={(event) => event.stopPropagation()}>
-        <button className="modal-close" type="button" onClick={p.onClose} aria-label="Close sign in">×</button>
-        <div className="auth-brand"><img src="/lexa-mark.png" alt="" aria-hidden="true"/><div><strong>LEXA</strong><span>Business workspace</span></div></div>
-        {choosing ? (
-          <>
-            <span className="section-label">CHOOSE A WORKSPACE</span>
-            <h2 id="auth-title">Where would you like to work?</h2>
-            <p className="auth-subtitle">Choose the business workspace you want to open.</p>
-            <div className="workspace-picker">
-              {p.workspaces.map(ws => <button key={ws.tenant_id} type="button" className="workspace-option" disabled={p.authBusy} onClick={() => p.onChooseWorkspace(ws.tenant_id)}><span className="workspace-option-avatar">{ws.tenant_name.slice(0,1).toUpperCase()}</span><span><strong>{ws.tenant_name}</strong><small>Open workspace</small></span><span aria-hidden="true">→</span></button>)}
-            </div>
-            {p.authError && <div className="auth-error" role="alert">{p.authError}</div>}
-            <button className="auth-back" type="button" onClick={() => p.setAuthMode("login")} disabled={p.authBusy}>Use another account</button>
-          </>
-        ) : (
-          <>
-            <span className="section-label">{p.authMode === "login" ? "WELCOME BACK" : "START WITH LEXA"}</span>
-            <h2 id="auth-title">{p.authMode === "login" ? "Sign in to your workspace" : "Create your workspace"}</h2>
-            <p className="auth-subtitle">{p.authMode === "login" ? "Use your email and password to continue." : "Set up one place for your business to operate."}</p>
-            <div className="auth-tabs" aria-label="Account access">
-              <button type="button" className={p.authMode === "login" ? "active" : ""} disabled={p.authBusy} onClick={() => p.setAuthMode("login")}>Sign in</button>
-              <button type="button" className={p.authMode === "register" ? "active" : ""} disabled={p.authBusy} onClick={() => p.setAuthMode("register")}>Create workspace</button>
-            </div>
-            <form onSubmit={p.onSubmit} className="auth-form">
-              <label>Email<input ref={emailRef} type="email" value={p.email} onChange={e => p.setEmail(e.target.value)} placeholder="you@business.com" autoComplete="email" inputMode="email" autoCapitalize="none" aria-label="Email address" required /></label>
-              <label>Password
-                <span className="password-field">
-                  <input type={p.passwordVisible ? "text" : "password"} value={p.password} onChange={e => p.setPassword(e.target.value)} placeholder="At least 12 characters" autoComplete={p.authMode === "login" ? "current-password" : "new-password"} minLength={12} aria-label="Password" required />
-                  <button type="button" className="password-toggle" onClick={() => p.setPasswordVisible(!p.passwordVisible)} aria-label={p.passwordVisible ? "Hide password" : "Show password"}>{p.passwordVisible ? "Hide" : "Show"}</button>
-                </span>
-              </label>
-              {p.authMode === "register" && <label>Business name<input value={p.tenantName} onChange={e => p.setTenantName(e.target.value)} placeholder="Your business name" autoComplete="organization" required /></label>}
-              {p.authError && <div className="auth-error" role="alert">{p.authError}</div>}
-              <button className="button button-dark button-full button-auth-submit" disabled={p.authBusy}>{p.authBusy ? "Working…" : p.authMode === "login" ? "Sign in" : "Create workspace"}</button>
-            </form>
-          </>
-        )}
-        <div className="auth-footnote">Your workspace stays focused on the work that matters.</div>
-      </div>
-    </div>
-  );
-}
-
 type CatalogProps = any;
 function CatalogWorkspace(p: CatalogProps) {
-  if (!p.token) return <section className="module-page"><span className="tag">CATALOG</span><h2>Your product catalog</h2><p>Sign in to manage your products, variants, SKUs and pricing.</p><div className="notice"><strong>No demo catalog is shown.</strong><p>Only products belonging to your workspace are shown.</p></div></section>;
+  if (!p.token) return <section className="module-page"><span className="tag">CATALOG</span><h2>Your product catalog</h2><p>Your workspace is being prepared.</p><div className="notice"><strong>Getting your catalog ready.</strong><p>Your product tools will appear here as soon as the workspace is connected.</p></div></section>;
   return <>
     <section className="inventory-summary"><div><span className="eyebrow">CATALOG CONTROL</span><h2>Products and SKUs</h2><p>Product identity that becomes the foundation for inventory, sales and purchasing.</p></div><div className="inventory-actions"><button className="secondary" onClick={p.onRefresh}>{p.busy ? "Refreshing…" : "Refresh catalog"}</button></div></section>
     {p.message && <div className="inline-message">{p.message}</div>}
@@ -395,7 +329,7 @@ function CatalogWorkspace(p: CatalogProps) {
 type InvProps = any;
 
 function InventoryWorkspace(p: InvProps) {
-  if (!p.token) return <section className="module-page"><span className="tag">INVENTORY</span><h2>Your inventory workspace</h2><p>Sign in to work with your stock data.</p><div className="notice"><strong>Your information stays focused on your workspace.</strong><p>LEXA shows the products, quantities and movements available to you.</p><p className="section-sub">Sign in to open your workspace tools.</p></div></section>;
+  if (!p.token) return <section className="module-page"><span className="tag">INVENTORY</span><h2>Your inventory workspace</h2><p>Your workspace is being prepared.</p><div className="notice"><strong>Getting inventory ready.</strong><p>Your stock, movements and locations will appear here as soon as the workspace is connected.</p></div></section>;
   return <>
     <section className="inventory-summary"><div><span className="eyebrow">INVENTORY CONTROL</span><h2>Stock operations</h2><p>Ledger-backed inventory with location-aware balances, controlled adjustments, counts and transfers.</p></div><div className="inventory-actions"><button className="secondary" onClick={p.onRefresh}>{p.busy ? "Refreshing…" : "Refresh data"}</button></div></section>
     <section className="stat-grid"><div className="stat-card"><span>ON HAND</span><strong>{qty(p.stats.totalUnits)}</strong><small>Across loaded locations</small></div><div className="stat-card"><span>STOCK VALUE</span><strong>{money(p.stats.value)}</strong><small>Weighted-average basis</small></div><div className="stat-card"><span>LOW STOCK</span><strong>{p.stats.low}</strong><small>Available ≤ 5 units</small></div><div className="stat-card"><span>OUT OF STOCK</span><strong>{p.stats.out}</strong><small>Available ≤ 0</small></div><div className="stat-card"><span>LEDGER INTEGRITY</span><strong>{p.integrity.status === "ok" ? "OK" : p.integrity.status === "checking" ? "Checking" : "Review"}</strong><small>{p.integrity.checked} balance records checked</small></div></section>

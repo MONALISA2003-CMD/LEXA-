@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     refresh_token_days: int = 30
     cors_origins: str = "http://localhost:3000"
     lexa_neon_branch_id: str = "br-soft-star-b1dj2m2w"
+    lexa_open_dev_mode: bool = False
+    lexa_open_dev_email: str = "preview@lexa.local"
+    lexa_open_dev_workspace_name: str = "LEXA Workspace"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property

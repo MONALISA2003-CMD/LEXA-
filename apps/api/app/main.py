@@ -6,7 +6,7 @@ from .config import settings
 from .health import check_database
 from .routes import auth, organization, rbac, catalog, inventory
 
-app = FastAPI(title="LEXA API", version="0.1.3")
+app = FastAPI(title="LEXA API", version="0.1.4")
 
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):

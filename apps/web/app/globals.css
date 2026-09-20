@@ -159,3 +159,5 @@ button { cursor: pointer; }
 .auth-form input:focus-visible,.password-toggle:focus-visible,.auth-tabs button:focus-visible,.modal-close:focus-visible,.auth-back:focus-visible,.workspace-option:focus-visible{outline:3px solid #dce8ff;outline-offset:2px}
 @media(max-width:600px){.modal-backdrop{padding:10px;align-items:center}.auth-modal{width:100%;max-height:calc(100vh - 20px);padding:22px;border-radius:24px}.auth-modal h2{font-size:29px;line-height:1.08}.auth-form{gap:15px}.auth-form input{min-height:48px}.password-toggle{min-height:34px}.workspace-option{min-height:58px;padding:11px}.auth-brand{margin-bottom:23px}}
 @media(max-height:700px){.auth-modal{max-height:calc(100vh - 12px);padding:19px}.auth-brand{margin-bottom:16px}.auth-modal h2{font-size:26px}.auth-tabs{margin:17px 0 14px}.auth-form{gap:11px}.auth-footnote{margin-top:12px;padding-top:10px}}
+
+.preview-badge{display:inline-flex;align-items:center;border:1px solid #d8e2ee;background:#f4f8fc;color:#183153;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:700;letter-spacing:.04em}
