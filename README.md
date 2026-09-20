@@ -1,4 +1,4 @@
-# LEXA — Experience Foundation v1.4.0
+# LEXA — Experience Foundation v1.4.1
 
 LEXA is being implemented as a real multi-purpose, multi-tenant business operating system. This package continues the existing LEXA implementation and focuses on the customer-facing experience, workspace authentication, responsive navigation and deployment readiness. It does not rebuild the application or reset business data.
 

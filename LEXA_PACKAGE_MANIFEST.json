@@ -1,6 +1,6 @@
 {
   "package": "LEXA Experience Foundation + Workspace Authentication",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "layout": "repository-root",
   "changes": [
     "Rebuilt the public LEXA landing experience around the supplied brand identity",

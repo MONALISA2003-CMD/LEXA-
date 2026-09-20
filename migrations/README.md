@@ -6,7 +6,7 @@ Apply migrations in order. This repository contains the complete LEXA migration 
 2. `002_identity_rbac_organization.sql`
 3. `003_rbac_sessions_organization_completion.sql`
 4. `004_catalog_and_rbac_hardening.sql`
-5. `005_inventory_foundation.sql` — existing inventory implementation; not deployed as part of the v1.4.0 experience release
+5. `005_inventory_foundation.sql` — existing inventory implementation; not deployed as part of the v1.4.1 experience release
 6. `006_phase1_security_reliability.sql`
 7. `007_phase2_catalog_hardening.sql`
 8. `008_workspace_registration_hardening.sql`
