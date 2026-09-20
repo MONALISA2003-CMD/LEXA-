@@ -1,0 +1,30 @@
+{
+  "package": "LEXA Workspace Registration Hardening",
+  "version": "1.2.0",
+  "layout": "repository-root",
+  "changes": [
+    "Hardened catalog schema on the LEXA development branch",
+    "Added database-enforced tenant consistency across catalog references",
+    "Added category hierarchy cycle protection",
+    "Added database-enforced unit/fraction rules",
+    "Added database-enforced temporal price overlap protection",
+    "Forced RLS across catalog tables and hardened system-unit access",
+    "Synchronized ORM outbox model with the deployed Phase 1 outbox contract",
+    "Added catalog idempotency records and product/variant idempotent creation",
+    "Connected the Products workspace to live tenant catalog APIs",
+    "Verified production branch remained untouched",
+    "workspace registration bootstrap now creates business_profiles",
+    "pre-tenant registration idempotency and replay protection",
+    "workspace creation audit and transactional outbox event",
+    "request ID propagation from FastAPI through Vercel proxy to frontend errors",
+    "registration hardening migration 008"
+  ],
+  "protected_paths": [
+    ".github/workflows/"
+  ],
+  "non_destructive": true,
+  "database_reset": false,
+  "seed_reset": false,
+  "product_deletion": false,
+  "description": "Deep catalog hardening on LEXA only. Inventory migration remains unapplied and production remains isolated."
+}
