@@ -19,7 +19,7 @@ Use the repository root as the Render Blueprint location. `render.yaml` sets:
 - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 - Health Check: `/health`
 
-Set the secret values listed in the deployment runbook. `sync: false` variables must be entered in Render and are not stored in Git.
+Set the secret values listed in the deployment runbook. `sync: false` variables must be entered in Render and are not stored in Git. For the hardened development deployment, set `DATABASE_APP_ROLE=lexa_app` only after the target LEXA Neon branch has the `lexa_app` role and grants.
 
 ## Vercel
 
@@ -43,7 +43,7 @@ After the Vercel URL is known, put that URL in the Render API's `CORS_ORIGINS`. 
 2. Add the Render environment variables.
 3. Create Render Key Value and set `REDIS_URL` to its connection URL.
 4. Set `DATABASE_URL` to the production Neon connection string using the `postgresql+psycopg://` scheme.
-5. Deploy and confirm `/health` returns HTTP 200.
+5. Deploy and confirm `/health` returns HTTP 200. Then confirm `/ready` reports both database connectivity and the LEXA schema as ready. A reachable but schema-empty Neon branch is intentionally reported as not ready.
 6. Create the Vercel project with Root Directory `apps/web`.
 7. Set `NEXT_PUBLIC_API_URL` to the Render API URL and deploy.
 8. Add the Vercel production URL to Render `CORS_ORIGINS` and redeploy the API.

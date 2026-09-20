@@ -29,6 +29,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const out = new NextResponse(body, { status: response.status, statusText: response.statusText });
     const responseType = response.headers.get("content-type");
     if (responseType) out.headers.set("content-type", responseType);
+    const responseRequestId = response.headers.get("x-request-id");
+    if (responseRequestId) out.headers.set("x-request-id", responseRequestId);
     return out;
   } catch (error) {
     return NextResponse.json(

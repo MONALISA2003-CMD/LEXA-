@@ -1,11 +1,25 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from uuid import UUID, uuid4
 
 from .config import settings
 from .health import check_database
 from .routes import auth, organization, rbac, catalog, inventory
 
-app = FastAPI(title="LEXA API", version="0.1.2")
+app = FastAPI(title="LEXA API", version="0.1.3")
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    incoming = request.headers.get("X-Request-ID", "").strip()
+    try:
+        request_id = str(UUID(incoming)) if incoming else str(uuid4())
+    except ValueError:
+        request_id = str(uuid4())
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,

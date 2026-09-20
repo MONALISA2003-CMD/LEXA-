@@ -1,20 +1,36 @@
 from datetime import datetime, timedelta, timezone
+import logging
+import secrets
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, EmailStr
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
+
 from ..auth import create_access_token, hash_password, verify_password, new_refresh_token, hash_refresh_token
+from ..catalog_rules import request_hash
 from ..dependencies import get_db
-from ..models import Tenant, TenantMembership, User, Session as AuthSession, Device, Role, MembershipRole, Permission, RolePermission
+from ..models import (
+    Tenant, TenantMembership, User, Session as AuthSession, Device,
+    Role, MembershipRole, Permission, RolePermission, BusinessProfile,
+    RegistrationRequest,
+)
+from ..catalog import emit_event, write_audit
+from ..health import check_database
 from ..config import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger("lexa.auth")
+
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str
-    tenant_name: str
+    password: str = Field(min_length=12, max_length=256)
+    tenant_name: str = Field(min_length=2, max_length=200)
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -24,31 +40,159 @@ class LoginRequest(BaseModel):
     device_name: str | None = None
     platform: str | None = None
 
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 
+
+def _registration_key(value: str | None) -> str:
+    if value is None or not value.strip():
+        return secrets.token_urlsafe(24)
+    value = value.strip()
+    if len(value) > 200:
+        raise HTTPException(status_code=400, detail="Invalid Idempotency-Key")
+    return value
+
+
+def _registration_hash(body: RegisterRequest) -> str:
+    return request_hash({
+        "email": body.email.lower(),
+        "password": body.password,
+        "tenant_name": body.tenant_name.strip(),
+    })
+
+
 @router.post("/register")
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
-    if len(body.password) < 12:
-        raise HTTPException(400, "Password must be at least 12 characters")
-    email = body.email.lower()
-    if db.scalar(select(User).where(User.email == email)):
-        raise HTTPException(409, "User already exists")
-    tenant = Tenant(name=body.tenant_name.strip())
-    user = User(email=email, password_hash=hash_password(body.password))
-    db.add_all([tenant, user]); db.flush()
-    db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant.id)})
-    membership = TenantMembership(tenant_id=tenant.id, user_id=user.id, status="ACTIVE")
-    db.add(membership); db.flush()
-    owner = Role(tenant_id=tenant.id, name="Owner", description="Initial tenant owner")
-    db.add(owner); db.flush()
-    db.add(MembershipRole(membership_id=membership.id, role_id=owner.id))
-    # Owner starts with all currently defined permissions. Future permissions are
-    # intentionally added through migrations rather than silently changing roles.
-    permissions = db.scalars(select(Permission)).all()
-    db.add_all([RolePermission(role_id=owner.id, permission_id=p.id) for p in permissions])
-    db.commit()
-    return {"user_id": user.id, "tenant_id": tenant.id}
+def register(
+    body: RegisterRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+):
+    email = body.email.lower().strip()
+    tenant_name = body.tenant_name.strip()
+    if not tenant_name:
+        raise HTTPException(400, "Business name is required")
+
+    key = _registration_key(idempotency_key)
+    digest = _registration_hash(body)
+
+    request_id = getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID") or "untracked"
+
+    database_ready, database_error = check_database()
+    if not database_ready:
+        raise HTTPException(503, f"LEXA database is not ready: {database_error}")
+
+    try:
+        # Registration is pre-tenant, so its idempotency record intentionally lives
+        # outside tenant RLS. The unique key makes retries and concurrent submits safe.
+        stmt = insert(RegistrationRequest).values(
+            idempotency_key=key,
+            email=email,
+            request_hash=digest,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+        ).on_conflict_do_nothing(index_elements=["idempotency_key"])
+        db.execute(stmt)
+        registration = db.scalar(
+            select(RegistrationRequest)
+            .where(RegistrationRequest.idempotency_key == key)
+            .with_for_update()
+        )
+        if not registration:
+            raise HTTPException(500, "Unable to establish registration request")
+        if registration.request_hash != digest:
+            raise HTTPException(409, "Idempotency-Key was already used with a different request")
+        if registration.response_status is not None:
+            return registration.response_body or {}
+
+        existing = db.scalar(select(User).where(User.email == email))
+        if existing:
+            raise HTTPException(409, "User already exists")
+
+        tenant = Tenant(name=tenant_name)
+        user = User(email=email, password_hash=hash_password(body.password))
+        db.add_all([tenant, user])
+        db.flush()
+
+        # Set tenant context before any RLS-protected tenant-owned insert.
+        db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant.id)})
+
+        profile = BusinessProfile(
+            tenant_id=tenant.id,
+            legal_name=tenant_name,
+            display_name=tenant_name,
+            country_code="UG",
+            currency_code="UGX",
+        )
+        membership = TenantMembership(tenant_id=tenant.id, user_id=user.id, status="ACTIVE")
+        db.add_all([profile, membership])
+        db.flush()
+
+        owner = Role(tenant_id=tenant.id, name="Owner", description="Initial tenant owner")
+        db.add(owner)
+        db.flush()
+        db.add(MembershipRole(membership_id=membership.id, role_id=owner.id))
+
+        permissions = db.scalars(select(Permission)).all()
+        if permissions:
+            db.add_all([RolePermission(role_id=owner.id, permission_id=p.id) for p in permissions])
+
+        correlation_id = request_id
+        write_audit(
+            db,
+            tenant_id=tenant.id,
+            actor_user_id=user.id,
+            action="workspace.create",
+            target_type="tenant",
+            target_id=tenant.id,
+            outcome="SUCCESS",
+            correlation_id=correlation_id,
+        )
+        emit_event(
+            db,
+            tenant_id=tenant.id,
+            event_type="workspace.created",
+            aggregate_type="tenant",
+            aggregate_id=tenant.id,
+            payload={"tenant_id": str(tenant.id), "user_id": str(user.id), "business_name": tenant_name},
+            actor_user_id=user.id,
+            correlation_id=correlation_id,
+        )
+
+        response = {"user_id": str(user.id), "tenant_id": str(tenant.id)}
+        registration.response_status = 201
+        registration.response_body = response
+        registration.user_id = user.id
+        registration.tenant_id = tenant.id
+        db.commit()
+        return response
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as exc:
+        db.rollback()
+        # A concurrent registration for the same email is a client conflict, not a 500.
+        if "users_email_key" in str(exc.orig) or "email" in str(exc.orig).lower():
+            raise HTTPException(409, "User already exists") from exc
+        raise HTTPException(409, "Workspace could not be created because of a data conflict") from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("workspace_registration_database_failure", extra={"request_id": request_id, "email": email})
+        raise HTTPException(503, detail={
+            "code": "WORKSPACE_DATABASE_FAILURE",
+            "message": "Workspace service could not complete the database transaction",
+            "request_id": request_id,
+        }) from exc
+    except Exception as exc:
+        db.rollback()
+        logger.exception("workspace_registration_unexpected_failure", extra={"request_id": request_id, "email": email})
+        raise HTTPException(500, detail={
+            "code": "WORKSPACE_REGISTRATION_FAILURE",
+            "message": "Workspace creation failed. Please try again.",
+            "request_id": request_id,
+        }) from exc
+
 
 @router.post("/login")
 def login(body: LoginRequest, db: Session = Depends(get_db)):
@@ -68,6 +212,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
     db.add(session); db.commit()
     return {"access_token": create_access_token(user.id, body.tenant_id, session.id), "refresh_token": refresh, "token_type": "bearer", "session_id": session.id}
 
+
 @router.post("/refresh")
 def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     token_hash = hash_refresh_token(body.refresh_token)
@@ -84,6 +229,7 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     session.refresh_token_hash = hash_refresh_token(new_refresh)
     db.commit()
     return {"access_token": create_access_token(user.id, session.tenant_id, session.id), "refresh_token": new_refresh, "token_type": "bearer", "session_id": session.id}
+
 
 @router.post("/logout")
 def logout(body: RefreshRequest, db: Session = Depends(get_db)):

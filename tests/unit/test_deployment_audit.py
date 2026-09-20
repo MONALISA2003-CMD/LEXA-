@@ -50,6 +50,7 @@ def test_render_runtime_contract_is_intact():
     assert "pip install -r requirements.txt" in render
     assert "uvicorn app.main:app --host 0.0.0.0 --port $PORT" in render
     assert "healthCheckPath: /health" in render
+    assert "key: DATABASE_APP_ROLE" in render
 
 
 def test_health_import_contract_has_no_missing_redis_symbol():
@@ -66,3 +67,10 @@ def test_system_routes_are_declared():
     assert '@app.get("/api/health"' in source
     assert '@app.get("/ready"' in source
     assert '@app.get("/api/ready"' in source
+
+
+def test_readiness_requires_lexa_schema_sentinel():
+    health = (API / "app/health.py").read_text()
+    assert "LEXA_SCHEMA_NOT_READY" in health
+    assert '"registration_requests"' in health
+    assert '"business_profiles"' in health

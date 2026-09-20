@@ -6,6 +6,20 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
+class RegistrationRequest(Base):
+    __tablename__ = "registration_requests"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    idempotency_key: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    response_status: Mapped[int | None] = mapped_column()
+    response_body: Mapped[dict | None] = mapped_column(JSON)
+    user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    tenant_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class Tenant(Base):
     __tablename__ = "tenants"
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)

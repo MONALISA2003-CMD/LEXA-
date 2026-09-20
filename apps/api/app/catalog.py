@@ -37,6 +37,12 @@ def write_audit(db: Session, *, tenant_id: UUID, actor_user_id: UUID | None, act
 def emit_event(db: Session, *, tenant_id: UUID, event_type: str, aggregate_type: str,
                aggregate_id: UUID, payload: dict[str, Any], actor_user_id: UUID | None = None,
                correlation_id: str | None = None) -> OutboxEvent:
+    parsed_correlation_id = None
+    if correlation_id:
+        try:
+            parsed_correlation_id = UUID(correlation_id)
+        except (ValueError, TypeError):
+            parsed_correlation_id = None
     event = OutboxEvent(
         tenant_id=tenant_id,
         event_type=event_type,
@@ -46,7 +52,7 @@ def emit_event(db: Session, *, tenant_id: UUID, event_type: str, aggregate_type:
         occurred_at=utc_now(),
         payload=payload,
         actor_id=actor_user_id,
-        correlation_id=UUID(correlation_id) if correlation_id else None,
+        correlation_id=parsed_correlation_id,
     )
     db.add(event)
     return event
