@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: lexa-api
+    runtime: python
+    rootDir: apps/api
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: APP_ENV
+        value: development
+      - key: LEXA_OPEN_DEV_MODE
+        value: "true"
+      - key: LEXA_OPEN_DEV_EMAIL
+        value: preview@lexa.local
+      - key: LEXA_OPEN_DEV_WORKSPACE_NAME
+        value: LEXA Workspace
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_APP_ROLE
+        sync: false
+      - key: LEXA_NEON_BRANCH_ID
+        value: br-soft-star-b1dj2m2w
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_ISSUER
+        value: lexa
+      - key: JWT_AUDIENCE
+        value: lexa-web
+      - key: ACCESS_TOKEN_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_DAYS
+        value: "30"
+      - key: CORS_ORIGINS
+        sync: false
