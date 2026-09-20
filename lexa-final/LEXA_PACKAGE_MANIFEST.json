@@ -1,0 +1,39 @@
+{
+  "package": "LEXA Experience Foundation + Workspace Authentication",
+  "version": "1.4.2",
+  "layout": "repository-root",
+  "changes": [
+    "Rebuilt the public LEXA landing experience around the supplied brand identity",
+    "Added LEXA mark, wordmark and browser icon assets",
+    "Added responsive authenticated workspace shell with desktop sidebar and mobile navigation",
+    "Added branded sign-in and create-workspace flows",
+    "Removed workspace ID entry from normal sign-in",
+    "Added automatic workspace resolution for single-workspace accounts",
+    "Added workspace picker for multi-workspace accounts",
+    "Added friendly frontend error normalization for authentication and service failures",
+    "Removed developer-facing infrastructure diagnostics from the customer-facing frontend",
+    "Updated browser metadata and favicon assets to the LEXA brand",
+    "Added workspace registration hardening migration 008",
+    "Added workspace selection migration 009",
+    "Applied and verified migrations 008 and 009 on the LEXA development branch",
+    "Verified the LEXA production branch remained untouched",
+    "Kept existing catalog functionality connected to tenant-scoped live APIs",
+    "Kept the existing inventory implementation in source for the subsequent product phase without deploying its database migration",
+    "Hardened authentication modal interactions for keyboard, focus, mobile and password visibility states",
+    "Removed stale workspace selection state from normal sign-in and persisted active workspace name safely in session storage",
+    "Normalized network failures so customer UI never receives raw browser connection diagnostics",
+    "Added canonical Neon branch identity verification to application readiness checks",
+    "Renamed the populated Neon branch to lexa-live, removed branch expiry, and made it the LEXA project default branch",
+    "Added deployment configuration for the canonical Neon branch id",
+    "Fixed CSS flex-end compatibility warnings",
+    "Expanded validation to 44 automated tests"
+  ],
+  "protected_paths": [
+    ".github/workflows/"
+  ],
+  "non_destructive": true,
+  "database_reset": false,
+  "seed_reset": false,
+  "product_deletion": false,
+  "description": "LEXA customer experience, workspace authentication and canonical database safety foundation. The populated LEXA branch is now the permanent non-expiring project default named lexa-live; the empty legacy production branch remains untouched."
+}
