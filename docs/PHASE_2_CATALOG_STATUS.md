@@ -2,7 +2,7 @@
 
 ## Target
 
-LEXA Neon development branch `lexa-phase1-dev` only. Production remains untouched.
+LEXA Neon development branch `lexa-live` only. Production remains untouched.
 
 ## Implemented
 

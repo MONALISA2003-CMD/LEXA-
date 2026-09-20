@@ -39,3 +39,12 @@ def test_brand_assets_are_present():
         "lexa-icon-32.png",
     ]:
         assert (public / name).exists(), f"Missing LEXA brand asset: {name}"
+
+
+def test_auth_surface_has_safe_network_and_password_states():
+    page = (WEB / "app/page.tsx").read_text()
+    api = (WEB / "lib/api.ts").read_text()
+    assert "password-toggle" in page
+    assert "Use another account" in page
+    assert "We couldn't connect to LEXA right now." in api
+    assert "Failed to fetch" not in api

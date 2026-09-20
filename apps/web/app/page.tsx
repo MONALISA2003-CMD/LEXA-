@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   approveAdjustment, approveStockCount, approveTransfer, completeTransfer, createAdjustment, createLocation, createWarehouse,
   createStockCount, createTransfer, dispatchTransfer, getAdjustments, getHealth, getInventoryBalances,
@@ -38,6 +38,7 @@ export default function HomePage() {
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [authWorkspaces, setAuthWorkspaces] = useState<WorkspaceChoice[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -119,7 +120,29 @@ export default function HomePage() {
     finally { setCatalogBusy(false); }
   }
 
-  useEffect(() => { refreshSystem(); const saved = window.sessionStorage.getItem("lexa_access_token"); const savedWorkspace = window.sessionStorage.getItem("lexa_workspace_id"); if (saved) setToken(saved); if (savedWorkspace) setTenantId(savedWorkspace); }, []);
+  useEffect(() => {
+    refreshSystem();
+    const saved = window.sessionStorage.getItem("lexa_access_token");
+    const savedWorkspace = window.sessionStorage.getItem("lexa_workspace_id");
+    const savedWorkspaceName = window.sessionStorage.getItem("lexa_workspace_name");
+    const savedEmail = window.sessionStorage.getItem("lexa_email");
+    if (saved) setToken(saved);
+    if (savedWorkspace) setTenantId(savedWorkspace);
+    if (savedWorkspaceName) setTenantName(savedWorkspaceName);
+    if (savedEmail) setEmail(savedEmail);
+  }, []);
+  useEffect(() => {
+    if (!authOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !authBusy) {
+        setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false);
+      }
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener("keydown", onKeyDown); };
+  }, [authOpen, authBusy]);
   useEffect(() => { if (token && active === "Inventory") refreshInventory(); }, [token, active, invTab, locationFilter]);
   useEffect(() => { if (token && active === "Products") refreshCatalog(); }, [token, active, catalogSearch]);
 
@@ -145,39 +168,46 @@ export default function HomePage() {
   }
 
   async function submitAuth(event: React.FormEvent) {
-    event.preventDefault(); setAuthError(null); setAuthBusy(true);
+    event.preventDefault();
+    setAuthError(null);
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanBusinessName = tenantName.trim();
+    if (!cleanEmail) { setAuthError("Enter your email address to continue."); return; }
+    if (password.length < 12) { setAuthError("Use a password with at least 12 characters."); return; }
+    if (authMode === "register" && cleanBusinessName.length < 2) { setAuthError("Enter your business name to continue."); return; }
+    setAuthBusy(true);
     try {
-      let tid = tenantId || undefined;
+      let selectedWorkspace = authMode === "register" ? tenantId || undefined : undefined;
       if (authMode === "register") {
-        const created = await register({ email, password, tenant_name: tenantName });
-        tid = created.tenant_id;
-        setTenantId(created.tenant_id);
-        window.sessionStorage.setItem("lexa_workspace_id", created.tenant_id);
+        const created = await register({ email: cleanEmail, password, tenant_name: cleanBusinessName });
+        selectedWorkspace = created.tenant_id;
       }
-      const session = await login({ email, password, tenant_id: tid });
+      const session = await login({ email: cleanEmail, password, tenant_id: selectedWorkspace });
       window.sessionStorage.setItem("lexa_access_token", session.access_token);
       window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
-      setTenantId(session.tenant_id); setTenantName(session.tenant_name);
-      setToken(session.access_token); setAuthOpen(false); setAuthWorkspaces([]); setActive("Overview");
+      window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
+      window.sessionStorage.setItem("lexa_email", cleanEmail);
+      setTenantId(session.tenant_id); setTenantName(session.tenant_name); setEmail(cleanEmail);
+      setToken(session.access_token); setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); setActive("Overview");
     } catch (e) {
-      if (e instanceof WorkspaceSelectionError) { setAuthWorkspaces(e.workspaces); setAuthError("Choose a workspace to continue."); }
-      else { setAuthError(e instanceof Error ? e.message : "We couldn't sign you in. Please try again."); }
+      if (e instanceof WorkspaceSelectionError) { setAuthWorkspaces(e.workspaces); setAuthError(null); }
+      else { setAuthError(e instanceof Error ? e.message : "We couldn't complete that request. Please try again."); }
     } finally { setAuthBusy(false); }
   }
   async function chooseWorkspace(workspaceId: string) {
     setAuthBusy(true); setAuthError(null);
     try {
-      const session = await login({ email, password, tenant_id: workspaceId });
-      setTenantId(workspaceId);
-      window.sessionStorage.setItem("lexa_workspace_id", workspaceId);
-      window.sessionStorage.setItem("lexa_access_token", session.access_token);
+      const session = await login({ email: email.trim().toLowerCase(), password, tenant_id: workspaceId });
       window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
+      window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
+      window.sessionStorage.setItem("lexa_access_token", session.access_token);
+      window.sessionStorage.setItem("lexa_email", email.trim().toLowerCase());
       setTenantId(session.tenant_id); setTenantName(session.tenant_name);
-      setToken(session.access_token); setAuthOpen(false); setAuthWorkspaces([]); setActive("Overview");
+      setToken(session.access_token); setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); setActive("Overview");
     } catch (e) { setAuthError(e instanceof Error ? e.message : "We couldn't open that workspace. Please try again."); }
     finally { setAuthBusy(false); }
   }
-  function signOut() { window.sessionStorage.removeItem("lexa_access_token"); window.sessionStorage.removeItem("lexa_workspace_id"); setToken(null); setTenantId(""); setTenantName(""); setEmail(""); setPassword(""); setAuthWorkspaces([]); setBalances([]); setLocations([]); setVariants([]); setActive("Overview"); setMobileMenuOpen(false); }
+  function signOut() { window.sessionStorage.removeItem("lexa_access_token"); window.sessionStorage.removeItem("lexa_workspace_id"); window.sessionStorage.removeItem("lexa_workspace_name"); window.sessionStorage.removeItem("lexa_email"); setToken(null); setTenantId(""); setTenantName(""); setEmail(""); setPassword(""); setAuthWorkspaces([]); setBalances([]); setLocations([]); setVariants([]); setCatalogProducts([]); setCatalogVariants([]); setActive("Overview"); setMobileMenuOpen(false); }
   function clearInvMessage() { setInvMessage(null); setError(null); }
 
   async function submitAdjustment(e: React.FormEvent) {
@@ -253,7 +283,7 @@ export default function HomePage() {
         <section className="public-cta"><div><span className="section-label">LEXA</span><h2>Give your business one place to operate.</h2><p>Create a workspace and bring the day to day together.</p></div><button className="button button-light button-large" onClick={() => { setAuthMode("register"); setAuthOpen(true); }}>Create your workspace</button></section>
         <footer className="public-footer"><div className="footer-brand">{logo}</div><p>Business operations, connected.</p><span>© {new Date().getFullYear()} LEXA</span></footer>
 
-        {authOpen && <AuthModal authMode={authMode} setAuthMode={(mode) => { setAuthMode(mode); setAuthError(null); setAuthWorkspaces([]); }} email={email} setEmail={setEmail} password={password} setPassword={setPassword} tenantName={tenantName} setTenantName={setTenantName} authError={authError} authBusy={authBusy} onSubmit={submitAuth} onClose={() => { setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); }} workspaces={authWorkspaces} onChooseWorkspace={chooseWorkspace} />}
+        {authOpen && <AuthModal authMode={authMode} setAuthMode={(mode) => { setAuthMode(mode); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); }} email={email} setEmail={setEmail} password={password} setPassword={setPassword} tenantName={tenantName} setTenantName={setTenantName} authError={authError} authBusy={authBusy} onSubmit={submitAuth} onClose={() => { setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); }} workspaces={authWorkspaces} onChooseWorkspace={chooseWorkspace} passwordVisible={passwordVisible} setPasswordVisible={setPasswordVisible} />}
       </main>
     );
   }
@@ -283,7 +313,7 @@ export default function HomePage() {
 
       <nav className="mobile-nav" aria-label="Mobile navigation">{modules.slice(0, 4).map(item => <button key={item.name} className={active === item.name ? "active" : ""} onClick={() => setActive(item.name)}><NavIcon name={item.name} /><span>{item.name}</span></button>)}<button onClick={() => setMobileMenuOpen(true)}><span className="more-icon">•••</span><span>More</span></button></nav>
 
-      {authOpen && <AuthModal authMode={authMode} setAuthMode={(mode) => { setAuthMode(mode); setAuthError(null); setAuthWorkspaces([]); }} email={email} setEmail={setEmail} password={password} setPassword={setPassword} tenantName={tenantName} setTenantName={setTenantName} authError={authError} authBusy={authBusy} onSubmit={submitAuth} onClose={() => { setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); }} workspaces={authWorkspaces} onChooseWorkspace={chooseWorkspace} />}
+      {authOpen && <AuthModal authMode={authMode} setAuthMode={(mode) => { setAuthMode(mode); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); }} email={email} setEmail={setEmail} password={password} setPassword={setPassword} tenantName={tenantName} setTenantName={setTenantName} authError={authError} authBusy={authBusy} onSubmit={submitAuth} onClose={() => { setAuthOpen(false); setAuthError(null); setAuthWorkspaces([]); setPasswordVisible(false); }} workspaces={authWorkspaces} onChooseWorkspace={chooseWorkspace} passwordVisible={passwordVisible} setPasswordVisible={setPasswordVisible} />}
     </main>
   );
 }
@@ -300,12 +330,54 @@ function NavIcon({ name }: { name: string }) {
   return <svg {...common}><path d="M12 3 14 8l5 .5-3.7 3.2 1.1 5.1-4.4-2.8-4.4 2.8 1.1-5.1L5 8.5 10 8z"/><circle cx="12" cy="12" r="2"/></svg>;
 }
 
-type AuthModalProps = { authMode: "login" | "register"; setAuthMode: (mode: "login" | "register") => void; email: string; setEmail: (v: string) => void; password: string; setPassword: (v: string) => void; tenantName: string; setTenantName: (v: string) => void; authError: string | null; authBusy: boolean; onSubmit: (e: React.FormEvent) => void; onClose: () => void; workspaces: WorkspaceChoice[]; onChooseWorkspace: (id: string) => void; };
+type AuthModalProps = { authMode: "login" | "register"; setAuthMode: (mode: "login" | "register") => void; email: string; setEmail: (v: string) => void; password: string; setPassword: (v: string) => void; tenantName: string; setTenantName: (v: string) => void; authError: string | null; authBusy: boolean; onSubmit: (e: React.FormEvent) => void; onClose: () => void; workspaces: WorkspaceChoice[]; onChooseWorkspace: (id: string) => void; passwordVisible: boolean; setPasswordVisible: (v: boolean) => void; };
 function AuthModal(p: AuthModalProps) {
   const choosing = p.authMode === "login" && p.workspaces.length > 0;
-  return <div className="modal-backdrop" onClick={p.onClose}><div className="auth-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={p.onClose} aria-label="Close">×</button><div className="auth-brand"><img src="/lexa-mark.png" alt="" aria-hidden="true"/><div><strong>LEXA</strong><span>Business workspace</span></div></div>
-    {choosing ? <><span className="section-label">CHOOSE A WORKSPACE</span><h2>Where would you like to work?</h2><p className="auth-subtitle">You have access to more than one workspace.</p><div className="workspace-picker">{p.workspaces.map(ws => <button key={ws.tenant_id} className="workspace-option" disabled={p.authBusy} onClick={() => p.onChooseWorkspace(ws.tenant_id)}><span className="workspace-option-avatar">{ws.tenant_name.slice(0,1).toUpperCase()}</span><span><strong>{ws.tenant_name}</strong><small>Open workspace</small></span><span>→</span></button>)}</div>{p.authError && <div className="auth-error">{p.authError}</div>}</> : <><span className="section-label">{p.authMode === "login" ? "WELCOME BACK" : "START WITH LEXA"}</span><h2>{p.authMode === "login" ? "Sign in to your workspace" : "Create your workspace"}</h2><p className="auth-subtitle">{p.authMode === "login" ? "Use your email and password to continue." : "Set up one place for your business to operate."}</p><div className="auth-tabs"><button className={p.authMode === "login" ? "active" : ""} onClick={() => p.setAuthMode("login")}>Sign in</button><button className={p.authMode === "register" ? "active" : ""} onClick={() => p.setAuthMode("register")}>Create workspace</button></div><form onSubmit={p.onSubmit} className="auth-form"><label>Email<input type="email" value={p.email} onChange={e => p.setEmail(e.target.value)} placeholder="you@business.com" autoComplete="email" required /></label><label>Password<input type="password" value={p.password} onChange={e => p.setPassword(e.target.value)} placeholder="At least 12 characters" autoComplete={p.authMode === "login" ? "current-password" : "new-password"} minLength={12} required /></label>{p.authMode === "register" && <label>Business name<input value={p.tenantName} onChange={e => p.setTenantName(e.target.value)} placeholder="Your business name" autoComplete="organization" required /></label>}{p.authError && <div className="auth-error">{p.authError}</div>}<button className="button button-dark button-full" disabled={p.authBusy}>{p.authBusy ? "Please wait…" : p.authMode === "login" ? "Sign in" : "Create workspace"}</button></form></>}
-    <div className="auth-footnote">Your workspace stays focused on the work that matters.</div></div></div>;
+  const emailRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => { const timer = window.setTimeout(() => emailRef.current?.focus(), 40); return () => window.clearTimeout(timer); }, [choosing, p.authMode]);
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !p.authBusy) p.onClose(); }}>
+      <div className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" onMouseDown={(event) => event.stopPropagation()}>
+        <button className="modal-close" type="button" onClick={p.onClose} aria-label="Close sign in">×</button>
+        <div className="auth-brand"><img src="/lexa-mark.png" alt="" aria-hidden="true"/><div><strong>LEXA</strong><span>Business workspace</span></div></div>
+        {choosing ? (
+          <>
+            <span className="section-label">CHOOSE A WORKSPACE</span>
+            <h2 id="auth-title">Where would you like to work?</h2>
+            <p className="auth-subtitle">Choose the business workspace you want to open.</p>
+            <div className="workspace-picker">
+              {p.workspaces.map(ws => <button key={ws.tenant_id} type="button" className="workspace-option" disabled={p.authBusy} onClick={() => p.onChooseWorkspace(ws.tenant_id)}><span className="workspace-option-avatar">{ws.tenant_name.slice(0,1).toUpperCase()}</span><span><strong>{ws.tenant_name}</strong><small>Open workspace</small></span><span aria-hidden="true">→</span></button>)}
+            </div>
+            {p.authError && <div className="auth-error" role="alert">{p.authError}</div>}
+            <button className="auth-back" type="button" onClick={() => p.setAuthMode("login")} disabled={p.authBusy}>Use another account</button>
+          </>
+        ) : (
+          <>
+            <span className="section-label">{p.authMode === "login" ? "WELCOME BACK" : "START WITH LEXA"}</span>
+            <h2 id="auth-title">{p.authMode === "login" ? "Sign in to your workspace" : "Create your workspace"}</h2>
+            <p className="auth-subtitle">{p.authMode === "login" ? "Use your email and password to continue." : "Set up one place for your business to operate."}</p>
+            <div className="auth-tabs" aria-label="Account access">
+              <button type="button" className={p.authMode === "login" ? "active" : ""} disabled={p.authBusy} onClick={() => p.setAuthMode("login")}>Sign in</button>
+              <button type="button" className={p.authMode === "register" ? "active" : ""} disabled={p.authBusy} onClick={() => p.setAuthMode("register")}>Create workspace</button>
+            </div>
+            <form onSubmit={p.onSubmit} className="auth-form">
+              <label>Email<input ref={emailRef} type="email" value={p.email} onChange={e => p.setEmail(e.target.value)} placeholder="you@business.com" autoComplete="email" inputMode="email" autoCapitalize="none" aria-label="Email address" required /></label>
+              <label>Password
+                <span className="password-field">
+                  <input type={p.passwordVisible ? "text" : "password"} value={p.password} onChange={e => p.setPassword(e.target.value)} placeholder="At least 12 characters" autoComplete={p.authMode === "login" ? "current-password" : "new-password"} minLength={12} aria-label="Password" required />
+                  <button type="button" className="password-toggle" onClick={() => p.setPasswordVisible(!p.passwordVisible)} aria-label={p.passwordVisible ? "Hide password" : "Show password"}>{p.passwordVisible ? "Hide" : "Show"}</button>
+                </span>
+              </label>
+              {p.authMode === "register" && <label>Business name<input value={p.tenantName} onChange={e => p.setTenantName(e.target.value)} placeholder="Your business name" autoComplete="organization" required /></label>}
+              {p.authError && <div className="auth-error" role="alert">{p.authError}</div>}
+              <button className="button button-dark button-full button-auth-submit" disabled={p.authBusy}>{p.authBusy ? "Working…" : p.authMode === "login" ? "Sign in" : "Create workspace"}</button>
+            </form>
+          </>
+        )}
+        <div className="auth-footnote">Your workspace stays focused on the work that matters.</div>
+      </div>
+    </div>
+  );
 }
 
 type CatalogProps = any;

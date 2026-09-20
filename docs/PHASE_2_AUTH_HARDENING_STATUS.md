@@ -18,14 +18,14 @@ This hardening is LEXA-only and targets the development implementation branch be
 - Accounts with multiple active workspaces receive a workspace picker.
 - Browser-facing errors are translated into business-friendly messages.
 - Internal trace identifiers and infrastructure diagnostics are kept out of customer-facing frontend messages.
-- Migration `008_workspace_registration_hardening` was applied to `lexa-phase1-dev`.
-- Migration `009_auth_workspace_picker` was applied to `lexa-phase1-dev`.
+- Migration `008_workspace_registration_hardening` was applied to `lexa-live`.
+- Migration `009_auth_workspace_picker` was applied to `lexa-live`.
 
 ## Environment requirement still external to this source package
 
 The live Vercel deployment uses a separate FastAPI service. Its secret `DATABASE_URL` is not stored in Git and cannot safely be embedded in this package.
 
-For development validation, the FastAPI service must point to the LEXA `lexa-phase1-dev` Neon branch. LEXA production remains intentionally untouched and currently contains zero application tables.
+For development validation, the FastAPI service must point to the LEXA `lexa-live` Neon branch. LEXA production remains intentionally untouched and currently contains zero application tables.
 
 The service should expose the health and readiness checks used by the deployment environment and the authenticated workspace flows.
 
@@ -35,7 +35,7 @@ The service should expose the health and readiness checks used by the deployment
 - Frontend customer-language contract: PASS.
 - TypeScript source transpilation checks: PASS.
 - Python compilation: PASS.
-- Neon migrations 008 and 009: applied successfully on `lexa-phase1-dev`.
+- Neon migrations 008 and 009: applied successfully on `lexa-live`.
 - Production branch: not modified.
 - No production data reset, deletion, or seeding performed.
 

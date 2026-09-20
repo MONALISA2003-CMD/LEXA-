@@ -33,7 +33,7 @@ function friendlyMessage(status: number, payload: unknown): string {
   if (status === 400 && raw === "Business name is required") return "Enter your business name to continue.";
   if (status === 422) return "Please check the information and try again.";
   if (status === 429) return "Too many attempts. Please wait a moment and try again.";
-  if (status >= 500) return "LEXA is temporarily unavailable. Please try again shortly.";
+  if (status >= 500) return "We couldn't connect to LEXA right now. Please try again in a moment.";
   if (status >= 400) return "We couldn't complete that action. Please review the information and try again.";
   return "Something went wrong. Please try again.";
 }
@@ -41,7 +41,12 @@ function friendlyMessage(status: number, payload: unknown): string {
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   const auth = typeof window !== "undefined" ? window.sessionStorage.getItem("lexa_access_token") : null;
   const headers: HeadersInit = { Accept: "application/json", ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(init?.headers || {}) };
-  const response = await fetch(`/api/lexa${path}`, { cache: "no-store", ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(`/api/lexa${path}`, { cache: "no-store", ...init, headers });
+  } catch {
+    throw new Error("We couldn't connect to LEXA right now. Check your connection and try again.");
+  }
   const text = await response.text();
   let payload: unknown = null;
   try { payload = text ? JSON.parse(text) : null; } catch { payload = text; }

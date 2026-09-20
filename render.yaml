@@ -15,6 +15,8 @@ services:
         sync: false
       - key: DATABASE_APP_ROLE
         sync: false
+      - key: LEXA_NEON_BRANCH_ID
+        value: br-soft-star-b1dj2m2w
       - key: REDIS_URL
         sync: false
       - key: JWT_SECRET

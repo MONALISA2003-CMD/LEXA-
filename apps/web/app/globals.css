@@ -146,3 +146,16 @@ button { cursor: pointer; }
 @media(max-width:600px){.stat-grid{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}.filters{flex-direction:column}.filters input,.filters select{width:100%}.inventory-summary{padding:18px}.stat-card{padding:14px}.stat-card strong{font-size:21px}.inventory-section>.inventory-tabs+*{padding:15px}}
 .location-setup{max-width:720px;margin-bottom:22px}.location-setup form{border:1px solid #e1e6ee;background:#fafbfd;border-radius:12px;padding:18px}.location-setup h3{margin:0 0 5px}.location-setup p{color:#758298;font-size:12px;line-height:1.5;margin:0}.location-grid{grid-template-columns:repeat(3,1fr)}
 @media(max-width:900px){.location-grid{grid-template-columns:1fr 1fr}}@media(max-width:600px){.location-grid{grid-template-columns:1fr}}
+
+
+/* LEXA auth polish and responsive interaction states */
+.modal-backdrop{overscroll-behavior:contain}
+.auth-modal{width:min(560px,100%);max-height:min(760px,calc(100vh - 28px));overflow:auto;padding:32px}
+.auth-modal::-webkit-scrollbar{width:8px}.auth-modal::-webkit-scrollbar-thumb{background:#d5ddea;border-radius:999px}
+.auth-tabs button:disabled,.workspace-option:disabled,.auth-back:disabled{cursor:wait;opacity:.55}
+.password-field{position:relative;display:block}.password-field input{padding-right:72px}.password-toggle{position:absolute;right:7px;top:50%;transform:translateY(-50%);border:1px solid #dbe2ed;background:#f8fafc;color:#40516f;border-radius:8px;padding:6px 8px;font-size:9px;font-weight:800;letter-spacing:.03em}.password-toggle:hover{background:#fff;border-color:#bcc9dd}
+.button-auth-submit{min-height:48px}.auth-back{margin-top:15px;border:0;background:transparent;color:#4b5d7b;font-size:11px;font-weight:800;padding:7px;text-align:left}.auth-back:hover{color:var(--ink)}
+.auth-error{box-shadow:0 5px 20px rgba(156,77,77,.05)}
+.auth-form input:focus-visible,.password-toggle:focus-visible,.auth-tabs button:focus-visible,.modal-close:focus-visible,.auth-back:focus-visible,.workspace-option:focus-visible{outline:3px solid #dce8ff;outline-offset:2px}
+@media(max-width:600px){.modal-backdrop{padding:10px;align-items:center}.auth-modal{width:100%;max-height:calc(100vh - 20px);padding:22px;border-radius:24px}.auth-modal h2{font-size:29px;line-height:1.08}.auth-form{gap:15px}.auth-form input{min-height:48px}.password-toggle{min-height:34px}.workspace-option{min-height:58px;padding:11px}.auth-brand{margin-bottom:23px}}
+@media(max-height:700px){.auth-modal{max-height:calc(100vh - 12px);padding:19px}.auth-brand{margin-bottom:16px}.auth-modal h2{font-size:26px}.auth-tabs{margin:17px 0 14px}.auth-form{gap:11px}.auth-footnote{margin-top:12px;padding-top:10px}}

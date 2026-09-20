@@ -11,7 +11,7 @@ No other Neon project is part of this implementation.
 - Project ID: `wispy-mud-75323042`
 - Database: `neondb`
 - Production branch: `production` (`br-wild-river-b11wn8sg`)
-- Phase 1 validation branch: `lexa-phase1-dev` (`br-soft-star-b1dj2m2w`)
+- Phase 1 validation branch: `lexa-live` (`br-soft-star-b1dj2m2w`)
 - PostgreSQL: 18.6
 
 Production was not modified during this phase.

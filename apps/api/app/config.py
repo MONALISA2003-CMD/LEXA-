@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     access_token_minutes: int = 30
     refresh_token_days: int = 30
     cors_origins: str = "http://localhost:3000"
+    lexa_neon_branch_id: str = "br-soft-star-b1dj2m2w"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property

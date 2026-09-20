@@ -74,3 +74,14 @@ def test_readiness_requires_lexa_schema_sentinel():
     assert "LEXA_SCHEMA_NOT_READY" in health
     assert '"registration_requests"' in health
     assert '"business_profiles"' in health
+
+
+def test_database_readiness_locks_to_canonical_lexa_branch():
+    health = (API / "app/health.py").read_text()
+    config = CONFIG.read_text()
+    render = (ROOT / "render.yaml").read_text()
+    assert "neon.branch_id" in health
+    assert "LEXA_DATABASE_NOT_CANONICAL" in health
+    assert 'lexa_neon_branch_id: str = "br-soft-star-b1dj2m2w"' in config
+    assert "LEXA_NEON_BRANCH_ID" in render
+    assert "br-soft-star-b1dj2m2w" in render

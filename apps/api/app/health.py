@@ -1,6 +1,7 @@
 from sqlalchemy import text
 
 from .db import engine
+from .config import settings
 
 REQUIRED_TABLES = (
     "schema_migrations",
@@ -19,6 +20,10 @@ def check_database() -> tuple[bool, str | None]:
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
+            identity = connection.execute(text("SELECT current_database(), current_setting('neon.branch_id', true)" )).one()
+            database_name, branch_id = identity[0], identity[1]
+            if database_name != "neondb" or branch_id != settings.lexa_neon_branch_id:
+                return False, "LEXA_DATABASE_NOT_CANONICAL"
             result = connection.execute(
                 text("""
                     SELECT table_name

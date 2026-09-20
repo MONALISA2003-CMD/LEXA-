@@ -61,3 +61,10 @@ Never commit production `DATABASE_URL`, `REDIS_URL`, or `JWT_SECRET`. The source
 - Compatibility readiness alias: `GET /api/ready`
 
 `/health` is intentionally dependency-independent so Render can determine whether the process is alive. `/ready` verifies PostgreSQL and Redis/Valkey without exposing connection details.
+
+
+## Canonical LEXA Neon branch
+
+The permanent populated branch for LEXA is `lexa-live` (`br-soft-star-b1dj2m2w`) in Neon project `LEXA` (`wispy-mud-75323042`). It is non-expiring and is the project default branch. The API readiness check verifies `current_setting('neon.branch_id', true)` against this canonical branch id before reporting the database ready.
+
+The Render service must use a Neon connection string for this branch. A connection string for the empty legacy `production` branch will intentionally remain unready.
