@@ -29,11 +29,12 @@ def check_database() -> tuple[bool, str | dict | None]:
                         current_setting('neon.endpoint_id', true) AS endpoint_id
                 """)
             ).mappings().one()
-            database_name = identity["database_name"]
-            branch_id = identity["branch_id"]
-            project_id = identity["project_id"]
-            endpoint_id = identity["endpoint_id"]
-            canonical = database_name == "neondb" and branch_id == settings.lexa_neon_branch_id
+            database_name = (identity["database_name"] or "").strip()
+            branch_id = (identity["branch_id"] or "").strip()
+            project_id = (identity["project_id"] or "").strip()
+            endpoint_id = (identity["endpoint_id"] or "").strip()
+            configured_branch_id = (settings.lexa_neon_branch_id or "").strip()
+            canonical = database_name == "neondb" and branch_id == configured_branch_id
             if not canonical:
                 # Development-only diagnostics. Never expose infrastructure identity
                 # through readiness in production. This lets free Render instances
@@ -43,7 +44,7 @@ def check_database() -> tuple[bool, str | dict | None]:
                         "code": "LEXA_DATABASE_NOT_CANONICAL",
                         "expected": {
                             "database": "neondb",
-                            "branch_id": settings.lexa_neon_branch_id,
+                            "branch_id": configured_branch_id,
                         },
                         "actual": {
                             "database": database_name,
