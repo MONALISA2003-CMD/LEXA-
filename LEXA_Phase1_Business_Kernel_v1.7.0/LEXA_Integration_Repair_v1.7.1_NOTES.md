@@ -23,3 +23,8 @@ A full TypeScript check requires the web project's npm dependencies to be instal
 ## Deployment note
 
 The source patch is ready, but the current Vercel connector scope cannot inspect or promote the live `lexa` deployment, and the Render service cannot be reached from the current tool network. Therefore this package is a verified source repair, not a claim that production has already been redeployed.
+
+
+## Phase 2 follow-on
+
+The v1.8.0 package builds on this integration repair and adds the Universal Business Engine without changing the canonical Neon target.

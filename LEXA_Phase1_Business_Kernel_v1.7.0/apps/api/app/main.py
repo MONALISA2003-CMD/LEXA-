@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from .config import settings
 from .health import check_database
-from .routes import auth, organization, rbac, catalog, inventory, kernel
+from .routes import auth, organization, rbac, catalog, inventory, kernel, business_engine
 
 app = FastAPI(title="LEXA API", version="0.1.4")
 
@@ -35,6 +35,7 @@ app.include_router(rbac.router, prefix="/api/v1")
 app.include_router(catalog.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(kernel.router, prefix="/api/v1")
+app.include_router(business_engine.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["system"])
