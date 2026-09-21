@@ -11,6 +11,7 @@ assert.match(page, /Sign in to manage your products, variants, SKUs and pricing/
 assert.doesNotMatch(page, /PREVIEW-SKU/);
 assert.doesNotMatch(page, /BUILD PREVIEW/);
 assert.match(proxy, /LEXA_API_URL \|\| process\.env\.NEXT_PUBLIC_API_URL/);
+assert.match(proxy, /DEFAULT_API_ORIGIN/);
 assert.match(proxy, /authorization/);
 console.log('visible product contract: PASS');
 

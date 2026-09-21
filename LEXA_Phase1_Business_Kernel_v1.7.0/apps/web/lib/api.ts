@@ -41,10 +41,27 @@ function friendlyMessage(status: number, payload: unknown): string {
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   const auth = typeof window !== "undefined" ? window.sessionStorage.getItem("lexa_access_token") : null;
   const headers: HeadersInit = { Accept: "application/json", ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(init?.headers || {}) };
-  let response: Response;
-  try {
-    response = await fetch(`/api/lexa${path}`, { cache: "no-store", ...init, headers });
-  } catch {
+  const method = (init?.method || "GET").toUpperCase();
+  const retryable = (method === "GET" && /^\/(health|ready)$/.test(path)) || (method === "POST" && path === "/api/v1/auth/dev-session");
+  let response: Response | null = null;
+  let lastNetworkError: unknown = null;
+  for (let attempt = 0; attempt < (retryable ? 4 : 1); attempt += 1) {
+    try {
+      response = await fetch(`/api/lexa${path}`, { cache: "no-store", ...init, headers });
+      if (!retryable || ![502, 503, 504].includes(response.status) || attempt === 3) break;
+      const retryAfter = Number(response.headers.get("retry-after") || "0");
+      const delay = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 4000) : 500 * (attempt + 1);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    } catch (error) {
+      lastNetworkError = error;
+      if (!retryable || attempt === 3) {
+        throw new Error("We couldn't connect to LEXA right now. Check your connection and try again.");
+      }
+      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+  if (!response) {
+    if (lastNetworkError) throw new Error("We couldn't connect to LEXA right now. Check your connection and try again.");
     throw new Error("We couldn't connect to LEXA right now. Check your connection and try again.");
   }
   const text = await response.text();

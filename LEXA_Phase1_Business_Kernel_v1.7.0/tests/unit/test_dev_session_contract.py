@@ -27,3 +27,18 @@ def test_dev_mode_configuration_exists_for_development_service():
 def test_web_client_can_boot_open_development_session():
     source = API.read_text()
     assert '"/api/v1/auth/dev-session"' in source
+
+
+def test_dev_session_seed_imports_decimal_for_price_bootstrap():
+    source = AUTH.read_text()
+    assert "from decimal import Decimal" in source
+    assert 'unit_price=Decimal("15000")' in source
+
+
+def test_frontend_boot_rechecks_readiness_after_session_establishment():
+    page = (ROOT / "apps/web/app/page.tsx").read_text()
+    assert "await establishWorkspaceSession();" in page
+    assert "await refreshSystem();" in page
+    assert 'r.status !== "ready"' in page
+    assert "setTimeout(boot, 1500)" in page
+    assert "setTimeout(boot, 2000)" in page

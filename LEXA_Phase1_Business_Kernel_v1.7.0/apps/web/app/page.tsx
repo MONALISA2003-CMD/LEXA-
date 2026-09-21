@@ -86,8 +86,33 @@ export default function HomePage() {
   const [newVariantUnit, setNewVariantUnit] = useState("");
 
   async function refreshSystem() {
-    try { const [h, r] = await Promise.all([getHealth(), getReadiness()]); setHealth(h); setReadiness(r); setError(null); }
-    catch (e) { setHealth(null); setReadiness(null); setError(e instanceof Error ? e.message : "Unable to reach LEXA."); }
+    try {
+      const [h, r] = await Promise.all([getHealth(), getReadiness()]);
+      setHealth(h);
+      setReadiness(r);
+      if (h.status !== "ok" || r.status !== "ready") {
+        setError(null);
+        return false;
+      }
+      setError(null);
+      return true;
+    } catch (e) {
+      setHealth(null);
+      setReadiness(null);
+      setError(e instanceof Error ? e.message : "Unable to reach LEXA.");
+      return false;
+    }
+  }
+
+  async function establishWorkspaceSession() {
+    const session = await openDevSession();
+    window.sessionStorage.setItem("lexa_access_token", session.access_token);
+    window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
+    window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
+    setToken(session.access_token);
+    setTenantId(session.tenant_id);
+    setTenantName(session.tenant_name);
+    return session;
   }
   async function refreshInventory() {
     if (!token) return;
@@ -132,29 +157,44 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
     async function boot() {
-      await refreshSystem();
+      if (cancelled) return;
       const saved = window.sessionStorage.getItem("lexa_access_token");
       const savedWorkspace = window.sessionStorage.getItem("lexa_workspace_id");
       const savedWorkspaceName = window.sessionStorage.getItem("lexa_workspace_name");
+
       if (saved && savedWorkspace) {
-        if (!cancelled) { setToken(saved); setTenantId(savedWorkspace); setTenantName(savedWorkspaceName || "LEXA Workspace"); }
+        if (!cancelled) {
+          setToken(saved);
+          setTenantId(savedWorkspace);
+          setTenantName(savedWorkspaceName || "LEXA Workspace");
+        }
+        const ready = await refreshSystem();
+        if (!ready && !cancelled) retryTimer = setTimeout(boot, 1500);
         return;
       }
-      if (!OPEN_DEV_MODE || cancelled) return;
+
+      if (!OPEN_DEV_MODE || cancelled) {
+        await refreshSystem();
+        return;
+      }
+
       try {
-        const session = await openDevSession();
+        await establishWorkspaceSession();
         if (cancelled) return;
-        window.sessionStorage.setItem("lexa_access_token", session.access_token);
-        window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
-        window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
-        setToken(session.access_token); setTenantId(session.tenant_id); setTenantName(session.tenant_name);
+        await refreshSystem();
       } catch (e) {
-        if (!cancelled) setCatalogMessage(e instanceof Error ? e.message : "LEXA is preparing your workspace.");
+        if (!cancelled) {
+          setCatalogMessage(e instanceof Error ? e.message : "LEXA is preparing your workspace.");
+          retryTimer = setTimeout(boot, 2000);
+        }
       }
     }
-    boot();
-    return () => { cancelled = true; };
+
+    void boot();
+    return () => { cancelled = true; if (retryTimer) clearTimeout(retryTimer); };
   }, []);
   useEffect(() => { if (token && active === "Inventory") refreshInventory(); }, [token, active, invTab, locationFilter]);
   useEffect(() => { if (token && active === "Products") refreshCatalog(); }, [token, active, catalogSearch]);
@@ -188,12 +228,7 @@ export default function HomePage() {
     setBalances([]); setLocations([]); setVariants([]); setCatalogProducts([]); setCatalogVariants([]);
     setActive("Overview"); setMobileMenuOpen(false);
     if (OPEN_DEV_MODE) {
-      void openDevSession().then(session => {
-        window.sessionStorage.setItem("lexa_access_token", session.access_token);
-        window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
-        window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
-        setToken(session.access_token); setTenantId(session.tenant_id); setTenantName(session.tenant_name);
-      });
+      void establishWorkspaceSession().then(() => refreshSystem()).catch(() => undefined);
     }
   }
   function clearInvMessage() { setInvMessage(null); setError(null); }

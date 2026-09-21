@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import logging
 import secrets
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_ORIGIN = (process.env.LEXA_API_URL || process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+const DEFAULT_API_ORIGIN = "https://lexa-n10e.onrender.com";
+const API_ORIGIN = (process.env.LEXA_API_URL || process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_ORIGIN).replace(/\/$/, "");
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   if (!API_ORIGIN) {
@@ -26,9 +27,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   try {
     const response = await fetch(target, init);
     if (response.status >= 500) {
+      const retryAfter = response.headers.get("retry-after");
+      const headers = retryAfter ? { "Retry-After": retryAfter } : undefined;
       return NextResponse.json(
         { detail: "LEXA is temporarily unavailable. Please try again shortly." },
-        { status: response.status },
+        { status: response.status, headers },
       );
     }
     const body = await response.arrayBuffer();
