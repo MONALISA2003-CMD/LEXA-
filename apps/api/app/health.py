@@ -16,13 +16,42 @@ REQUIRED_TABLES = (
 )
 
 
-def check_database() -> tuple[bool, str | None]:
+def check_database() -> tuple[bool, str | dict | None]:
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
-            identity = connection.execute(text("SELECT current_database(), current_setting('neon.branch_id', true)" )).one()
-            database_name, branch_id = identity[0], identity[1]
-            if database_name != "neondb" or branch_id != settings.lexa_neon_branch_id:
+            identity = connection.execute(
+                text("""
+                    SELECT
+                        current_database() AS database_name,
+                        current_setting('neon.branch_id', true) AS branch_id,
+                        current_setting('neon.project_id', true) AS project_id,
+                        current_setting('neon.endpoint_id', true) AS endpoint_id
+                """)
+            ).mappings().one()
+            database_name = identity["database_name"]
+            branch_id = identity["branch_id"]
+            project_id = identity["project_id"]
+            endpoint_id = identity["endpoint_id"]
+            canonical = database_name == "neondb" and branch_id == settings.lexa_neon_branch_id
+            if not canonical:
+                # Development-only diagnostics. Never expose infrastructure identity
+                # through readiness in production. This lets free Render instances
+                # diagnose DB/branch mismatches without an interactive shell.
+                if settings.app_env.strip().lower() != "production":
+                    return False, {
+                        "code": "LEXA_DATABASE_NOT_CANONICAL",
+                        "expected": {
+                            "database": "neondb",
+                            "branch_id": settings.lexa_neon_branch_id,
+                        },
+                        "actual": {
+                            "database": database_name,
+                            "branch_id": branch_id,
+                            "project_id": project_id,
+                            "endpoint_id": endpoint_id,
+                        },
+                    }
                 return False, "LEXA_DATABASE_NOT_CANONICAL"
             result = connection.execute(
                 text("""
