@@ -1,0 +1,7 @@
+LEXA Phase 1 Business Kernel v1.7.0
+
+Implemented universal tenant-scoped business kernel entities on top of Phase 0.
+Migration: 012_phase1_business_kernel.sql
+Neon target: LEXA / wispy-mud-75323042 / br-soft-star-b1dj2m2w / neondb
+
+This package does not claim the live migration was applied until the Neon prepared-migration gate is explicitly completed.

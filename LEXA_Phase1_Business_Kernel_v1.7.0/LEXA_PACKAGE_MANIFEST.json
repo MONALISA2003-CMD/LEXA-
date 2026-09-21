@@ -1,0 +1,30 @@
+{
+  "package": "LEXA Phase 0 Recovery + Canonical Neon Readiness",
+  "version": "1.6.0",
+  "layout": "repository-root",
+  "changes": [
+    "Added canonical LEXA Neon project identity enforcement",
+    "Normalized Neon project and branch identifiers before readiness comparison",
+    "Added bounded development-only readiness diagnostics for identity and schema mismatches",
+    "Aligned the visible product catalog authentication contract",
+    "Added Phase 0 recovery verification tests and runbook",
+    "Kept production data and the LEXA Neon database non-destructive"
+  ],
+  "protected_paths": [
+    ".github/workflows/"
+  ],
+  "non_destructive": true,
+  "database_reset": false,
+  "seed_reset": false,
+  "product_deletion": false,
+  "description": "Phase 0 recovery baseline with canonical LEXA Neon identity enforcement, readiness diagnostics, frontend bootstrap alignment, and non-destructive verification.",
+  "package_version": "1.7.0",
+  "phase": "1",
+  "phase_name": "Business Kernel",
+  "phase_status": "IMPLEMENTED_SOURCE_READY",
+  "canonical_neon": {
+    "project_id": "wispy-mud-75323042",
+    "branch_id": "br-soft-star-b1dj2m2w",
+    "database": "neondb"
+  }
+}
