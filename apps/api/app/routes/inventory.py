@@ -400,6 +400,40 @@ def get_stock_count(count_id: UUID, ctx=Depends(require_permission("inventory.re
     lines = list(db.scalars(select(StockCountLine).where(StockCountLine.stock_count_id == row.id, StockCountLine.tenant_id == tenant_id)))
     return {"id": row.id, "location_id": row.location_id, "status": row.status, "scope_description": row.scope_description, "started_at": row.started_at, "created_at": row.created_at, "lines": lines}
 
+
+
+@router.post("/rebuild", response_model=dict)
+def rebuild_inventory_balances(ctx=Depends(require_permission("inventory.rebuild"))):
+    """Replay the immutable ledger and rebuild materialized on-hand/WAC projections."""
+    db, actor, tenant_id, _ = ctx
+    rows = list(db.scalars(select(InventoryTransaction).where(InventoryTransaction.tenant_id == tenant_id).order_by(InventoryTransaction.location_id, InventoryTransaction.variant_id, InventoryTransaction.occurred_at, InventoryTransaction.id)))
+    state: dict[tuple[UUID, UUID], tuple[Decimal, Decimal]] = {}
+    for tx in rows:
+        key = (tx.location_id, tx.variant_id)
+        old_qty, old_avg = state.get(key, (ZERO, ZERO))
+        delta = q(tx.quantity_delta)
+        if delta > 0:
+            avg = weighted_average_cost(old_qty, old_avg, delta, q(tx.unit_cost)) if old_qty > 0 else q(tx.unit_cost)
+        else:
+            avg = old_avg
+        new_qty = q(old_qty + delta)
+        if new_qty < 0:
+            raise HTTPException(409, f"Ledger replay would create negative stock for {tx.variant_id}")
+        state[key] = (new_qty, avg)
+
+    rebuilt = 0
+    for (location_id, variant_id), (on_hand, average_cost) in state.items():
+        balance = get_or_create_balance(db, tenant_id, location_id, variant_id)
+        balance.on_hand = on_hand
+        balance.average_cost = average_cost
+        balance.stock_value = q(on_hand * average_cost)
+        balance.updated_at = now()
+        rebuilt += 1
+    write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="inventory.balances.rebuilt", target_type="inventory", target_id=None)
+    emit_event(db, tenant_id=tenant_id, event_type="inventory.balances.rebuilt.v1", aggregate_type="inventory", aggregate_id=tenant_id, actor_user_id=actor, payload={"rebuilt": rebuilt})
+    db.commit()
+    return {"status": "ok", "rebuilt": rebuilt}
+
 @router.get("/integrity")
 def inventory_integrity(ctx=Depends(require_permission("inventory.read"))):
     """Read-only consistency check: every materialized balance must equal ledger quantity sum."""

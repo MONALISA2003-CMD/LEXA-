@@ -1,18 +1,17 @@
 {
-  "package": "LEXA Strategic Phase 2 \u2014 Universal Business Engine",
-  "version": "1.8.1",
+  "package": "LEXA Phase 3 \u2014 Inventory Foundation",
+  "version": "1.9.0",
   "layout": "repository-root",
   "changes": [
-    "Added tenant business capabilities and configuration registry",
-    "Added universal party relationship graph edges",
-    "Added configurable transaction types, transaction lines and lifecycle history",
-    "Added reusable workflow definitions, steps, instances and step runs",
-    "Added authorized business context read API",
-    "Added Business Engine workspace UI",
-    "Added explicit Phase 2 permissions, RLS and append-only transaction status history",
-    "Added automatic business-engine default seeding for new and existing workspaces",
-    "Preserved the canonical LEXA Neon project and live branch without applying Phase 2 to production",
-    "Hardened /ready to require the Phase 2 Universal Business Engine schema before reporting ready"
+    "Activated the immutable inventory ledger and rebuildable balance projection",
+    "Added weighted-average costing, stock availability and inbound tracking",
+    "Added adjustment, count and transfer state machines with approvals",
+    "Added tenant-safe idempotency records and inventory command permissions",
+    "Added forced tenant RLS and composite tenant-consistency foreign keys",
+    "Made inventory ledger append-only at the database privilege and trigger layers",
+    "Added controlled inventory balance rebuild endpoint",
+    "Hardened readiness to require the Phase 3 inventory schema",
+    "Validated canonical LEXA Neon live migration 014"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -22,9 +21,9 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Phase 0 recovery baseline with canonical LEXA Neon identity enforcement, readiness diagnostics, frontend bootstrap alignment, and non-destructive verification.",
-  "package_version": "1.8.1",
-  "phase": "2",
-  "phase_name": "Universal Business Engine",
+  "package_version": "1.9.0",
+  "phase": "3",
+  "phase_name": "Inventory Foundation",
   "phase_status": "LIVE_DATABASE_MIGRATION_APPLIED_SOURCE_VALIDATED",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
@@ -37,5 +36,11 @@
     "migration_version": "013_phase2_universal_business_engine",
     "live_branch_phase2_tables": 10,
     "live_branch_migration_013": 1
+  },
+  "phase3_validation": {
+    "temporary_branch_id": "br-nameless-dew-b11k9xo1",
+    "parent_branch_id": "br-soft-star-b1dj2m2w",
+    "migration_version": "014_phase3_inventory_foundation",
+    "live_branch_phase3_tables": 9
   }
 }

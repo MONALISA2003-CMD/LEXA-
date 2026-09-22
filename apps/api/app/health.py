@@ -25,6 +25,16 @@ REQUIRED_TABLES = (
     "workflow_steps",
     "workflow_instances",
     "workflow_step_runs",
+    # Phase 3 Inventory Foundation must be present before the API reports ready.
+    "idempotency_keys",
+    "inventory_balances",
+    "inventory_transactions",
+    "inventory_adjustments",
+    "inventory_adjustment_lines",
+    "stock_counts",
+    "stock_count_lines",
+    "inventory_transfers",
+    "inventory_transfer_lines",
 )
 
 

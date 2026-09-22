@@ -1,8 +1,8 @@
-> **Release status:** Inventory source implementation is present for the next LEXA product phase. The inventory database migration is not applied as part of Experience Foundation v1.4.2, so this phase is not treated as deployed in that release.
+> **Release status:** Phase 3 Inventory Foundation is implemented in source, validated on an isolated LEXA Neon branch, and the additive migration is now applied to canonical `lexa-live` in LEXA PostgreSQL.
 
 # LEXA Phase 3 — Inventory Foundation
 
-This phase adds the real inventory transaction layer to the existing LEXA implementation.
+This phase adds the operational inventory execution layer to the existing LEXA catalog and Universal Business Engine.
 
 ## Scope
 
@@ -17,35 +17,29 @@ This phase adds the real inventory transaction layer to the existing LEXA implem
 - audit and transactional outbox records
 - tenant isolation and tenant-consistency foreign keys
 - read-only ledger/balance integrity checking
+- controlled balance rebuild command
 - visible frontend inventory workspace
 
 ## Accounting/inventory behavior
 
-The balance is not the historical source of truth. `inventory_transactions` is the immutable history. `inventory_balances` is a rebuildable projection.
+`inventory_transactions` is the immutable historical source of truth. `inventory_balances` is a rebuildable materialized projection.
 
-Inbound stock uses weighted-average cost. Outbound movements use the location's current average cost at the time of issue. Transfer cost is captured on dispatch and reused at destination receipt.
+Inbound stock uses weighted-average cost. Outbound movements use the location's current average cost at the time of issue. Transfer cost is captured at dispatch and reused at destination receipt.
 
-Committed negative stock is blocked. Reserved quantity is retained as a separate field for future reservation workflows; the current inventory foundation does not silently create reservations.
+Committed negative stock is blocked. Reserved quantity remains a separate projection field for future reservation workflows.
+
+## Database security
+
+All nine Phase 3 tables use forced tenant RLS. Tenant-consistency composite foreign keys prevent cross-tenant location and product-variant references. The inventory ledger is append-only through both privilege revocation and a database trigger.
 
 ## Commands
 
-Every state-changing command accepts `Idempotency-Key`. Reusing a key with a different request is rejected. Successful command results are stored so a retry can return the original result without repeating the business mutation.
+Every state-changing inventory command accepts `Idempotency-Key`. Reusing a key with a different request is rejected.
 
 ## Frontend
 
-The Inventory workspace is intentionally connected to live authenticated tenant APIs. It does not generate placeholder products, quantities, balances or movements.
-
-Tabs:
-
-- Stock
-- Ledger
-- Adjustments
-- Counts
-- Transfers
-- Locations
-
-The UI exposes operational state and workflow actions while keeping infrastructure details out of normal business screens.
+The Inventory workspace uses authenticated tenant APIs and live database data. It does not fabricate stock quantities, movements or products.
 
 ## Migration
 
-Apply `migrations/005_inventory_foundation.sql` after the existing catalog migration. It is additive and contains no data reset, table drop, truncate, or reseed operation.
+Current live-series migration: `014_phase3_inventory_foundation.sql`. It is additive and does not reset, truncate, reseed or delete existing business data.
