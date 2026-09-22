@@ -6,7 +6,7 @@ import {
   createStockCount, createTransfer, dispatchTransfer, getAdjustments, getHealth, getInventoryBalances,
   getInventoryIntegrity, getInventoryLedger, getLocations, getReadiness, getStockCounts, getTransfers, getVariantOptions,
   openDevSession, postAdjustment, postStockCount, receiveTransfer, submitStockCount, updateCountLines,
-  createProduct, createVariant, getBrands, getCategories, getPriceLists, getProducts, getUnits, getVariants,
+  createProduct, createVariant, getBrands, getCategories, getPriceLists, getProducts, getUnits, getVariants, getBusinessCapabilities,
   type ApiHealth, type ApiReadiness, type Brand, type Category, type InventoryAdjustment, type InventoryBalance, type InventoryLedger,
   type Location, type PriceList, type Product, type StockCount, type Transfer, type Unit, type Variant, type VariantOption,
 } from "../lib/api";
@@ -114,6 +114,10 @@ export default function HomePage() {
     setTenantName(session.tenant_name);
     return session;
   }
+
+  async function verifyWorkspaceAccess() {
+    await getBusinessCapabilities();
+  }
   async function refreshInventory() {
     if (!token) return;
     setInvBusy(true); setInvMessage(null);
@@ -172,7 +176,18 @@ export default function HomePage() {
           setTenantName(savedWorkspaceName || "LEXA Workspace");
         }
         const ready = await refreshSystem();
-        if (!ready && !cancelled) retryTimer = setTimeout(boot, 1500);
+        if (!ready) {
+          if (!cancelled) retryTimer = setTimeout(boot, 1500);
+          return;
+        }
+        try {
+          await verifyWorkspaceAccess();
+        } catch {
+          window.sessionStorage.removeItem("lexa_access_token");
+          window.sessionStorage.removeItem("lexa_workspace_id");
+          window.sessionStorage.removeItem("lexa_workspace_name");
+          if (!cancelled && OPEN_DEV_MODE) retryTimer = setTimeout(boot, 200);
+        }
         return;
       }
 
@@ -184,7 +199,9 @@ export default function HomePage() {
       try {
         await establishWorkspaceSession();
         if (cancelled) return;
-        await refreshSystem();
+        const ready = await refreshSystem();
+        if (!ready) throw new Error("LEXA is not ready yet.");
+        await verifyWorkspaceAccess();
       } catch (e) {
         if (!cancelled) {
           setCatalogMessage(e instanceof Error ? e.message : "LEXA is preparing your workspace.");

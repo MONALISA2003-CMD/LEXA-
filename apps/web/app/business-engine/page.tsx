@@ -85,7 +85,7 @@ export default function BusinessEnginePage(){
       </section>
 
       <section className="split-panel" style={{marginTop:24}}>
-        <form className="command-form" onSubmit={e=>{e.preventDefault();if(!txReference||!txType)return;void run(()=>createBusinessTransaction({transaction_type:txType,reference:txReference,party_id:txParty||null,lines:txAmount!=="0"?[{line_type:"MISC",description:"Business transaction line",quantity:1,unit_price:txAmount}]:[]}),"Transaction created.");setTxReference("");}}>
+        <form className="command-form" onSubmit={e=>{e.preventDefault();if(!txReference||!txType)return;void run(()=>createBusinessTransaction({transaction_type:txType,reference:txReference,party_id:txParty||null,lines:txAmount!=="0"?[{line_type:"MISC",description:"Business transaction line",quantity:"1",unit_price:txAmount}]:[]}),"Transaction created.");setTxReference("");}}>
           <p className="eyebrow">TRANSACTION ENGINE</p><h3>Create a universal transaction</h3><p>One lifecycle supports quotations, orders, fulfillment, invoices and custom business transactions.</p>
           <label>Type<select value={txType} onChange={e=>setTxType(e.target.value)}>{types.map(t=><option value={t.code} key={t.id}>{t.code} · {t.name}</option>)}</select></label><label>Reference<input value={txReference} onChange={e=>setTxReference(e.target.value)} placeholder="ORD-1001" required /></label><label>Party ID<input value={txParty} onChange={e=>setTxParty(e.target.value)} placeholder="optional" /></label><label>Total line amount<input type="number" step="0.01" value={txAmount} onChange={e=>setTxAmount(e.target.value)} /></label><button className="primary">Create transaction</button>
         </form>
