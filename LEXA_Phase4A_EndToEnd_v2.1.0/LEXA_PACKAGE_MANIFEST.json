@@ -1,0 +1,46 @@
+{
+  "package": "LEXA Phase 3 \u2014 Inventory Foundation",
+  "version": "1.9.0",
+  "layout": "repository-root",
+  "changes": [
+    "Activated the immutable inventory ledger and rebuildable balance projection",
+    "Added weighted-average costing, stock availability and inbound tracking",
+    "Added adjustment, count and transfer state machines with approvals",
+    "Added tenant-safe idempotency records and inventory command permissions",
+    "Added forced tenant RLS and composite tenant-consistency foreign keys",
+    "Made inventory ledger append-only at the database privilege and trigger layers",
+    "Added controlled inventory balance rebuild endpoint",
+    "Hardened readiness to require the Phase 3 inventory schema",
+    "Validated canonical LEXA Neon live migration 014"
+  ],
+  "protected_paths": [
+    ".github/workflows/"
+  ],
+  "non_destructive": true,
+  "database_reset": false,
+  "seed_reset": false,
+  "product_deletion": false,
+  "description": "Phase 0 recovery baseline with canonical LEXA Neon identity enforcement, readiness diagnostics, frontend bootstrap alignment, and non-destructive verification.",
+  "package_version": "1.9.0",
+  "phase": "3",
+  "phase_name": "Inventory Foundation",
+  "phase_status": "LIVE_DATABASE_MIGRATION_APPLIED_SOURCE_VALIDATED",
+  "canonical_neon": {
+    "project_id": "wispy-mud-75323042",
+    "branch_id": "br-soft-star-b1dj2m2w",
+    "database": "neondb"
+  },
+  "phase2_validation": {
+    "temporary_branch_id": "br-withered-thunder-b1699ugo",
+    "parent_branch_id": "br-soft-star-b1dj2m2w",
+    "migration_version": "013_phase2_universal_business_engine",
+    "live_branch_phase2_tables": 10,
+    "live_branch_migration_013": 1
+  },
+  "phase3_validation": {
+    "temporary_branch_id": "br-nameless-dew-b11k9xo1",
+    "parent_branch_id": "br-soft-star-b1dj2m2w",
+    "migration_version": "014_phase3_inventory_foundation",
+    "live_branch_phase3_tables": 9
+  }
+}
