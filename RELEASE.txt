@@ -1,1 +1,1 @@
-package=LEXA Open Development v1.5.1
+LEXA Strategic Phase 2 — Universal Business Engine v1.8.1

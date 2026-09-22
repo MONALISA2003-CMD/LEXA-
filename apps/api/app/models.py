@@ -458,3 +458,341 @@ class InventoryTransferLine(Base):
     dispatched_quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
     received_quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
     unit_cost: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 Business Kernel
+# Universal, tenant-owned primitives shared by multiple business categories.
+# ---------------------------------------------------------------------------
+
+class Party(Base):
+    __tablename__ = "parties"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    party_type: Mapped[str] = mapped_column(String(30), nullable=False, default="PERSON")
+    display_name: Mapped[str] = mapped_column(String(250), nullable=False)
+    legal_name: Mapped[str | None] = mapped_column(String(250))
+    email: Mapped[str | None] = mapped_column(String(320))
+    phone: Mapped[str | None] = mapped_column(String(50))
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="ACTIVE")
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class PartyRole(Base):
+    __tablename__ = "party_roles"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    party_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("parties.id", ondelete="CASCADE"), nullable=False)
+    role_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="ACTIVE")
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class Service(Base):
+    __tablename__ = "services"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(250), nullable=False)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    service_type: Mapped[str | None] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="ACTIVE")
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class Resource(Base):
+    __tablename__ = "resources"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    name: Mapped[str] = mapped_column(String(250), nullable=False)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    capacity: Mapped[Decimal | None] = mapped_column(Numeric(18, 6))
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="AVAILABLE")
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class Asset(Base):
+    __tablename__ = "assets"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    asset_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    name: Mapped[str] = mapped_column(String(250), nullable=False)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    serial_number: Mapped[str | None] = mapped_column(String(120))
+    resource_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("resources.id", ondelete="SET NULL"))
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="ACTIVE")
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    document_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_type: Mapped[str | None] = mapped_column(String(80))
+    entity_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    name: Mapped[str] = mapped_column(String(250), nullable=False)
+    mime_type: Mapped[str | None] = mapped_column(String(120))
+    storage_key: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="ACTIVE")
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class BusinessTransaction(Base):
+    __tablename__ = "business_transactions"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    transaction_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    reference: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="DRAFT")
+    party_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("parties.id", ondelete="SET NULL"))
+    branch_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("branches.id", ondelete="SET NULL"))
+    source_transaction_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("business_transactions.id", ondelete="SET NULL"))
+    total_amount: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    currency_code: Mapped[str | None] = mapped_column(String(3))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class BusinessCapability(Base):
+    __tablename__ = "business_capabilities"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    code: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(180), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="ACTIVE")
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    configuration: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    version: Mapped[int] = mapped_column(default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class BusinessConfiguration(Base):
+    __tablename__ = "business_configurations"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    config_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    value_json: Mapped[object | None] = mapped_column(JSON)
+    value_type: Mapped[str] = mapped_column(String(30), nullable=False, default="JSON")
+    version: Mapped[int] = mapped_column(default=1, nullable=False)
+    updated_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class PartyRelationship(Base):
+    __tablename__ = "party_relationships"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    from_party_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("parties.id", ondelete="CASCADE"), nullable=False)
+    to_party_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("parties.id", ondelete="CASCADE"), nullable=False)
+    relationship_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="ACTIVE")
+    valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    valid_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class TransactionType(Base):
+    __tablename__ = "transaction_types"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    category: Mapped[str] = mapped_column(String(60), nullable=False, default="GENERAL")
+    initial_status: Mapped[str] = mapped_column(String(40), nullable=False, default="DRAFT")
+    statuses: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    transitions: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    configuration: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class TransactionLine(Base):
+    __tablename__ = "transaction_lines"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    transaction_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("business_transactions.id", ondelete="CASCADE"), nullable=False)
+    line_no: Mapped[int] = mapped_column(default=1, nullable=False)
+    line_type: Mapped[str] = mapped_column(String(20), nullable=False, default="MISC")
+    product_variant_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("product_variants.id", ondelete="RESTRICT"))
+    service_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("services.id", ondelete="RESTRICT"))
+    resource_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("resources.id", ondelete="RESTRICT"))
+    description: Mapped[str | None] = mapped_column(Text)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=1)
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    line_total: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False, default=0)
+    currency_code: Mapped[str] = mapped_column(String(3), nullable=False)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class TransactionStatusHistory(Base):
+    __tablename__ = "transaction_status_history"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    transaction_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("business_transactions.id", ondelete="CASCADE"), nullable=False)
+    from_status: Mapped[str | None] = mapped_column(String(40))
+    to_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text)
+    changed_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class WorkflowDefinition(Base):
+    __tablename__ = "workflow_definitions"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    code: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(180), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT")
+    trigger_event: Mapped[str | None] = mapped_column(String(120))
+    version: Mapped[int] = mapped_column(default=1, nullable=False)
+    configuration: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class WorkflowStep(Base):
+    __tablename__ = "workflow_steps"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    workflow_definition_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("workflow_definitions.id", ondelete="CASCADE"), nullable=False)
+    step_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(180), nullable=False)
+    step_type: Mapped[str] = mapped_column(String(30), nullable=False, default="TASK")
+    position: Mapped[int] = mapped_column(default=1, nullable=False)
+    configuration: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class WorkflowInstance(Base):
+    __tablename__ = "workflow_instances"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    workflow_definition_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("workflow_definitions.id", ondelete="RESTRICT"), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    current_step_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("workflow_steps.id", ondelete="SET NULL"))
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="RUNNING")
+    context: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WorkflowStepRun(Base):
+    __tablename__ = "workflow_step_runs"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    workflow_instance_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("workflow_instances.id", ondelete="CASCADE"), nullable=False)
+    workflow_step_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("workflow_steps.id", ondelete="RESTRICT"), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="RUNNING")
+    output: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    task_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    transaction_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("business_transactions.id", ondelete="SET NULL"))
+    party_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("parties.id", ondelete="SET NULL"))
+    amount: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    currency_code: Mapped[str] = mapped_column(String(3), nullable=False)
+    method: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="RECORDED")
+    reference: Mapped[str | None] = mapped_column(String(120))
+    paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(250), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="OPEN")
+    priority: Mapped[str] = mapped_column(String(30), nullable=False, default="NORMAL")
+    assigned_to_user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    entity_type: Mapped[str | None] = mapped_column(String(80))
+    entity_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class BusinessCase(Base):
+    __tablename__ = "business_cases"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    case_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    title: Mapped[str] = mapped_column(String(250), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="OPEN")
+    priority: Mapped[str] = mapped_column(String(30), nullable=False, default="NORMAL")
+    party_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("parties.id", ondelete="SET NULL"))
+    assigned_to_user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class BusinessProject(Base):
+    __tablename__ = "business_projects"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(250), nullable=False)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="PLANNED")
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class Contract(Base):
+    __tablename__ = "contracts"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    contract_number: Mapped[str] = mapped_column(String(120), nullable=False)
+    contract_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    title: Mapped[str] = mapped_column(String(250), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="DRAFT")
+    party_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("parties.id", ondelete="SET NULL"))
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    terms: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

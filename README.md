@@ -45,3 +45,8 @@ The Python test suite passes with 44 tests. Frontend TSX/TS source files were sy
 The production LEXA application uses the Neon project `LEXA`, branch `lexa-live` (`br-soft-star-b1dj2m2w`), database `neondb`. The branch is permanent and is the project default. Do not point the application at the legacy empty `production` branch.
 
 The repository root is the single deployment source. Vercel serves `apps/web`; Render serves `apps/api`. Do not deploy a nested copy of the application.
+
+
+## Phase 1 Business Kernel v1.7.0
+
+This package adds the universal Business Kernel and keeps Phase 0 readiness hard-locked to the canonical LEXA Neon project. See `docs/PHASE_1_BUSINESS_KERNEL.md` and `migrations/012_phase1_business_kernel.sql`.

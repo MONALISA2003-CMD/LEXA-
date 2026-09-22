@@ -41,10 +41,27 @@ function friendlyMessage(status: number, payload: unknown): string {
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   const auth = typeof window !== "undefined" ? window.sessionStorage.getItem("lexa_access_token") : null;
   const headers: HeadersInit = { Accept: "application/json", ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(init?.headers || {}) };
-  let response: Response;
-  try {
-    response = await fetch(`/api/lexa${path}`, { cache: "no-store", ...init, headers });
-  } catch {
+  const method = (init?.method || "GET").toUpperCase();
+  const retryable = (method === "GET" && /^\/(health|ready)$/.test(path)) || (method === "POST" && path === "/api/v1/auth/dev-session");
+  let response: Response | null = null;
+  let lastNetworkError: unknown = null;
+  for (let attempt = 0; attempt < (retryable ? 4 : 1); attempt += 1) {
+    try {
+      response = await fetch(`/api/lexa${path}`, { cache: "no-store", ...init, headers });
+      if (!retryable || ![502, 503, 504].includes(response.status) || attempt === 3) break;
+      const retryAfter = Number(response.headers.get("retry-after") || "0");
+      const delay = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 4000) : 500 * (attempt + 1);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    } catch (error) {
+      lastNetworkError = error;
+      if (!retryable || attempt === 3) {
+        throw new Error("We couldn't connect to LEXA right now. Check your connection and try again.");
+      }
+      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+  if (!response) {
+    if (lastNetworkError) throw new Error("We couldn't connect to LEXA right now. Check your connection and try again.");
     throw new Error("We couldn't connect to LEXA right now. Check your connection and try again.");
   }
   const text = await response.text();
@@ -111,3 +128,52 @@ export function login(body: LoginRequest) { return getJson<AuthResponse>("/api/v
 export function register(body: { email:string; password:string; tenant_name:string }) { return getJson<RegisterResponse>("/api/v1/auth/register", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
 
 export function openDevSession() { return getJson<AuthResponse>("/api/v1/auth/dev-session", { method:"POST" }); }
+
+
+export type KernelSummary = { tenant_id:string; counts:Record<string,number> };
+export type KernelParty = { id:string; tenant_id:string; party_type:string; display_name:string; legal_name?:string|null; email?:string|null; phone?:string|null; status:string; metadata:Record<string,unknown> };
+export type KernelService = { id:string; tenant_id:string; name:string; code:string; description?:string|null; service_type?:string|null; status:string; metadata:Record<string,unknown> };
+export type KernelResource = { id:string; tenant_id:string; resource_type:string; name:string; code:string; capacity?:string|null; status:string; metadata:Record<string,unknown> };
+export type KernelTask = { id:string; tenant_id:string; title:string; description?:string|null; status:string; priority:string; assigned_to_user_id?:string|null; entity_type?:string|null; entity_id?:string|null; due_at?:string|null; metadata:Record<string,unknown> };
+export function getKernelSummary() { return getJson<KernelSummary>('/api/v1/kernel/summary'); }
+export function getKernelParties() { return getJson<KernelParty[]>('/api/v1/kernel/parties'); }
+export function createKernelParty(body:{party_type:'PERSON'|'ORGANIZATION';display_name:string;legal_name?:string;email?:string;phone?:string}) { return getJson<KernelParty>('/api/v1/kernel/parties',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)}); }
+export function getKernelServices() { return getJson<KernelService[]>('/api/v1/kernel/services'); }
+export function createKernelService(body:{name:string;code:string;description?:string;service_type?:string}) { return getJson<KernelService>('/api/v1/kernel/services',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)}); }
+export function getKernelResources() { return getJson<KernelResource[]>('/api/v1/kernel/resources'); }
+export function createKernelResource(body:{resource_type:string;name:string;code:string;capacity?:string}) { return getJson<KernelResource>('/api/v1/kernel/resources',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)}); }
+export function getKernelTasks() { return getJson<KernelTask[]>('/api/v1/kernel/tasks'); }
+export function createKernelTask(body:{title:string;description?:string;priority?:'LOW'|'NORMAL'|'HIGH'|'URGENT'}) { return getJson<KernelTask>('/api/v1/kernel/tasks',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)}); }
+
+
+export type BusinessCapability = { id:string; tenant_id:string; code:string; name:string; status:string; enabled:boolean; configuration:Record<string,unknown>; version:number };
+export type BusinessConfiguration = { id:string; tenant_id:string; config_key:string; value_json:unknown; value_type:string; version:number; updated_by?:string|null };
+export type PartyRelationship = { id:string; tenant_id:string; from_party_id:string; to_party_id:string; relationship_type:string; status:string; valid_from?:string|null; valid_to?:string|null; metadata_json:Record<string,unknown>; from_party_name?:string|null; to_party_name?:string|null };
+export type TransactionType = { id:string; tenant_id:string; code:string; name:string; category:string; initial_status:string; statuses:string[]; transitions:Record<string,string[]>; active:boolean; configuration:Record<string,unknown> };
+export type BusinessTransaction = { id:string; tenant_id:string; transaction_type:string; reference:string; status:string; party_id?:string|null; branch_id?:string|null; source_transaction_id?:string|null; total_amount?:string|null; currency_code?:string|null; occurred_at:string; closed_at?:string|null; metadata_json:Record<string,unknown>; line_count?:number; lines?:TransactionLine[]; history?:TransactionStatusHistory[]; payments?:unknown[] };
+export type TransactionLine = { id:string; transaction_id:string; line_no:number; line_type:string; product_variant_id?:string|null; service_id?:string|null; resource_id?:string|null; description?:string|null; quantity:string; unit_price:string; line_total:string; currency_code:string };
+export type TransactionStatusHistory = { id:string; transaction_id:string; from_status?:string|null; to_status:string; reason?:string|null; changed_by?:string|null; changed_at:string };
+export type WorkflowStep = { id:string; workflow_definition_id:string; step_key:string; name:string; step_type:string; position:number; configuration:Record<string,unknown> };
+export type WorkflowDefinition = { id:string; tenant_id:string; code:string; name:string; description?:string|null; status:string; trigger_event?:string|null; version:number; configuration:Record<string,unknown>; steps:WorkflowStep[] };
+export type WorkflowInstance = { id:string; tenant_id:string; workflow_definition_id:string; entity_type:string; entity_id:string; current_step_id?:string|null; status:string; context:Record<string,unknown>; started_at:string; completed_at?:string|null; current_step?:WorkflowStep|null; runs?:unknown[] };
+export type BusinessContext = { entity_type:string; entity_id:string; primary:Record<string,unknown>; related:Record<string,unknown[]>; evidence:{source:string;id:string;observed_at?:string|null}[] };
+
+export function getBusinessCapabilities(){return getJson<BusinessCapability[]>('/api/v1/business-engine/capabilities');}
+export function setBusinessCapability(code:string,body:{enabled:boolean;configuration?:Record<string,unknown>}){return getJson<BusinessCapability>(`/api/v1/business-engine/capabilities/${encodeURIComponent(code)}`,{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify({configuration:{},...body})});}
+export function getBusinessConfiguration(){return getJson<BusinessConfiguration[]>('/api/v1/business-engine/configuration');}
+export function putBusinessConfiguration(keyName:string,body:{value:unknown;value_type?:string}){return getJson<BusinessConfiguration>(`/api/v1/business-engine/configuration/${encodeURIComponent(keyName)}`,{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
+export function getPartyRelationships(partyId?:string){return getJson<PartyRelationship[]>(`/api/v1/business-engine/relationships${partyId?`?party_id=${encodeURIComponent(partyId)}`:''}`);}
+export function createPartyRelationship(body:{from_party_id:string;to_party_id:string;relationship_type:string;valid_from?:string;valid_to?:string;metadata?:Record<string,unknown>}){return getJson<PartyRelationship>('/api/v1/business-engine/relationships',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
+export function getTransactionTypes(){return getJson<TransactionType[]>('/api/v1/business-engine/transaction-types');}
+export function createTransactionType(body:Partial<TransactionType> & {code:string;name:string}){return getJson<TransactionType>('/api/v1/business-engine/transaction-types',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
+export function getBusinessTransactions(filters?:{status?:string;transaction_type?:string}){const q=new URLSearchParams(); if(filters?.status)q.set('status',filters.status); if(filters?.transaction_type)q.set('transaction_type',filters.transaction_type); return getJson<BusinessTransaction[]>(`/api/v1/business-engine/transactions${q.toString()?`?${q}`:''}`);}
+export function getBusinessTransaction(id:string){return getJson<BusinessTransaction & {history:TransactionStatusHistory[]}>(`/api/v1/business-engine/transactions/${id}`);}
+export function createBusinessTransaction(body:{transaction_type:string;reference:string;party_id?:string|null;branch_id?:string|null;source_transaction_id?:string|null;currency_code?:string|null;metadata?:Record<string,unknown>;lines?:Partial<TransactionLine>[]}){return getJson<BusinessTransaction>('/api/v1/business-engine/transactions',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
+export function transitionBusinessTransaction(id:string,to_status:string,reason?:string){return getJson<BusinessTransaction>(`/api/v1/business-engine/transactions/${id}/transition`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify({to_status,reason})});}
+export function getWorkflowDefinitions(){return getJson<WorkflowDefinition[]>('/api/v1/business-engine/workflows/definitions');}
+export function createWorkflowDefinition(body:{code:string;name:string;description?:string;trigger_event?:string;configuration?:Record<string,unknown>;steps:WorkflowStep[]}){return getJson<WorkflowDefinition>('/api/v1/business-engine/workflows/definitions',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
+export function getWorkflowInstances(status?:string){return getJson<WorkflowInstance[]>(`/api/v1/business-engine/workflows/instances${status?`?status=${encodeURIComponent(status)}`:''}`);}
+export function createWorkflowInstance(body:{workflow_definition_id:string;entity_type:string;entity_id:string;context?:Record<string,unknown>}){return getJson<WorkflowInstance>('/api/v1/business-engine/workflows/instances',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
+export function advanceWorkflow(id:string,output?:Record<string,unknown>){return getJson<WorkflowInstance>(`/api/v1/business-engine/workflows/instances/${id}/advance`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(output||{})});}
+export function getWorkflowInstance(id:string){return getJson<WorkflowInstance>(`/api/v1/business-engine/workflows/instances/${id}`);}
+export function getBusinessContext(entityType:string,id:string){return getJson<BusinessContext>(`/api/v1/business-engine/context/${encodeURIComponent(entityType)}/${id}`);}

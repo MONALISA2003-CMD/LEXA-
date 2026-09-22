@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import logging
 import secrets
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -113,8 +114,10 @@ def dev_session(request: Request, db: Session = Depends(get_db)):
             if permissions:
                 db.add_all([RolePermission(role_id=owner.id, permission_id=p.id) for p in permissions])
             db.flush()
+            db.execute(text("SELECT lexa_seed_business_engine(:tenant_id)"), {"tenant_id": str(tenant.id)})
         else:
             db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant.id)})
+            db.execute(text("SELECT lexa_seed_business_engine(:tenant_id)"), {"tenant_id": str(tenant.id)})
 
         # Keep one short-lived development session per preview user.
         now = datetime.now(timezone.utc)
@@ -266,6 +269,8 @@ def register(
         permissions = db.scalars(select(Permission)).all()
         if permissions:
             db.add_all([RolePermission(role_id=owner.id, permission_id=p.id) for p in permissions])
+        db.flush()
+        db.execute(text("SELECT lexa_seed_business_engine(:tenant_id)"), {"tenant_id": str(tenant.id)})
 
         correlation_id = request_id
         write_audit(

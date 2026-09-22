@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     access_token_minutes: int = 30
     refresh_token_days: int = 30
     cors_origins: str = "http://localhost:3000"
+    lexa_neon_project_id: str = "wispy-mud-75323042"
     lexa_neon_branch_id: str = "br-soft-star-b1dj2m2w"
     lexa_open_dev_mode: bool = False
     lexa_open_dev_email: str = "preview@lexa.local"

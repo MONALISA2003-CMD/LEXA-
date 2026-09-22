@@ -1,40 +1,18 @@
 {
-  "package": "LEXA Experience Foundation + Workspace Authentication",
-  "version": "1.5.1",
+  "package": "LEXA Strategic Phase 2 \u2014 Universal Business Engine",
+  "version": "1.8.1",
   "layout": "repository-root",
   "changes": [
-    "Rebuilt the public LEXA landing experience around the supplied brand identity",
-    "Added LEXA mark, wordmark and browser icon assets",
-    "Added responsive authenticated workspace shell with desktop sidebar and mobile navigation",
-    "Added branded sign-in and create-workspace flows",
-    "Removed workspace ID entry from normal sign-in",
-    "Added automatic workspace resolution for single-workspace accounts",
-    "Added workspace picker for multi-workspace accounts",
-    "Added friendly frontend error normalization for authentication and service failures",
-    "Removed developer-facing infrastructure diagnostics from the customer-facing frontend",
-    "Updated browser metadata and favicon assets to the LEXA brand",
-    "Added workspace registration hardening migration 008",
-    "Added workspace selection migration 009",
-    "Applied and verified migrations 008 and 009 on the LEXA development branch",
-    "Verified the LEXA production branch remained untouched",
-    "Kept existing catalog functionality connected to tenant-scoped live APIs",
-    "Kept the existing inventory implementation in source for the subsequent product phase without deploying its database migration",
-    "Hardened authentication modal interactions for keyboard, focus, mobile and password visibility states",
-    "Removed stale workspace selection state from normal sign-in and persisted active workspace name safely in session storage",
-    "Normalized network failures so customer UI never receives raw browser connection diagnostics",
-    "Added canonical Neon branch identity verification to application readiness checks",
-    "Renamed the populated Neon branch to lexa-live, removed branch expiry, and made it the LEXA project default branch",
-    "Added deployment configuration for the canonical Neon branch id",
-    "Fixed CSS flex-end compatibility warnings",
-    "Expanded validation to 44 automated tests",
-    "Temporarily removed the customer-facing authentication gate from the rapid development experience",
-    "Added guarded open development sessions backed by the real tenant session and RLS path",
-    "Added a dedicated LEXA preview workspace and reusable sample catalog data",
-    "Added development-only workspace bootstrap endpoint guarded against production use",
-    "Kept the real login and registration endpoints available for the later production onboarding pass",
-    "Made inventory loading resilient so incomplete stock services do not block review of the rest of the workspace",
-    "Added open-development configuration and validation contracts",
-    "Flattened the open-development implementation into the repository root so Vercel and Render consume the same source tree."
+    "Added tenant business capabilities and configuration registry",
+    "Added universal party relationship graph edges",
+    "Added configurable transaction types, transaction lines and lifecycle history",
+    "Added reusable workflow definitions, steps, instances and step runs",
+    "Added authorized business context read API",
+    "Added Business Engine workspace UI",
+    "Added explicit Phase 2 permissions, RLS and append-only transaction status history",
+    "Added automatic business-engine default seeding for new and existing workspaces",
+    "Preserved the canonical LEXA Neon project and live branch without applying Phase 2 to production",
+    "Hardened /ready to require the Phase 2 Universal Business Engine schema before reporting ready"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -43,5 +21,21 @@
   "database_reset": false,
   "seed_reset": false,
   "product_deletion": false,
-  "description": "LEXA rapid development experience with a guarded open workspace. Authentication remains implemented server-side for the later production-ready onboarding pass."
+  "description": "Phase 0 recovery baseline with canonical LEXA Neon identity enforcement, readiness diagnostics, frontend bootstrap alignment, and non-destructive verification.",
+  "package_version": "1.8.1",
+  "phase": "2",
+  "phase_name": "Universal Business Engine",
+  "phase_status": "LIVE_DATABASE_MIGRATION_APPLIED_SOURCE_VALIDATED",
+  "canonical_neon": {
+    "project_id": "wispy-mud-75323042",
+    "branch_id": "br-soft-star-b1dj2m2w",
+    "database": "neondb"
+  },
+  "phase2_validation": {
+    "temporary_branch_id": "br-withered-thunder-b1699ugo",
+    "parent_branch_id": "br-soft-star-b1dj2m2w",
+    "migration_version": "013_phase2_universal_business_engine",
+    "live_branch_phase2_tables": 10,
+    "live_branch_migration_013": 1
+  }
 }

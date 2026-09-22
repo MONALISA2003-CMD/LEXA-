@@ -86,8 +86,33 @@ export default function HomePage() {
   const [newVariantUnit, setNewVariantUnit] = useState("");
 
   async function refreshSystem() {
-    try { const [h, r] = await Promise.all([getHealth(), getReadiness()]); setHealth(h); setReadiness(r); setError(null); }
-    catch (e) { setHealth(null); setReadiness(null); setError(e instanceof Error ? e.message : "Unable to reach LEXA."); }
+    try {
+      const [h, r] = await Promise.all([getHealth(), getReadiness()]);
+      setHealth(h);
+      setReadiness(r);
+      if (h.status !== "ok" || r.status !== "ready") {
+        setError(null);
+        return false;
+      }
+      setError(null);
+      return true;
+    } catch (e) {
+      setHealth(null);
+      setReadiness(null);
+      setError(e instanceof Error ? e.message : "Unable to reach LEXA.");
+      return false;
+    }
+  }
+
+  async function establishWorkspaceSession() {
+    const session = await openDevSession();
+    window.sessionStorage.setItem("lexa_access_token", session.access_token);
+    window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
+    window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
+    setToken(session.access_token);
+    setTenantId(session.tenant_id);
+    setTenantName(session.tenant_name);
+    return session;
   }
   async function refreshInventory() {
     if (!token) return;
@@ -132,29 +157,44 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
     async function boot() {
-      await refreshSystem();
+      if (cancelled) return;
       const saved = window.sessionStorage.getItem("lexa_access_token");
       const savedWorkspace = window.sessionStorage.getItem("lexa_workspace_id");
       const savedWorkspaceName = window.sessionStorage.getItem("lexa_workspace_name");
+
       if (saved && savedWorkspace) {
-        if (!cancelled) { setToken(saved); setTenantId(savedWorkspace); setTenantName(savedWorkspaceName || "LEXA Workspace"); }
+        if (!cancelled) {
+          setToken(saved);
+          setTenantId(savedWorkspace);
+          setTenantName(savedWorkspaceName || "LEXA Workspace");
+        }
+        const ready = await refreshSystem();
+        if (!ready && !cancelled) retryTimer = setTimeout(boot, 1500);
         return;
       }
-      if (!OPEN_DEV_MODE || cancelled) return;
+
+      if (!OPEN_DEV_MODE || cancelled) {
+        await refreshSystem();
+        return;
+      }
+
       try {
-        const session = await openDevSession();
+        await establishWorkspaceSession();
         if (cancelled) return;
-        window.sessionStorage.setItem("lexa_access_token", session.access_token);
-        window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
-        window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
-        setToken(session.access_token); setTenantId(session.tenant_id); setTenantName(session.tenant_name);
+        await refreshSystem();
       } catch (e) {
-        if (!cancelled) setCatalogMessage(e instanceof Error ? e.message : "LEXA is preparing your workspace.");
+        if (!cancelled) {
+          setCatalogMessage(e instanceof Error ? e.message : "LEXA is preparing your workspace.");
+          retryTimer = setTimeout(boot, 2000);
+        }
       }
     }
-    boot();
-    return () => { cancelled = true; };
+
+    void boot();
+    return () => { cancelled = true; if (retryTimer) clearTimeout(retryTimer); };
   }, []);
   useEffect(() => { if (token && active === "Inventory") refreshInventory(); }, [token, active, invTab, locationFilter]);
   useEffect(() => { if (token && active === "Products") refreshCatalog(); }, [token, active, catalogSearch]);
@@ -188,12 +228,7 @@ export default function HomePage() {
     setBalances([]); setLocations([]); setVariants([]); setCatalogProducts([]); setCatalogVariants([]);
     setActive("Overview"); setMobileMenuOpen(false);
     if (OPEN_DEV_MODE) {
-      void openDevSession().then(session => {
-        window.sessionStorage.setItem("lexa_access_token", session.access_token);
-        window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
-        window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
-        setToken(session.access_token); setTenantId(session.tenant_id); setTenantName(session.tenant_name);
-      });
+      void establishWorkspaceSession().then(() => refreshSystem()).catch(() => undefined);
     }
   }
   function clearInvMessage() { setInvMessage(null); setError(null); }
@@ -279,7 +314,8 @@ export default function HomePage() {
       <aside className={`sidebar ${mobileMenuOpen ? "open" : ""}`}>
         <div className="sidebar-brand"><a href="#" className="sidebar-brand-link" onClick={(e) => { e.preventDefault(); setActive("Overview"); setMobileMenuOpen(false); }}><img className="lexa-sidebar-mark" src="/lexa-mark.png" alt="LEXA" /><span>LEXA</span></a><button className="mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">×</button></div>
         <div className="sidebar-workspace"><span className="workspace-avatar">{tenantName ? tenantName.slice(0, 1).toUpperCase() : "L"}</span><div><strong>{tenantName || "Your workspace"}</strong><small>Business workspace</small></div></div>
-        <nav className="sidebar-nav" aria-label="Workspace navigation">{modules.map(item => <button key={item.name} className={`sidebar-item ${active === item.name ? "active" : ""}`} onClick={() => { setActive(item.name); setMobileMenuOpen(false); }}><span className="sidebar-icon"><NavIcon name={item.name} /></span><span className="sidebar-text"><b>{item.name}</b><small>{item.desc}</small></span></button>)}</nav>
+        <a href="/kernel" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">◆</span><span className="sidebar-text"><b>Business Kernel</b><small>Universal business objects</small></span></a>
+        <a href="/business-engine" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">◇</span><span className="sidebar-text"><b>Business Engine</b><small>Configure, transact and automate</small></span></a><nav className="sidebar-nav" aria-label="Workspace navigation">{modules.map(item => <button key={item.name} className={`sidebar-item ${active === item.name ? "active" : ""}`} onClick={() => { setActive(item.name); setMobileMenuOpen(false); }}><span className="sidebar-icon"><NavIcon name={item.name} /></span><span className="sidebar-text"><b>{item.name}</b><small>{item.desc}</small></span></button>)}</nav>
         <div className="sidebar-bottom"><div className="sidebar-note"><span className="note-dot" /><div><strong>{health && readiness?.status === "ready" ? "Workspace ready" : "Getting things ready"}</strong><p>{health && readiness?.status === "ready" ? "Your business tools are ready to use." : "Your workspace is loading."}</p></div></div><button className="sidebar-account" onClick={resetPreview}><span className="avatar-small">L</span><span><b>Preview workspace</b><small>Reset workspace</small></span></button></div>
       </aside>
 
@@ -316,7 +352,7 @@ function NavIcon({ name }: { name: string }) {
 
 type CatalogProps = any;
 function CatalogWorkspace(p: CatalogProps) {
-  if (!p.token) return <section className="module-page"><span className="tag">CATALOG</span><h2>Your product catalog</h2><p>Your workspace is being prepared.</p><div className="notice"><strong>Getting your catalog ready.</strong><p>Your product tools will appear here as soon as the workspace is connected.</p></div></section>;
+  if (!p.token) return <section className="module-page"><span className="tag">CATALOG</span><h2>Your product catalog</h2><p>Sign in to manage your products, variants, SKUs and pricing.</p><div className="notice"><strong>Getting your catalog ready.</strong><p>Your product tools will appear here as soon as the workspace is connected.</p></div></section>;
   return <>
     <section className="inventory-summary"><div><span className="eyebrow">CATALOG CONTROL</span><h2>Products and SKUs</h2><p>Product identity that becomes the foundation for inventory, sales and purchasing.</p></div><div className="inventory-actions"><button className="secondary" onClick={p.onRefresh}>{p.busy ? "Refreshing…" : "Refresh catalog"}</button></div></section>
     {p.message && <div className="inline-message">{p.message}</div>}
