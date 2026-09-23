@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Phase 4B \u2014 Accounting, Tax and EFRIS Foundation",
-  "version": "2.3.0",
+  "package": "LEXA Phase 5 \u2014 Business Intelligence Foundation",
+  "version": "2.4.0",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -9,7 +9,11 @@
     "Added separate EFRIS configuration, fiscal documents and fiscalization event queue",
     "Added forced tenant RLS and financial permissions",
     "Added Accounting and Compliance frontend workspaces",
-    "Fixed mobile sidebar logo asset overflow that caused the observed white overlay"
+    "Fixed mobile sidebar logo asset overflow that caused the observed white overlay",
+    "Removed Business Engine as a user-facing product module while retaining its transaction/workflow schema as internal technical infrastructure",
+    "Added deterministic analytics projections and Reports & Business Intelligence workspace",
+    "Added tenant-scoped analytics permissions and forced RLS projections",
+    "Added migration 021 phase5 analytics foundation"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -18,10 +22,10 @@
   "database_reset": false,
   "seed_reset": false,
   "product_deletion": false,
-  "description": "Canonical LEXA Neon foundation for deterministic double-entry accounting, effective-dated tax configuration, bounded expense posting, and separate EFRIS fiscal-document orchestration.",
-  "package_version": "2.3.0",
-  "phase": "4B",
-  "phase_name": "Accounting, Tax and EFRIS Foundation",
+  "description": "Canonical LEXA Neon foundation for deterministic business intelligence, reporting, product performance, customer patterns, branch performance, and inventory health.",
+  "package_version": "2.4.0",
+  "phase": "5",
+  "phase_name": "Business Intelligence Foundation",
   "phase_status": "LIVE_DATABASE_MIGRATION_APPLIED_SOURCE_VALIDATED",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
@@ -49,5 +53,12 @@
     "forced_rls_tables": 12,
     "rls_policies": 12,
     "finance_permissions": 12
+  },
+  "phase5_validation": {
+    "migration_version": "021_phase5_analytics_foundation",
+    "analytics_tables": 6,
+    "forced_rls_tables": 6,
+    "analytics_permissions": 2,
+    "temporary_validation": "phase5-analytics-validation"
   }
 }

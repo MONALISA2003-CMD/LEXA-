@@ -6,7 +6,7 @@ import {
   createStockCount, createTransfer, dispatchTransfer, getAdjustments, getHealth, getInventoryBalances,
   getInventoryIntegrity, getInventoryLedger, getLocations, getReadiness, getStockCounts, getTransfers, getVariantOptions,
   openDevSession, postAdjustment, postStockCount, receiveTransfer, submitStockCount, updateCountLines,
-  createProduct, createVariant, getBrands, getCategories, getPriceLists, getProducts, getUnits, getVariants, getBusinessCapabilities,
+  createProduct, createVariant, getBrands, getCategories, getPriceLists, getProducts, getUnits, getVariants,
   type ApiHealth, type ApiReadiness, type Brand, type Category, type InventoryAdjustment, type InventoryBalance, type InventoryLedger,
   type Location, type PriceList, type Product, type StockCount, type Transfer, type Unit, type Variant, type VariantOption,
 } from "../lib/api";
@@ -116,7 +116,7 @@ export default function HomePage() {
   }
 
   async function verifyWorkspaceAccess() {
-    await getBusinessCapabilities();
+    await getLocations();
   }
   async function refreshInventory() {
     if (!token) return;
@@ -332,8 +332,7 @@ export default function HomePage() {
         <div className="sidebar-brand"><a href="#" className="sidebar-brand-link" onClick={(e) => { e.preventDefault(); setActive("Overview"); setMobileMenuOpen(false); }}><img className="lexa-sidebar-mark" src="/lexa-mark.png" alt="LEXA" /><span>LEXA</span></a><button className="mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">×</button></div>
         <div className="sidebar-workspace"><span className="workspace-avatar">{tenantName ? tenantName.slice(0, 1).toUpperCase() : "L"}</span><div><strong>{tenantName || "Your workspace"}</strong><small>Business workspace</small></div></div>
         <a href="/kernel" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">◆</span><span className="sidebar-text"><b>Business Kernel</b><small>Universal business objects</small></span></a>
-        <a href="/business-engine" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">◇</span><span className="sidebar-text"><b>Business Engine</b><small>Configure, transact and automate</small></span></a>
-        <a href="/commerce" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">$</span><span className="sidebar-text"><b>Commerce</b><small>Sales, money and reconciliation</small></span></a><a href="/accounting" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">≡</span><span className="sidebar-text"><b>Accounting</b><small>Journals, periods and reports</small></span></a><a href="/compliance" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">✓</span><span className="sidebar-text"><b>Compliance</b><small>Tax and EFRIS</small></span></a><nav className="sidebar-nav" aria-label="Workspace navigation">{modules.map(item => <button key={item.name} className={`sidebar-item ${active === item.name ? "active" : ""}`} onClick={() => { setActive(item.name); setMobileMenuOpen(false); }}><span className="sidebar-icon"><NavIcon name={item.name} /></span><span className="sidebar-text"><b>{item.name}</b><small>{item.desc}</small></span></button>)}</nav>
+        <a href="/commerce" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">$</span><span className="sidebar-text"><b>Commerce</b><small>Sales, money and reconciliation</small></span></a><a href="/accounting" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">≡</span><span className="sidebar-text"><b>Accounting</b><small>Journals, periods and reports</small></span></a><a href="/compliance" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">✓</span><span className="sidebar-text"><b>Compliance</b><small>Tax and EFRIS</small></span></a><nav className="sidebar-nav" aria-label="Workspace navigation">{modules.map(item => item.name === "Reports" ? <a key={item.name} href="/reports" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon"><NavIcon name={item.name} /></span><span className="sidebar-text"><b>{item.name}</b><small>{item.desc}</small></span></a> : <button key={item.name} className={`sidebar-item ${active === item.name ? "active" : ""}`} onClick={() => { setActive(item.name); setMobileMenuOpen(false); }}><span className="sidebar-icon"><NavIcon name={item.name} /></span><span className="sidebar-text"><b>{item.name}</b><small>{item.desc}</small></span></button>)}</nav>
         <div className="sidebar-bottom"><div className="sidebar-note"><span className="note-dot" /><div><strong>{health && readiness?.status === "ready" ? "Workspace ready" : "Getting things ready"}</strong><p>{health && readiness?.status === "ready" ? "Your business tools are ready to use." : "Your workspace is loading."}</p></div></div><button className="sidebar-account" onClick={resetPreview}><span className="avatar-small">L</span><span><b>Preview workspace</b><small>Reset workspace</small></span></button></div>
       </aside>
 

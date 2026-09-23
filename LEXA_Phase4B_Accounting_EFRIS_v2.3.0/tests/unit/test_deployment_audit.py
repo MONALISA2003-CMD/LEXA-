@@ -91,19 +91,19 @@ def test_database_readiness_locks_to_canonical_lexa_branch():
 def test_kernel_router_is_imported_from_canonical_module():
     source = (API / "app/main.py").read_text()
     assert "from .kernel import router as kernel_router" in source
-    assert "from .routes import auth, organization, rbac, catalog, inventory, business_engine" in source
+    assert "from .routes import auth, organization, rbac, catalog, inventory, commerce, finance, analytics" in source
     assert 'app.include_router(kernel_router, prefix="/api/v1")' in source
     assert "from .routes import auth, organization, rbac, catalog, inventory, kernel, business_engine" not in source
 
 
-def test_business_engine_transaction_line_quantities_match_api_contract():
-    page = (ROOT / "apps/web/app/business-engine/page.tsx").read_text()
-    assert 'quantity:"1",unit_price:txAmount' in page
-    assert 'quantity:1,unit_price:txAmount' not in page
+def test_business_engine_user_surface_is_removed():
+    assert not (ROOT / "apps/web/app/business-engine/page.tsx").exists()
+    page = (ROOT / "apps/web/app/page.tsx").read_text()
+    assert "/business-engine" not in page
 
 
 def test_frontend_boot_verifies_authenticated_workspace_access():
     page = (ROOT / "apps/web/app/page.tsx").read_text()
-    assert "getBusinessCapabilities" in page
+    assert "getLocations" in page
     assert "verifyWorkspaceAccess" in page
 

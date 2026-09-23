@@ -23,17 +23,10 @@ def test_phase2_universal_business_engine_migration_is_additive_and_tenant_scope
     assert "DELETE FROM" not in source
 
 
-def test_phase2_business_engine_api_surface_exists():
-    source = (ROOT / "apps/api/app/routes/business_engine.py").read_text()
-    for marker in [
-        '@router.get("/capabilities")', '@router.put("/capabilities/{code}")',
-        '@router.get("/configuration")', '@router.put("/configuration/{key}")',
-        '@router.post("/relationships", status_code=201)', '@router.get("/transaction-types")',
-        '@router.post("/transactions", status_code=201)', '@router.post("/transactions/{transaction_id}/transition")',
-        '@router.post("/workflows/definitions", status_code=201)', '@router.post("/workflows/instances", status_code=201)',
-        '@router.post("/workflows/instances/{instance_id}/advance")', '@router.get("/context/{entity_type}/{entity_id}", response_model=ContextOut)',
-    ]:
-        assert marker in source
+def test_phase2_business_engine_is_internal_not_user_module():
+    source = (ROOT / "apps/api/app/main.py").read_text()
+    assert "business_engine" not in source
+    assert not (ROOT / "apps/web/app/business-engine/page.tsx").exists()
 
 
 def test_phase2_business_engine_permissions_are_explicit():
@@ -42,15 +35,12 @@ def test_phase2_business_engine_permissions_are_explicit():
         assert f"('{code}'" in source
 
 
-def test_business_engine_is_registered_with_api():
+def test_business_engine_route_is_not_registered():
     source = (ROOT / "apps/api/app/main.py").read_text()
-    assert "business_engine" in source
-    assert "app.include_router(business_engine.router" in source
+    assert "include_router(business_engine.router" not in source
 
 
-def test_frontend_business_engine_surface_exists():
-    page = (ROOT / "apps/web/app/business-engine/page.tsx").read_text()
+def test_business_engine_frontend_surface_is_removed():
+    assert not (ROOT / "apps/web/app/business-engine/page.tsx").exists()
     api = (ROOT / "apps/web/lib/api.ts").read_text()
-    assert "Universal business engine" in page
-    for marker in ["getBusinessCapabilities", "createBusinessTransaction", "createWorkflowDefinition", "getBusinessContext"]:
-        assert marker in api
+    assert "/api/v1/business-engine/" not in api
