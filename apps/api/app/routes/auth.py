@@ -4,12 +4,13 @@ import secrets
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
+import redis
 
 from ..auth import create_access_token, hash_password, verify_password, new_refresh_token, hash_refresh_token
 from ..catalog_rules import request_hash
@@ -43,7 +44,58 @@ class LoginRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None
+
+
+
+def _enforce_registration_rate_limit(request: Request) -> None:
+    client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+    ip = request.client.host if request.client else "unknown"
+    key = f"lexa:registration:{ip}"
+    try:
+        count = int(client.incr(key))
+        if count == 1:
+            client.expire(key, 3600)
+    except Exception as exc:
+        logger.exception("registration_rate_limit_unavailable", extra={"request_id": getattr(request.state, "request_id", "untracked")})
+        raise HTTPException(503, "Workspace service is temporarily unavailable. Please try again shortly.") from exc
+    if count > 10:
+        raise HTTPException(429, "Too many workspace creation attempts. Please try again later.")
+
+
+def _login_rate_key(request: Request, email: str) -> str:
+    ip = request.client.host if request.client else "unknown"
+    return f"lexa:login:{ip}:{email}"
+
+
+def _enforce_login_rate_limit(request: Request, email: str) -> None:
+    client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+    key = _login_rate_key(request, email)
+    try:
+        count = int(client.incr(key))
+        if count == 1:
+            client.expire(key, 300)
+    except Exception as exc:
+        logger.exception("login_rate_limit_unavailable", extra={"request_id": getattr(request.state, "request_id", "untracked")})
+        raise HTTPException(503, "Sign-in protection is temporarily unavailable. Please try again shortly.") from exc
+    if count > 10:
+        raise HTTPException(429, "Too many sign-in attempts. Please wait a few minutes and try again.")
+
+
+def _clear_login_rate_limit(request: Request, email: str) -> None:
+    try:
+        client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+        client.delete(_login_rate_key(request, email))
+    except Exception:
+        logger.warning("login_rate_limit_clear_failed", extra={"request_id": getattr(request.state, "request_id", "untracked")})
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie("lexa_refresh_token", token, httponly=True, secure=settings.app_env.strip().lower() == "production", samesite="lax", max_age=settings.refresh_token_days * 86400, path="/")
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie("lexa_refresh_token", path="/")
 
 
 def _registration_key(value: str | None) -> str:
@@ -64,137 +116,6 @@ def _registration_hash(body: RegisterRequest) -> str:
 
 
 
-@router.post("/dev-session")
-def dev_session(request: Request, db: Session = Depends(get_db)):
-    """Create or restore a safe development workspace session.
-
-    This route is intentionally unavailable in production and is only used while
-    LEXA is being built. It still issues a normal session token, so tenant-scoped
-    APIs and RLS continue to exercise their real authorization paths.
-    """
-    if settings.app_env.strip().lower() == "production" or not settings.lexa_open_dev_mode:
-        raise HTTPException(404, "Not found")
-
-    database_ready, database_error = check_database()
-    if not database_ready:
-        raise HTTPException(503, f"LEXA database is not ready: {database_error}")
-
-    email = settings.lexa_open_dev_email.lower().strip()
-    workspace_name = settings.lexa_open_dev_workspace_name.strip() or "LEXA Workspace"
-    request_id = getattr(request.state, "request_id", None) or "untracked"
-
-    try:
-        user = db.scalar(select(User).where(User.email == email))
-        tenant = None
-        membership = None
-        owner = None
-        if user:
-            membership = db.scalar(select(TenantMembership).where(TenantMembership.user_id == user.id, TenantMembership.status == "ACTIVE"))
-            if membership:
-                tenant = db.scalar(select(Tenant).where(Tenant.id == membership.tenant_id, Tenant.status == "ACTIVE"))
-
-        if not user or not tenant or not membership:
-            if not user:
-                user = User(email=email, password_hash=hash_password(secrets.token_urlsafe(32)), is_active=True)
-                db.add(user)
-                db.flush()
-            tenant = Tenant(name=workspace_name, status="ACTIVE")
-            db.add(tenant)
-            db.flush()
-            db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant.id)})
-            profile = BusinessProfile(tenant_id=tenant.id, legal_name=workspace_name, display_name=workspace_name, country_code="UG", currency_code="UGX")
-            membership = TenantMembership(tenant_id=tenant.id, user_id=user.id, status="ACTIVE")
-            db.add_all([profile, membership])
-            db.flush()
-            owner = Role(tenant_id=tenant.id, name="Owner", description="Preview workspace owner")
-            db.add(owner)
-            db.flush()
-            db.add(MembershipRole(membership_id=membership.id, role_id=owner.id))
-            permissions = db.scalars(select(Permission)).all()
-            if permissions:
-                db.add_all([RolePermission(role_id=owner.id, permission_id=p.id) for p in permissions])
-            db.flush()
-            db.execute(text("SELECT lexa_seed_business_engine(:tenant_id)"), {"tenant_id": str(tenant.id)})
-        else:
-            db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant.id)})
-            db.execute(text("SELECT lexa_seed_business_engine(:tenant_id)"), {"tenant_id": str(tenant.id)})
-
-        # Keep one short-lived development session per preview user.
-        now = datetime.now(timezone.utc)
-        db.query(AuthSession).filter(
-            AuthSession.user_id == user.id,
-            AuthSession.tenant_id == tenant.id,
-            AuthSession.revoked_at.is_(None),
-        ).update({"revoked_at": now}, synchronize_session=False)
-        refresh = new_refresh_token()
-        session = AuthSession(
-            tenant_id=tenant.id,
-            user_id=user.id,
-            refresh_token_hash=hash_refresh_token(refresh),
-            expires_at=now + timedelta(days=7),
-        )
-        db.add(session)
-        db.flush()
-
-        # Seed a small, reusable workspace only once. These are ordinary catalog
-        # records and are visible through the same tenant/RLS paths as real data.
-        if not db.scalar(select(Category.id).where(Category.tenant_id == tenant.id, Category.code == "PREVIEW")):
-            category = Category(tenant_id=tenant.id, name="Everyday Products", code="PREVIEW", description="Sample catalog category")
-            brand = Brand(tenant_id=tenant.id, name="LEXA Sample", code="LEXA")
-            db.add_all([category, brand])
-            db.flush()
-            unit = db.scalar(select(Unit).where(Unit.tenant_id.is_(None), Unit.code == "PCS"))
-            if not unit:
-                raise HTTPException(503, "Workspace unit setup is unavailable")
-            products = [
-                ("Everyday Essentials", "Sample item for catalog review", "SKU-PREVIEW-001"),
-                ("Premium Pack", "Sample variant for pricing and catalog review", "SKU-PREVIEW-002"),
-                ("Starter Bundle", "Sample multi-item product", "SKU-PREVIEW-003"),
-                ("Office Supply Set", "Sample business supply item", "SKU-PREVIEW-004"),
-                ("Household Kit", "Sample household item", "SKU-PREVIEW-005"),
-            ]
-            for name, description, sku in products:
-                product = Product(tenant_id=tenant.id, category_id=category.id, brand_id=brand.id, name=name, description=description, product_type="STOCKED", status="ACTIVE", has_variants=True, product_metadata={"preview": True})
-                db.add(product)
-                db.flush()
-                variant = ProductVariant(tenant_id=tenant.id, product_id=product.id, name="Standard", sku=sku, base_unit_id=unit.id, track_inventory=True, allow_fractional_quantity=False, status="ACTIVE", costing_method="WEIGHTED_AVERAGE", variant_metadata={"preview": True})
-                db.add(variant)
-                db.flush()
-                if sku.endswith("001"):
-                    price_list = db.scalar(select(PriceList).where(PriceList.tenant_id == tenant.id, PriceList.name == "Retail"))
-                    if not price_list:
-                        price_list = PriceList(tenant_id=tenant.id, name="Retail", currency="UGX", price_type="RETAIL", status="ACTIVE", effective_from=now)
-                        db.add(price_list)
-                        db.flush()
-                    db.add(ProductPrice(tenant_id=tenant.id, price_list_id=price_list.id, variant_id=variant.id, unit_price=Decimal("15000"), minimum_quantity=Decimal("1"), effective_from=now))
-
-            branch = Branch(tenant_id=tenant.id, name="Main Branch", code="MAIN", status="ACTIVE")
-            db.add(branch)
-            db.flush()
-            warehouse = Warehouse(tenant_id=tenant.id, branch_id=branch.id, name="Main Warehouse", code="MAIN-WH", status="ACTIVE")
-            db.add(warehouse)
-            db.flush()
-            db.add(Location(tenant_id=tenant.id, warehouse_id=warehouse.id, name="Main Shelf", code="SHELF-01", status="ACTIVE"))
-
-        write_audit(db, tenant_id=tenant.id, actor_user_id=user.id, action="workspace.dev_session", target_type="tenant", target_id=tenant.id, outcome="SUCCESS", correlation_id=request_id)
-        db.commit()
-        return {
-            "access_token": create_access_token(user.id, tenant.id, session.id),
-            "refresh_token": refresh,
-            "token_type": "bearer",
-            "session_id": session.id,
-            "tenant_id": str(tenant.id),
-            "tenant_name": tenant.name,
-        }
-    except HTTPException:
-        db.rollback()
-        raise
-    except SQLAlchemyError as exc:
-        db.rollback()
-        logger.exception("development_session_database_failure", extra={"request_id": request_id})
-        raise HTTPException(503, "LEXA could not prepare the workspace right now") from exc
-
-
 @router.post("/register")
 def register(
     body: RegisterRequest,
@@ -203,6 +124,7 @@ def register(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     email = body.email.lower().strip()
+    _enforce_registration_rate_limit(request)
     tenant_name = body.tenant_name.strip()
     if not tenant_name:
         raise HTTPException(400, "Business name is required")
@@ -330,8 +252,9 @@ def register(
 
 
 @router.post("/login")
-def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
+def login(body: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     email = body.email.lower().strip()
+    _enforce_login_rate_limit(request, email)
     user = db.scalar(select(User).where(User.email == email))
     if not user or not user.is_active or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "Invalid credentials")
@@ -384,11 +307,12 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
     )
     db.add(session)
     db.commit()
+    _clear_login_rate_limit(request, email)
     logger.info("workspace_login_success", extra={"request_id": request_id, "tenant_id": str(tenant_id)})
     tenant = db.get(Tenant, tenant_id)
+    _set_refresh_cookie(response, refresh)
     return {
         "access_token": create_access_token(user.id, tenant_id, session.id),
-        "refresh_token": refresh,
         "token_type": "bearer",
         "session_id": session.id,
         "tenant_id": str(tenant_id),
@@ -397,8 +321,11 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/refresh")
-def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
-    token_hash = hash_refresh_token(body.refresh_token)
+def refresh(body: RefreshRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    refresh_token = request.cookies.get("lexa_refresh_token") or body.refresh_token
+    if not refresh_token:
+        raise HTTPException(401, "Authentication session expired")
+    token_hash = hash_refresh_token(refresh_token)
     session = db.scalar(select(AuthSession).where(AuthSession.refresh_token_hash == token_hash, AuthSession.revoked_at.is_(None)))
     now = datetime.now(timezone.utc)
     if not session or session.expires_at <= now:
@@ -411,12 +338,22 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     new_refresh = new_refresh_token()
     session.refresh_token_hash = hash_refresh_token(new_refresh)
     db.commit()
-    return {"access_token": create_access_token(user.id, session.tenant_id, session.id), "refresh_token": new_refresh, "token_type": "bearer", "session_id": session.id}
+    tenant = db.get(Tenant, session.tenant_id)
+    _set_refresh_cookie(response, new_refresh)
+    return {
+        "access_token": create_access_token(user.id, session.tenant_id, session.id),
+        "token_type": "bearer",
+        "session_id": session.id,
+        "tenant_id": str(session.tenant_id),
+        "tenant_name": tenant.name if tenant else "Your workspace",
+    }
 
 
 @router.post("/logout")
-def logout(body: RefreshRequest, db: Session = Depends(get_db)):
-    session = db.scalar(select(AuthSession).where(AuthSession.refresh_token_hash == hash_refresh_token(body.refresh_token), AuthSession.revoked_at.is_(None)))
+def logout(body: RefreshRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    refresh_token = request.cookies.get("lexa_refresh_token") or body.refresh_token
+    session = db.scalar(select(AuthSession).where(AuthSession.refresh_token_hash == hash_refresh_token(refresh_token), AuthSession.revoked_at.is_(None))) if refresh_token else None
     if session:
         session.revoked_at = datetime.now(timezone.utc); db.commit()
+    _clear_refresh_cookie(response)
     return {"status": "logged_out"}

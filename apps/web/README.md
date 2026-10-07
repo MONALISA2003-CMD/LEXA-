@@ -17,6 +17,6 @@ The public experience does not display internal service diagnostics, request ide
 
 ## Rapid development mode
 
-During active product development the web app can open the workspace directly. Set `NEXT_PUBLIC_LEXA_OPEN_MODE=true` for the development build. The API must have its guarded development session enabled.
+During active product development the web app can requires normal sign-in. The shipped build does not expose an open development workspace session.
 
 This mode does not remove database isolation or permissions; it only removes the browser authentication interruption.

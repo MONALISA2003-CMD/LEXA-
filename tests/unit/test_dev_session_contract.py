@@ -5,40 +5,44 @@ AUTH = ROOT / "apps/api/app/routes/auth.py"
 CONFIG = ROOT / "apps/api/app/config.py"
 RENDER = ROOT / "render.yaml"
 API = ROOT / "apps/web/lib/api.ts"
+PAGE = ROOT / "apps/web/app/page.tsx"
 
 
-def test_dev_session_is_guarded_and_uses_real_session_tokens():
-    source = AUTH.read_text()
-    assert '@router.post("/dev-session")' in source
-    assert 'settings.app_env.strip().lower() == "production"' in source
-    assert 'not settings.lexa_open_dev_mode' in source
-    assert 'create_access_token' in source
+def test_development_session_route_is_removed_from_production_surface():
+    auth = AUTH.read_text()
+    api = API.read_text()
+    page = PAGE.read_text()
+    assert '@router.post("/dev-session")' not in auth
+    assert '"/api/v1/auth/dev-session"' not in api
+    assert "openDevSession" not in page
+    assert "NEXT_PUBLIC_LEXA_OPEN_MODE" not in page
 
 
-def test_dev_mode_configuration_exists_for_development_service():
+def test_production_configuration_is_fail_closed():
     config = CONFIG.read_text()
     render = RENDER.read_text()
-    assert "lexa_open_dev_mode" in config
-    assert "LEXA_OPEN_DEV_MODE" in render
-    assert 'value: "true"' in render
-    assert 'value: development' in render
+    assert "def validate_production_settings" in config
+    assert 'database_app_role != "lexa_app"' in config
+    assert 'value: production' in render
+    assert 'value: "false"' in render
+    assert "LEXA_OPEN_DEV_EMAIL" not in render
+    assert "LEXA_OPEN_DEV_WORKSPACE_NAME" not in render
 
 
-def test_web_client_can_boot_open_development_session():
-    source = API.read_text()
-    assert '"/api/v1/auth/dev-session"' in source
+def test_browser_session_restoration_uses_refresh_cookie_not_persistent_access_token():
+    api = API.read_text()
+    assert "restoreSession" in api
+    assert 'credentials: "same-origin"' in api
+    assert 'sessionStorage.getItem("lexa_access_token")' not in api
+    assert 'sessionStorage.setItem("lexa_access_token"' not in api
 
 
-def test_dev_session_seed_imports_decimal_for_price_bootstrap():
-    source = AUTH.read_text()
-    assert "from decimal import Decimal" in source
-    assert 'unit_price=Decimal("15000")' in source
-
-
-def test_frontend_boot_rechecks_readiness_after_session_establishment():
-    page = (ROOT / "apps/web/app/page.tsx").read_text()
-    assert "await establishWorkspaceSession();" in page
-    assert "await refreshSystem();" in page
-    assert 'r.status !== "ready"' in page
-    assert "setTimeout(boot, 1500)" in page
-    assert "setTimeout(boot, 2000)" in page
+def test_authentication_surface_has_safe_refresh_and_rate_limits():
+    auth = AUTH.read_text()
+    assert "_enforce_login_rate_limit" in auth
+    assert "_enforce_registration_rate_limit" in auth
+    assert "_clear_login_rate_limit" in auth
+    assert 'httponly=True' in auth
+    assert 'samesite="lax"' in auth
+    assert 'return {\n        "access_token"' in auth
+    assert '"refresh_token": refresh' not in auth

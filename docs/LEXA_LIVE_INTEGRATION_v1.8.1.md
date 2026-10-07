@@ -1,25 +1,11 @@
-# LEXA Live Integration v1.8.1
+# LEXA Live Integration
 
-## Canonical path
+The canonical LEXA application uses the Neon project `LEXA`, branch `lexa-live` (`br-soft-star-b1dj2m2w`), database `neondb`.
 
-Browser → Next.js `/api/lexa/*` proxy → FastAPI → canonical LEXA Neon PostgreSQL
+The API is served by Render and the web application is served by Vercel/Next.js. The browser communicates with the API through the same-origin Next.js proxy so refresh cookies remain HttpOnly.
 
-## Readiness contract
+Authentication no longer uses an open-development bootstrap or `sessionStorage` bearer persistence. Browser access tokens live in memory; refresh credentials are rotated through the HttpOnly refresh cookie.
 
-`GET /ready` now verifies:
+The API runtime uses the restricted PostgreSQL role `lexa_app` and applies that role per database transaction so PgBouncer transaction pooling does not weaken the RLS boundary.
 
-- canonical project identity
-- canonical branch identity
-- canonical database name
-- Phase 0 schema
-- Phase 2 Universal Business Engine schema
-
-The endpoint may return HTTP 200 with `status=not_ready`; the frontend must inspect the payload, retry, and only mark the workspace ready when `status=ready`.
-
-## Browser bootstrap
-
-Development preview bootstrap uses `/api/v1/auth/dev-session`, stores the short-lived access token in session storage, and immediately re-runs readiness. Transient 502/503/504 responses are retried.
-
-## Deployment dependency
-
-The source package is deployment-ready. Live deployment of the frontend/API still depends on access to the connected hosting accounts. No non-LEXA Neon target is used.
+The source repository must contain every migration present on the canonical Neon database. The current production package includes migrations through `022_phase6a_brain_foundation`.

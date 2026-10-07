@@ -5,8 +5,8 @@ import {
   approveAdjustment, approveStockCount, approveTransfer, completeTransfer, createAdjustment, createLocation, createWarehouse,
   createStockCount, createTransfer, dispatchTransfer, getAdjustments, getHealth, getInventoryBalances,
   getInventoryIntegrity, getInventoryLedger, getLocations, getReadiness, getStockCounts, getTransfers, getVariantOptions,
-  openDevSession, postAdjustment, postStockCount, receiveTransfer, submitStockCount, updateCountLines,
-  createProduct, createVariant, getBrands, getCategories, getPriceLists, getProducts, getUnits, getVariants, getBusinessCapabilities,
+  logout, postAdjustment, postStockCount, receiveTransfer, restoreSession, submitStockCount, updateCountLines,
+  createProduct, createVariant, getBrands, getCategories, getPriceLists, getProducts, getUnits, getVariants,
   type ApiHealth, type ApiReadiness, type Brand, type Category, type InventoryAdjustment, type InventoryBalance, type InventoryLedger,
   type Location, type PriceList, type Product, type StockCount, type Transfer, type Unit, type Variant, type VariantOption,
 } from "../lib/api";
@@ -22,8 +22,6 @@ const modules = [
   { name: "LEXA Intelligence", desc: "Analysis, recommendations and controlled actions" },
 ];
 const invTabs = ["Stock", "Ledger", "Adjustments", "Counts", "Transfers", "Locations"];
-const OPEN_DEV_MODE = process.env.NEXT_PUBLIC_LEXA_OPEN_MODE !== "false";
-
 function money(value: string | number) { return new Intl.NumberFormat("en-UG", { style: "currency", currency: "UGX", maximumFractionDigits: 0 }).format(Number(value)); }
 function qty(value: string | number) { return new Intl.NumberFormat("en-UG", { maximumFractionDigits: 3 }).format(Number(value)); }
 function date(value: string) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
@@ -104,19 +102,8 @@ export default function HomePage() {
     }
   }
 
-  async function establishWorkspaceSession() {
-    const session = await openDevSession();
-    window.sessionStorage.setItem("lexa_access_token", session.access_token);
-    window.sessionStorage.setItem("lexa_workspace_id", session.tenant_id);
-    window.sessionStorage.setItem("lexa_workspace_name", session.tenant_name);
-    setToken(session.access_token);
-    setTenantId(session.tenant_id);
-    setTenantName(session.tenant_name);
-    return session;
-  }
-
   async function verifyWorkspaceAccess() {
-    await getBusinessCapabilities();
+    await getLocations();
   }
   async function refreshInventory() {
     if (!token) return;
@@ -165,49 +152,17 @@ export default function HomePage() {
 
     async function boot() {
       if (cancelled) return;
-      const saved = window.sessionStorage.getItem("lexa_access_token");
-      const savedWorkspace = window.sessionStorage.getItem("lexa_workspace_id");
-      const savedWorkspaceName = window.sessionStorage.getItem("lexa_workspace_name");
-
-      if (saved && savedWorkspace) {
+      const session = await restoreSession();
+      if (session) {
         if (!cancelled) {
-          setToken(saved);
-          setTenantId(savedWorkspace);
-          setTenantName(savedWorkspaceName || "LEXA Workspace");
+          setToken(session.access_token);
+          setTenantId(session.tenant_id);
+          setTenantName(session.tenant_name);
         }
-        const ready = await refreshSystem();
-        if (!ready) {
-          if (!cancelled) retryTimer = setTimeout(boot, 1500);
-          return;
-        }
-        try {
-          await verifyWorkspaceAccess();
-        } catch {
-          window.sessionStorage.removeItem("lexa_access_token");
-          window.sessionStorage.removeItem("lexa_workspace_id");
-          window.sessionStorage.removeItem("lexa_workspace_name");
-          if (!cancelled && OPEN_DEV_MODE) retryTimer = setTimeout(boot, 200);
-        }
-        return;
-      }
-
-      if (!OPEN_DEV_MODE || cancelled) {
         await refreshSystem();
         return;
       }
-
-      try {
-        await establishWorkspaceSession();
-        if (cancelled) return;
-        const ready = await refreshSystem();
-        if (!ready) throw new Error("LEXA is not ready yet.");
-        await verifyWorkspaceAccess();
-      } catch (e) {
-        if (!cancelled) {
-          setCatalogMessage(e instanceof Error ? e.message : "LEXA is preparing your workspace.");
-          retryTimer = setTimeout(boot, 2000);
-        }
-      }
+      await refreshSystem();
     }
 
     void boot();
@@ -237,16 +192,11 @@ export default function HomePage() {
     catch (e) { setCatalogMessage(e instanceof Error ? e.message : "Variant creation failed."); }
   }
 
-  function resetPreview() {
-    window.sessionStorage.removeItem("lexa_access_token");
-    window.sessionStorage.removeItem("lexa_workspace_id");
-    window.sessionStorage.removeItem("lexa_workspace_name");
+  async function resetWorkspaceState() {
+    await logout();
     setToken(null); setTenantId(""); setTenantName("");
     setBalances([]); setLocations([]); setVariants([]); setCatalogProducts([]); setCatalogVariants([]);
     setActive("Overview"); setMobileMenuOpen(false);
-    if (OPEN_DEV_MODE) {
-      void establishWorkspaceSession().then(() => refreshSystem()).catch(() => undefined);
-    }
   }
   function clearInvMessage() { setInvMessage(null); setError(null); }
 
@@ -276,7 +226,7 @@ export default function HomePage() {
   const mark = <img className="lexa-mark" src="/lexa-mark.png" alt="" aria-hidden="true" />;
   const activeDescription = modules.find(item => item.name === active)?.desc || "Business operations";
 
-  if (!token && !OPEN_DEV_MODE) {
+  if (!token) {
     return (
       <main className="public-page">
         <header className="public-header">
@@ -284,7 +234,7 @@ export default function HomePage() {
           <nav className="public-nav" aria-label="Primary navigation">
             <a href="#platform">Platform</a><a href="#capabilities">Capabilities</a><a href="#intelligence">Intelligence</a>
           </nav>
-          <button className="button button-dark" onClick={() => setActive("Overview")}>Open workspace</button>
+          <a className="button button-dark" href="/login">Open workspace</a>
         </header>
 
         <section className="public-hero" id="top">
@@ -292,7 +242,7 @@ export default function HomePage() {
             <div className="hero-kicker"><span className="kicker-dot" /> Business operating system</div>
             <h1>Run your business from one intelligent place.</h1>
             <p>LEXA brings products, inventory, sales, purchasing, customers, reporting and business intelligence into a single workspace built for growing businesses.</p>
-            <div className="hero-actions"><button className="button button-dark button-large" onClick={() => setActive("Overview")}>Create your workspace</button><a className="text-link" href="#platform">See how it works <span>→</span></a></div>
+            <div className="hero-actions"><a className="button button-dark button-large" href="/register">Create your workspace</a><a className="text-link" href="#platform">See how it works <span>→</span></a></div>
             <div className="hero-trust"><span>One workspace</span><span>Clear operations</span><span>Built to scale</span></div>
           </div>
           <div className="hero-visual" aria-label="LEXA workspace preview">
@@ -320,7 +270,7 @@ export default function HomePage() {
           <div className="intelligence-card"><div className="intelligence-top"><span>{mark}</span><div><strong>LEXA Intelligence</strong><small>Your business, clearly explained.</small></div></div><div className="insight"><span>INSIGHT</span><strong>Inventory movement is changing across your active locations.</strong><p>See the products, locations and time periods behind the change.</p></div><div className="insight-row"><span>Business signal</span><b>Ready for review</b></div><div className="insight-row"><span>Next step</span><b>Open Inventory</b></div></div>
         </section>
 
-        <section className="public-cta"><div><span className="section-label">LEXA</span><h2>Give your business one place to operate.</h2><p>Create a workspace and bring the day to day together.</p></div><button className="button button-light button-large" onClick={() => setActive("Overview")}>Create your workspace</button></section>
+        <section className="public-cta"><div><span className="section-label">LEXA</span><h2>Give your business one place to operate.</h2><p>Create a workspace and bring the day to day together.</p></div><a className="button button-light button-large" href="/register">Create your workspace</a></section>
         <footer className="public-footer"><div className="footer-brand">{logo}</div><p>Business operations, connected.</p><span>© {new Date().getFullYear()} LEXA</span></footer>
       </main>
     );
@@ -329,16 +279,15 @@ export default function HomePage() {
   return (
     <main className="app-shell">
       <aside className={`sidebar ${mobileMenuOpen ? "open" : ""}`}>
-        <div className="sidebar-brand"><a href="#" className="sidebar-brand-link" onClick={(e) => { e.preventDefault(); setActive("Overview"); setMobileMenuOpen(false); }}><img className="lexa-sidebar-mark" src="/lexa-icon.png" alt="LEXA" /><span>LEXA</span></a><button className="mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">×</button></div>
+        <div className="sidebar-brand"><a href="#" className="sidebar-brand-link" onClick={(e) => { e.preventDefault(); setActive("Overview"); setMobileMenuOpen(false); }}><img className="lexa-sidebar-mark" src="/lexa-mark.png" alt="LEXA" /><span>LEXA</span></a><button className="mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">×</button></div>
         <div className="sidebar-workspace"><span className="workspace-avatar">{tenantName ? tenantName.slice(0, 1).toUpperCase() : "L"}</span><div><strong>{tenantName || "Your workspace"}</strong><small>Business workspace</small></div></div>
         <a href="/kernel" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">◆</span><span className="sidebar-text"><b>Business Kernel</b><small>Universal business objects</small></span></a>
-        <a href="/business-engine" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">◇</span><span className="sidebar-text"><b>Business Engine</b><small>Configure, transact and automate</small></span></a>
-        <a href="/commerce" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">$</span><span className="sidebar-text"><b>Commerce</b><small>Sales, money and reconciliation</small></span></a><nav className="sidebar-nav" aria-label="Workspace navigation">{modules.map(item => <button key={item.name} className={`sidebar-item ${active === item.name ? "active" : ""}`} onClick={() => { setActive(item.name); setMobileMenuOpen(false); }}><span className="sidebar-icon"><NavIcon name={item.name} /></span><span className="sidebar-text"><b>{item.name}</b><small>{item.desc}</small></span></button>)}</nav>
-        <div className="sidebar-bottom"><div className="sidebar-note"><span className="note-dot" /><div><strong>{health && readiness?.status === "ready" ? "Workspace ready" : "Getting things ready"}</strong><p>{health && readiness?.status === "ready" ? "Your business tools are ready to use." : "Your workspace is loading."}</p></div></div><button className="sidebar-account" onClick={resetPreview}><span className="avatar-small">L</span><span><b>Preview workspace</b><small>Reset workspace</small></span></button></div>
+        <a href="/commerce" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">$</span><span className="sidebar-text"><b>Commerce</b><small>Sales, money and reconciliation</small></span></a><a href="/accounting" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">≡</span><span className="sidebar-text"><b>Accounting</b><small>Journals, periods and reports</small></span></a><a href="/compliance" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon">✓</span><span className="sidebar-text"><b>Compliance</b><small>Tax and EFRIS</small></span></a><nav className="sidebar-nav" aria-label="Workspace navigation">{modules.map(item => item.name === "Reports" ? <a key={item.name} href="/reports" className="sidebar-item" style={{textDecoration:"none"}}><span className="sidebar-icon"><NavIcon name={item.name} /></span><span className="sidebar-text"><b>{item.name}</b><small>{item.desc}</small></span></a> : <button key={item.name} className={`sidebar-item ${active === item.name ? "active" : ""}`} onClick={() => { setActive(item.name); setMobileMenuOpen(false); }}><span className="sidebar-icon"><NavIcon name={item.name} /></span><span className="sidebar-text"><b>{item.name}</b><small>{item.desc}</small></span></button>)}</nav>
+        <div className="sidebar-bottom"><div className="sidebar-note"><span className="note-dot" /><div><strong>{health && readiness?.status === "ready" ? "Workspace ready" : "Getting things ready"}</strong><p>{health && readiness?.status === "ready" ? "Your business tools are ready to use." : "Your workspace is loading."}</p></div></div><button className="sidebar-account" onClick={resetWorkspaceState}><span className="avatar-small">L</span><span><b>{tenantName || "Your workspace"}</b><small>Sign out</small></span></button></div>
       </aside>
 
       <section className="workspace">
-        <header className="workspace-header"><button className="mobile-menu" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">☰</button><div><span className="workspace-breadcrumb">LEXA · {active}</span><h1>{active === "Overview" ? "Business command center" : active}</h1><p>{activeDescription}</p></div><div className="header-actions"><span className="preview-badge">Preview</span><button className="button button-soft" onClick={active === "Inventory" ? refreshInventory : active === "Products" ? refreshCatalog : refreshSystem}>Refresh</button></div></header>
+        <header className="workspace-header"><button className="mobile-menu" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">☰</button><div><span className="workspace-breadcrumb">LEXA · {active}</span><h1>{active === "Overview" ? "Business command center" : active}</h1><p>{activeDescription}</p></div><div className="header-actions"><button className="button button-soft" onClick={active === "Inventory" ? refreshInventory : active === "Products" ? refreshCatalog : refreshSystem}>Refresh</button></div></header>
         <div className={`workspace-banner ${health && readiness?.status === "ready" ? "positive" : "attention"}`}><span className="banner-icon">{health && readiness?.status === "ready" ? "✓" : "i"}</span><div><strong>{health && readiness?.status === "ready" ? "Everything is ready" : "Your workspace is taking a moment to connect"}</strong><p>{health && readiness?.status === "ready" ? "You can move between your business areas and keep work moving." : "Refresh in a moment. Your workspace and information remain safe."}</p></div></div>
 
         {active === "Overview" && <>

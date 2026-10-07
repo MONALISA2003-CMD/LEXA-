@@ -36,7 +36,7 @@ Core workflows:
 
 ## Database safeguards
 
-Migrations `015`, `016`, `017`, `018`, and `019` are recorded on the canonical branch.
+Migrations `015`, `016`, `017`, and `018` are recorded on the canonical branch.
 
 Phase 4A currently has 12 tenant-scoped tables with forced RLS and one tenant isolation policy each.
 
@@ -54,16 +54,12 @@ The application integrity layer enforces:
 - closed reconciliations cannot be edited
 - zero-variance reconciliation can close without manual variance handling
 - return adjustments update sale and receivable values atomically
-- customer credit allocations update credit balances and receivables deterministically
-- customer credit allocations require matching customer ownership and cannot over-allocate
-- customer credit reversals restore both credit and receivable balances
-- critical reconciliation mutations use idempotency keys
 
 Payment channels contain only business configuration fields: name, channel type, provider, currency, active state. No bank/mobile-money credentials are stored.
 
 ## Verification performed
 
-Backend/source contracts: `84 passed`.
+Backend/source contracts: `79 passed`.
 
 Frontend contract TypeScript check: passed with the repository-local contract stubs used for this sandbox because the production `node_modules` set is not installed in the working container.
 

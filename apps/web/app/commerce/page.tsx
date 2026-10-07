@@ -8,7 +8,6 @@ import {
   createPaymentChannel,
   createReconciliation,
   createSaleReturn,
-  allocateCustomerCredit,
   getCommerceCustomers,
   getCommerceDashboard,
   getCommerceProducts,
@@ -19,7 +18,6 @@ import {
   getReconciliations,
   getReceivables,
   getSaleReturns,
-  getCustomerCredits,
   payReceivable,
   resolveReconciliationLine,
   setReconciliationActual,
@@ -28,7 +26,6 @@ import {
   type CommerceProduct,
   type CommerceSale,
   type CommerceSaleDetail,
-  type CustomerCredit,
   type Location,
   type PaymentChannel,
   type Receivable,
@@ -67,7 +64,6 @@ export default function CommercePage() {
   const [receivables, setReceivables] = useState<Receivable[]>([]);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
   const [returns, setReturns] = useState<SaleReturn[]>([]);
-  const [customerCredits, setCustomerCredits] = useState<CustomerCredit[]>([]);
 
   const [customerId, setCustomerId] = useState("");
   const [locationId, setLocationId] = useState("");
@@ -93,8 +89,6 @@ export default function CommercePage() {
   const [returnReason, setReturnReason] = useState("");
   const [returnSettlement, setReturnSettlement] = useState<"NONE" | "REFUND" | "CUSTOMER_CREDIT">("NONE");
   const [refundChannelId, setRefundChannelId] = useState("");
-  const [creditReceivableId, setCreditReceivableId] = useState("");
-  const [creditAmount, setCreditAmount] = useState("");
 
   const selectedProduct = useMemo(() => products.find((x) => x.variant_id === variantId), [products, variantId]);
   const selectedReconData = useMemo(() => reconciliations.find((x) => x.id === selectedRecon), [reconciliations, selectedRecon]);
@@ -106,7 +100,7 @@ export default function CommercePage() {
     setMessage(null);
     try {
       const date = today();
-      const [d, c, ch, p, l, s, r, re, rr, cc] = await Promise.all([
+      const [d, c, ch, p, l, s, r, re, rr] = await Promise.all([
         getCommerceDashboard(date),
         getCommerceCustomers(),
         getPaymentChannels(),
@@ -116,7 +110,6 @@ export default function CommercePage() {
         getReceivables(),
         getReconciliations(),
         getSaleReturns(),
-        getCustomerCredits(),
       ]);
       setDashboard(d);
       setCustomers(c);
@@ -127,7 +120,6 @@ export default function CommercePage() {
       setReceivables(r);
       setReconciliations(re);
       setReturns(rr);
-      setCustomerCredits(cc);
       if (!locationId && l[0]) setLocationId(l[0].id);
       const usableChannels = ch.filter((x) => x.active && x.currency_code === "UGX");
       if (!paymentRows[0]?.channelId && usableChannels[0]) setPaymentRows([{ channelId: usableChannels[0].id, amount: "0" }]);
@@ -271,24 +263,6 @@ export default function CommercePage() {
     }
   }
 
-  async function submitCreditAllocation(creditId: string, e: FormEvent) {
-    e.preventDefault();
-    const credit = customerCredits.find((x) => x.id === creditId);
-    if (!credit) return;
-    if (!creditReceivableId || !creditAmount) {
-      setMessage("Select a receivable and enter an amount.");
-      return;
-    }
-    try {
-      await allocateCustomerCredit(credit.id, { receivable_id: creditReceivableId, amount: creditAmount });
-      setMessage("Customer credit allocated to the receivable.");
-      setCreditAmount("");
-      await refresh();
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not allocate customer credit");
-    }
-  }
-
   async function loadReturnSale(id: string) {
     setReturnSaleId(id);
     setReturnSale(null);
@@ -355,7 +329,7 @@ export default function CommercePage() {
 
       <section className="section inventory-section">
         <div className="inventory-tabs">
-          {["Sell", "Customers", "Payment Channels", "Receivables", "Customer Credits", "Reconciliation", "Returns", "Sales History"].map((x) => (
+          {["Sell", "Customers", "Payment Channels", "Receivables", "Reconciliation", "Returns", "Sales History"].map((x) => (
             <button key={x} className={tab === x ? "selected" : ""} onClick={() => setTab(x)}>{x}</button>
           ))}
         </div>
@@ -406,30 +380,6 @@ export default function CommercePage() {
           )}
 
           {tab === "Receivables" && <div className="workflow-list">{receivables.length ? receivables.map((r) => <div className="workflow-row" key={r.id}><div><strong>{r.customer_name}</strong><small>Sale {short(r.sale_id)} · {r.status}</small></div><span>{money(r.balance)}</span><button className="secondary" onClick={() => void submitReceivablePayment(r.id)}>Record payment</button></div>) : <div className="empty-inline">No open receivables.</div>}</div>}
-
-          {tab === "Customer Credits" && (
-            <div className="workflow-list">
-              {customerCredits.length ? customerCredits.map((credit) => (
-                <div className="workflow-row" key={credit.id}>
-                  <div>
-                    <strong>{credit.customer_name}</strong>
-                    <small>Credit {short(credit.id)} · {credit.status} · Source return {short(credit.source_return_id)}</small>
-                  </div>
-                  <span>{money(credit.balance)}</span>
-                  <form className="credit-allocation-form" onSubmit={(e) => void submitCreditAllocation(credit.id, e)}>
-                    <select value={creditReceivableId} onChange={(e) => setCreditReceivableId(e.target.value)}>
-                      <option value="">Select receivable</option>
-                      {receivables.filter((r) => r.customer_party_id === credit.customer_party_id).map((r) => (
-                        <option key={r.id} value={r.id}>{short(r.id)} · {money(r.balance)}</option>
-                      ))}
-                    </select>
-                    <input type="number" min="0.01" step="0.01" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} placeholder="Amount" />
-                    <button className="secondary" type="submit">Apply credit</button>
-                  </form>
-                </div>
-              )) : <div className="empty-inline">No customer credits available.</div>}
-            </div>
-          )}
 
           {tab === "Reconciliation" && (
             <div className="split-panel">

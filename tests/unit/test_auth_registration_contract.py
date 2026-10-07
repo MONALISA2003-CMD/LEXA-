@@ -24,9 +24,11 @@ def test_registration_never_stores_plaintext_password_in_idempotency_record():
     assert "request_hash({" in source
     assert "registration.response_body = response" in source
     assert "password_hash" in source
-    # The idempotency table receives only the request digest, never the raw password field.
+    # The idempotency hash binds the full request, while the persistence row receives only the digest.
     assert "RegistrationRequest).values(" in source
     assert '"password": body.password' in source
+    values_block = source.split("RegistrationRequest).values(", 1)[1].split(").on_conflict_do_nothing", 1)[0]
+    assert "password" not in values_block
     assert 'password_hash=hash_password(body.password)' in source
 
 

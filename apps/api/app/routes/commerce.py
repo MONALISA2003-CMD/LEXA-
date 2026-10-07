@@ -104,11 +104,6 @@ class PaymentCreate(Strict):
     reference: str | None = Field(default=None, max_length=120)
 
 
-class CustomerCreditAllocateIn(Strict):
-    receivable_id: UUID
-    amount: Decimal = Field(gt=0)
-
-
 class ActualIn(Strict):
     actual_amount: Decimal = Field(ge=0)
     notes: str | None = None
@@ -313,21 +308,7 @@ def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=N
         if total<=0: raise HTTPException(422,"Sale total must be greater than zero")
         paid=q(sum((x.amount for x in body.payments),Decimal("0")))
         if paid>total: raise HTTPException(422,"Payment allocations cannot exceed sale total")
-        due=q(total-paid)
-        if due>0:
-            if body.customer_party_id is None: raise HTTPException(400,"A customer is required for credit/outstanding sales")
-            customer_profile=db.execute(text("""
-              SELECT cp.credit_limit,cp.status,
-                     COALESCE((SELECT SUM(r.balance) FROM receivables r WHERE r.tenant_id=cp.tenant_id AND r.customer_party_id=cp.party_id AND r.status IN ('OPEN','PARTIALLY_PAID')),0) outstanding
-              FROM customer_profiles cp
-              WHERE cp.tenant_id=:t AND cp.party_id=:p
-              FOR UPDATE
-            """),{"t":str(tenant_id),"p":str(body.customer_party_id)}).mappings().first()
-            if not customer_profile or customer_profile["status"] != "ACTIVE":
-                raise HTTPException(409,"Customer credit is not enabled for this customer")
-            available_credit=q(Decimal(str(customer_profile["credit_limit"]))-Decimal(str(customer_profile["outstanding"])))
-            if due>available_credit:
-                raise HTTPException(409,f"Sale would exceed the customer's available credit of {available_credit}")
+        if paid<total and body.customer_party_id is None: raise HTTPException(400,"A customer is required for credit/outstanding sales")
         ref=f"SAL-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8].upper()}"
         tx=BusinessTransaction(tenant_id=tenant_id,transaction_type="SALE",reference=ref,status="DRAFT",party_id=body.customer_party_id,branch_id=body.branch_id,total_amount=total,currency_code=currency,occurred_at=datetime.now(timezone.utc),metadata_json={"source":"commerce"})
         db.add(tx); db.flush()
@@ -346,6 +327,8 @@ def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=N
             pid=db.execute(text("""INSERT INTO payments(tenant_id,transaction_id,party_id,amount,currency_code,method,status,reference,paid_at,metadata,payment_channel_id,business_date)
               VALUES(:t,:tx,:p,:a,:c,:m,'RECORDED',:ref,now(),:meta,:ch,:d) RETURNING id"""),{"t":str(tenant_id),"tx":str(tx.id),"p":str(body.customer_party_id) if body.customer_party_id else None,"a":str(q(payment.amount)),"c":currency,"m":ch["channel_type"],"ref":payment.reference,"meta":{},"ch":str(ch["id"]),"d":payment.business_date}).scalar_one()
             db.execute(text("INSERT INTO payment_allocations(tenant_id,payment_id,sale_id,amount,status,created_by) VALUES(:t,:p,:s,:a,'RECORDED',:u)"),{"t":str(tenant_id),"p":str(pid),"s":str(sale_id),"a":str(q(payment.amount)),"u":str(actor)})
+            accounting_entry_id = db.execute(text("SELECT post_payment_journal(:id,:u)"), {"id":str(pid),"u":str(actor)}).scalar_one()
+            _emit(db,tenant_id,actor,"accounting.entry.posted","ACCOUNTING_ENTRY_POSTED","journal_entry",accounting_entry_id,{"payment_id":str(pid)},request_id)
             _emit(db,tenant_id,actor,"payment.recorded","PAYMENT_RECORDED","payment",pid,{"sale_id":str(sale_id),"channel_id":str(ch["id"]),"amount":str(q(payment.amount))},request_id)
             _emit(db,tenant_id,actor,"payment.allocated","PAYMENT_ALLOCATED","payment_allocation",pid,{"sale_id":str(sale_id),"amount":str(q(payment.amount))},request_id)
         paid_now=db.execute(text("SELECT amount_paid,amount_due FROM sales WHERE tenant_id=:t AND id=:s"),{"t":str(tenant_id),"s":str(sale_id)}).mappings().one()
@@ -356,7 +339,12 @@ def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=N
         db.execute(text("INSERT INTO transaction_status_history(tenant_id,transaction_id,from_status,to_status,reason,changed_by) VALUES(:t,:tx,'DRAFT','COMPLETED','Sale completed',:u)"),{"t":str(tenant_id),"tx":str(tx.id),"u":str(actor)})
         db.execute(text("UPDATE sales SET status='COMPLETED',completed_by=:u,completed_at=now(),updated_at=now() WHERE tenant_id=:t AND id=:s"),{"u":str(actor),"t":str(tenant_id),"s":str(sale_id)})
         _emit(db,tenant_id,actor,"sale.created","SALE_CREATED","sale",sale_id,{"reference":ref,"total":str(total)},request_id)
-        _emit(db,tenant_id,actor,"sale.completed","SALE_COMPLETED","sale",sale_id,{"reference":ref,"total":str(total),"paid":str(paid_now["amount_paid"]),"due":str(paid_now["amount_due"])},request_id)
+        accounting_sale_entry = db.execute(text("SELECT post_sale_journal(:id,:u)"), {"id":str(sale_id),"u":str(actor)}).scalar_one()
+        cogs_entry = db.execute(text("SELECT post_sale_cogs_journal(:id,:u)"), {"id":str(sale_id),"u":str(actor)}).scalar()
+        _emit(db,tenant_id,actor,"accounting.entry.posted","ACCOUNTING_ENTRY_POSTED","journal_entry",accounting_sale_entry,{"sale_id":str(sale_id),"entry_role":"SALE_RECOGNITION"},request_id)
+        if cogs_entry:
+            _emit(db,tenant_id,actor,"accounting.entry.posted","ACCOUNTING_ENTRY_POSTED","journal_entry",cogs_entry,{"sale_id":str(sale_id),"entry_role":"COGS"},request_id)
+        _emit(db,tenant_id,actor,"sale.completed","SALE_COMPLETED","sale",sale_id,{"reference":ref,"total":str(total),"paid":str(paid_now["amount_paid"]),"due":str(paid_now["amount_due"]),"accounting_journal_id":str(accounting_sale_entry)},request_id)
         result=db.execute(text("SELECT s.id,s.transaction_id,s.currency_code,s.status,s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,s.created_at,s.completed_at FROM sales s WHERE s.tenant_id=:t AND s.id=:s"),{"t":str(tenant_id),"s":str(sale_id)}).mappings().one()
         result=out(result); _finish(db,idem,201,result,"sale",sale_id); db.commit(); return result
     except HTTPException:
@@ -391,6 +379,8 @@ def pay_receivable(receivable_id: UUID, body: PaymentCreate, idempotency_key: st
     pid=db.execute(text("""INSERT INTO payments(tenant_id,transaction_id,party_id,amount,currency_code,method,status,reference,paid_at,metadata,payment_channel_id,business_date)
       VALUES(:t,:tx,:p,:a,:c,:m,'RECORDED',:ref,now(),'{}'::jsonb,:ch,:d) RETURNING id"""),{"t":str(tenant_id),"tx":str(receivable["transaction_id"]),"p":str(receivable["customer_party_id"]),"a":str(q(body.amount)),"c":receivable["currency_code"],"m":ch["channel_type"],"ref":body.reference,"ch":str(ch["id"]),"d":body.business_date}).scalar_one()
     db.execute(text("INSERT INTO payment_allocations(tenant_id,payment_id,receivable_id,amount,status,created_by) VALUES(:t,:p,:r,:a,'RECORDED',:u)"),{"t":str(tenant_id),"p":str(pid),"r":str(receivable_id),"a":str(q(body.amount)),"u":str(actor)})
+    accounting_entry_id = db.execute(text("SELECT post_payment_journal(:id,:u)"), {"id":str(pid),"u":str(actor)}).scalar_one()
+    _emit(db,tenant_id,actor,"accounting.entry.posted","ACCOUNTING_ENTRY_POSTED","journal_entry",accounting_entry_id,{"payment_id":str(pid),"receivable_id":str(receivable_id)},request_id)
     _emit(db,tenant_id,actor,"payment.recorded","PAYMENT_RECORDED","payment",pid,{"receivable_id":str(receivable_id),"amount":str(q(body.amount))},request_id)
     _emit(db,tenant_id,actor,"payment.allocated","PAYMENT_ALLOCATED","receivable",receivable_id,{"payment_id":str(pid),"amount":str(q(body.amount))},request_id)
     refreshed=db.execute(text("SELECT id,paid_amount,balance,status FROM receivables WHERE tenant_id=:t AND id=:r"),{"t":str(tenant_id),"r":str(receivable_id)}).mappings().one()
@@ -436,99 +426,40 @@ def create_reconciliation(body: ReconciliationCreate, idempotency_key: str | Non
 
 
 @router.post("/reconciliation-lines/{line_id}/actual")
-def set_actual(line_id: UUID, body: ActualIn, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.manage"))):
+def set_actual(line_id: UUID, body: ActualIn, request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.manage"))):
     db,actor,tenant_id,_=ctx
-    idem,cached,_,cached_body=_idempotency(db,tenant_id,idempotency_key,"commerce.reconciliation.actual",body.model_dump(mode="json") | {"line_id":str(line_id)})
-    if cached: return cached_body
     try:
         db.execute(text("SELECT set_reconciliation_line_actual(:id,:a,:n,:u)"),{"id":str(line_id),"a":str(q(body.actual_amount)),"n":body.notes,"u":str(actor)})
         row=db.execute(text("SELECT id,reconciliation_id,payment_channel_id,expected_amount,actual_amount,variance,status,notes,reviewed_by,updated_at FROM daily_reconciliation_lines WHERE tenant_id=:t AND id=:id"),{"t":str(tenant_id),"id":str(line_id)}).mappings().first()
         if not row: raise HTTPException(404,"Reconciliation line not found")
-        _emit(db,tenant_id,actor,"reconciliation.actual_entered","ACTUAL_SETTLEMENT_ENTERED","reconciliation_line",line_id,{"actual_amount":str(q(body.actual_amount))},request_id)
-        result=out(row); _finish(db,idem,200,result,"reconciliation_line",line_id); db.commit(); return result
+        _emit(db,tenant_id,actor,"reconciliation.actual_entered","ACTUAL_SETTLEMENT_ENTERED","reconciliation_line",line_id,{"actual_amount":str(q(body.actual_amount))},request_id); db.commit(); return out(row)
     except HTTPException: db.rollback(); raise
     except Exception as exc: db.rollback(); raise HTTPException(400,str(exc)) from exc
 
 
 @router.post("/reconciliation-lines/{line_id}/resolve")
-def resolve_line(line_id: UUID, body: ResolveIn, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.resolve"))):
+def resolve_line(line_id: UUID, body: ResolveIn, request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.resolve"))):
     db,actor,tenant_id,_=ctx
-    idem,cached,_,cached_body=_idempotency(db,tenant_id,idempotency_key,"commerce.reconciliation.resolve",body.model_dump(mode="json") | {"line_id":str(line_id)})
-    if cached: return cached_body
     try:
         db.execute(text("SELECT resolve_reconciliation_line(:id,:s,:u,:n)"),{"id":str(line_id),"s":body.status,"u":str(actor),"n":body.notes})
         row=db.execute(text("SELECT id,reconciliation_id,payment_channel_id,expected_amount,actual_amount,variance,status,notes,reviewed_by,updated_at FROM daily_reconciliation_lines WHERE tenant_id=:t AND id=:id"),{"t":str(tenant_id),"id":str(line_id)}).mappings().first()
         if not row: raise HTTPException(404,"Reconciliation line not found")
-        _emit(db,tenant_id,actor,"reconciliation.variance_resolved","VARIANCE_RESOLVED","reconciliation_line",line_id,{"status":body.status},request_id)
-        result=out(row); _finish(db,idem,200,result,"reconciliation_line",line_id); db.commit(); return result
+        _emit(db,tenant_id,actor,"reconciliation.variance_resolved","VARIANCE_RESOLVED","reconciliation_line",line_id,{"status":body.status},request_id); db.commit(); return out(row)
     except HTTPException: db.rollback(); raise
     except Exception as exc: db.rollback(); raise HTTPException(400,str(exc)) from exc
 
 
 @router.post("/reconciliations/{reconciliation_id}/close")
-def close_reconciliation(reconciliation_id: UUID, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.close"))):
+def close_reconciliation(reconciliation_id: UUID, request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.close"))):
     db,actor,tenant_id,_=ctx
-    idem,cached,_,cached_body=_idempotency(db,tenant_id,idempotency_key,"commerce.reconciliation.close",{"reconciliation_id":str(reconciliation_id)})
-    if cached: return cached_body
     try:
         db.execute(text("SELECT close_daily_reconciliation(:id)"),{"id":str(reconciliation_id)})
         db.execute(text("UPDATE daily_reconciliations SET closed_by=:u,updated_at=now() WHERE tenant_id=:t AND id=:id"),{"u":str(actor),"t":str(tenant_id),"id":str(reconciliation_id)})
         row=db.execute(text("SELECT id,business_date,status,closed_at FROM daily_reconciliations WHERE tenant_id=:t AND id=:id"),{"t":str(tenant_id),"id":str(reconciliation_id)}).mappings().first()
         if not row: raise HTTPException(404,"Reconciliation not found")
-        _emit(db,tenant_id,actor,"reconciliation.closed","DAY_CLOSED","reconciliation",reconciliation_id,{"business_date":str(row["business_date"])},request_id)
-        result=out(row); _finish(db,idem,200,result,"reconciliation",reconciliation_id); db.commit(); return result
+        _emit(db,tenant_id,actor,"reconciliation.closed","DAY_CLOSED","reconciliation",reconciliation_id,{"business_date":str(row["business_date"])},request_id); db.commit(); return out(row)
     except HTTPException: db.rollback(); raise
     except Exception as exc: db.rollback(); raise HTTPException(400,str(exc)) from exc
-
-@router.get("/customer-credits")
-def list_customer_credits(ctx=Depends(require_permission("credits.read"))):
-    db,_,tenant_id,_=ctx
-    rows=db.execute(text("""
-      SELECT cc.id,cc.customer_party_id,p.display_name customer_name,cc.source_return_id,cc.original_amount,cc.allocated_amount,cc.balance,cc.status,cc.created_at,cc.updated_at
-      FROM customer_credits cc
-      JOIN parties p ON p.id=cc.customer_party_id AND p.tenant_id=cc.tenant_id
-      WHERE cc.tenant_id=:t AND cc.status IN ('OPEN','PARTIALLY_USED')
-      ORDER BY cc.created_at DESC LIMIT 500
-    """),{"t":str(tenant_id)}).mappings().all()
-    return [out(x) for x in rows]
-
-
-@router.post("/customer-credits/{credit_id}/allocate", status_code=201)
-def allocate_customer_credit(credit_id: UUID, body: CustomerCreditAllocateIn, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("credits.manage"))):
-    db,actor,tenant_id,_=ctx
-    idem,cached,_,cached_body=_idempotency(db,tenant_id,idempotency_key,"commerce.customer_credit.allocate",body.model_dump(mode="json") | {"credit_id":str(credit_id)})
-    if cached: return cached_body
-    try:
-        credit=db.execute(text("""
-          SELECT * FROM customer_credits WHERE tenant_id=:t AND id=:id FOR UPDATE
-        """),{"t":str(tenant_id),"id":str(credit_id)}).mappings().first()
-        if not credit: raise HTTPException(404,"Customer credit not found")
-        if credit["status"] not in ('OPEN','PARTIALLY_USED') or Decimal(str(credit["balance"]))<=0:
-            raise HTTPException(409,"Customer credit has no available balance")
-        receivable=db.execute(text("""
-          SELECT * FROM receivables WHERE tenant_id=:t AND id=:id FOR UPDATE
-        """),{"t":str(tenant_id),"id":str(body.receivable_id)}).mappings().first()
-        if not receivable: raise HTTPException(404,"Receivable not found")
-        if receivable["customer_party_id"] != credit["customer_party_id"]:
-            raise HTTPException(409,"Customer credit and receivable belong to different customers")
-        amount=q(body.amount)
-        if amount>Decimal(str(credit["balance"])): raise HTTPException(422,"Allocation exceeds customer credit balance")
-        if amount>Decimal(str(receivable["balance"])): raise HTTPException(422,"Allocation exceeds receivable balance")
-        aid=db.execute(text("""
-          INSERT INTO customer_credit_allocations(tenant_id,customer_credit_id,receivable_id,amount,status,created_by)
-          VALUES(:t,:c,:r,:a,'RECORDED',:u) RETURNING id
-        """),{"t":str(tenant_id),"c":str(credit_id),"r":str(body.receivable_id),"a":str(amount),"u":str(actor)}).scalar_one()
-        result=db.execute(text("""
-          SELECT cc.id,cc.customer_party_id,p.display_name customer_name,cc.source_return_id,cc.original_amount,cc.allocated_amount,cc.balance,cc.status,cc.created_at,cc.updated_at
-          FROM customer_credits cc JOIN parties p ON p.id=cc.customer_party_id AND p.tenant_id=cc.tenant_id
-          WHERE cc.tenant_id=:t AND cc.id=:id
-        """),{"t":str(tenant_id),"id":str(credit_id)}).mappings().one()
-        _emit(db,tenant_id,actor,"customer_credit.allocated","CUSTOMER_CREDIT_ALLOCATED","customer_credit_allocation",aid,{"credit_id":str(credit_id),"receivable_id":str(body.receivable_id),"amount":str(amount)},request_id)
-        result=out(result); _finish(db,idem,201,result,"customer_credit",credit_id); db.commit(); return result
-    except HTTPException: db.rollback(); raise
-    except IntegrityError as exc: db.rollback(); raise HTTPException(409,"Customer credit allocation violated a financial invariant") from exc
-    except Exception as exc: db.rollback(); raise HTTPException(500,"Customer credit allocation failed") from exc
-
 
 class ReturnLineIn(Strict):
     sale_line_id: UUID
@@ -592,14 +523,9 @@ def create_return(sale_id: UUID, body: ReturnCreate, idempotency_key: str | None
         from ..models import InventoryBalance
         for req_line,line,line_total in validated:
             db.execute(text("""INSERT INTO sale_return_lines(tenant_id,return_id,sale_line_id,variant_id,quantity,unit_price,discount_amount,tax_amount,line_total) VALUES(:t,:r,:sl,:v,:q,:u,:d,:tax,:total)"""),{"t":str(tenant_id),"r":str(return_id),"sl":str(req_line.sale_line_id),"v":str(line["product_variant_id"]),"q":str(req_line.quantity),"u":str(line["unit_price"]),"d":str(line["discount_amount"]),"tax":str(line["tax_amount"]),"total":str(line_total)})
-            cost_row=db.execute(text("""
-              SELECT CASE WHEN SUM(ABS(quantity_delta))=0 THEN 0
-                          ELSE SUM(total_cost)/SUM(ABS(quantity_delta)) END unit_cost
-              FROM inventory_transactions
-              WHERE tenant_id=:t AND reference_type='sale' AND reference_id=:sale AND variant_id=:v AND quantity_delta<0
-            """),{"t":str(tenant_id),"sale":str(sale_id),"v":str(line["product_variant_id"])}).mappings().one()
-            unit_cost=Decimal(str(cost_row["unit_cost"] or 0))
-            post_ledger(db,tenant_id=tenant_id,actor_user_id=actor,location_id=return_location,variant_id=line["product_variant_id"],quantity_delta=q(req_line.quantity),unit_cost=unit_cost,transaction_type="RETURN",reference_type="sale_return",reference_id=return_id,idempotency_key=f"{idempotency_key or return_id}:inventory:{req_line.sale_line_id}",metadata={"sale_id":str(sale_id),"return_id":str(return_id),"cost_basis":"ORIGINAL_SALE_LEDGER"})
+            balance=db.scalar(select(InventoryBalance).where(InventoryBalance.tenant_id==tenant_id,InventoryBalance.location_id==return_location,InventoryBalance.variant_id==line["product_variant_id"]).with_for_update())
+            unit_cost=balance.average_cost if balance else Decimal("0")
+            post_ledger(db,tenant_id=tenant_id,actor_user_id=actor,location_id=return_location,variant_id=line["product_variant_id"],quantity_delta=q(req_line.quantity),unit_cost=unit_cost,transaction_type="RETURN",reference_type="sale_return",reference_id=return_id,idempotency_key=f"{idempotency_key or return_id}:inventory:{req_line.sale_line_id}",metadata={"sale_id":str(sale_id),"return_id":str(return_id)})
         db.execute(text("UPDATE sales SET return_adjustment_amount=return_adjustment_amount+:a,updated_at=now() WHERE tenant_id=:t AND id=:s"),{"t":str(tenant_id),"s":str(sale_id),"a":str(total)})
         db.execute(text("""
           UPDATE receivables

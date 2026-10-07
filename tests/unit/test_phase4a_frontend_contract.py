@@ -28,10 +28,3 @@ def test_checkout_supports_split_payments_and_credit():
     assert "Add another payment" in source
     assert "customer_party_id: customerId || null" in source
     assert "payments," in source
-
-
-def test_customer_credit_ui_is_connected():
-    source = PAGE.read_text()
-    assert '"Customer Credits"' in source
-    assert "getCustomerCredits" in source
-    assert "allocateCustomerCredit" in source

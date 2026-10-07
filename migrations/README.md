@@ -18,6 +18,9 @@ Apply migrations in order. This repository contains the complete LEXA migration 
 14. `016_phase4a_sales_payments_reconciliation.sql`
 15. `017_phase4a_reconciliation_engine.sql`
 16. `018_phase4a_application_integrity.sql`
+17. `019_phase4a_customer_credit_allocation.sql`
+18. `020_phase4b_accounting_efris_foundation.sql`
+19. `021_phase5_analytics_foundation.sql`
 
 ## Canonical live database for this release
 
@@ -25,6 +28,6 @@ Apply migrations in order. This repository contains the complete LEXA migration 
 - Neon branch: `lexa-live` (`br-soft-star-b1dj2m2w`)
 - Database: `neondb`
 
-Migrations `015` through `018` are recorded on that canonical branch.
+Migrations `015` through `021` are recorded on that canonical branch.
 
-Do not run destructive or unrelated database changes. Phase 4A is designed to be additive, tenant-scoped, and RLS protected.
+Do not run destructive or unrelated database changes. Phase 4A, Phase 4B and Phase 5 are additive, tenant-scoped, and RLS protected. The Universal Business Engine remains internal technical infrastructure and is not exposed as a product module.

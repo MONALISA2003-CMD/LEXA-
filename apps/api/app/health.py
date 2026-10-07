@@ -14,7 +14,7 @@ REQUIRED_TABLES = (
     "membership_roles",
     "business_profiles",
     "registration_requests",
-    # Phase 2 Universal Business Engine must be present before the API reports ready.
+    # Phase 2 universal transaction/workflow kernel remains technical infrastructure; it is not a user-facing module.
     "business_capabilities",
     "business_configurations",
     "party_relationships",

@@ -1,43 +1,80 @@
 {
-  "package": "LEXA Phase 4A End-to-End",
-  "version": "2.2.0",
+  "package": "LEXA Production Hardening & Convergence",
+  "version": "2.5.0",
   "layout": "repository-root",
-  "phase": "4A",
-  "phase_name": "Sales, Payments, Receivables and Reconciliation",
-  "phase_status": "CANONICAL_NEON_VALIDATED_SOURCE_TESTS_GREEN",
+  "changes": [
+    "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
+    "Added deterministic accounting posting, reversals, reporting functions and expense posting",
+    "Added effective-dated tax rates and tax configuration resolution",
+    "Added separate EFRIS configuration, fiscal documents and fiscalization event queue",
+    "Added forced tenant RLS and financial permissions",
+    "Added Accounting and Compliance frontend workspaces",
+    "Fixed mobile sidebar logo asset overflow that caused the observed white overlay",
+    "Removed Business Engine as a user-facing product module while retaining its transaction/workflow schema as internal technical infrastructure",
+    "Added deterministic analytics projections and Reports & Business Intelligence workspace",
+    "Added tenant-scoped analytics permissions and forced RLS projections",
+    "Added migration 021 phase5 analytics foundation",
+    "Removed user-facing Business Engine route module",
+    "Retired open-development browser session bootstrap",
+    "Moved refresh credentials to HttpOnly cookie rotation and access tokens to memory-only browser state",
+    "Added Redis-backed authentication rate limits",
+    "Added fail-closed production configuration checks",
+    "Applied lex\u0430_app role per transaction for PgBouncer-safe RLS enforcement",
+    "Added bounded SQLAlchemy pooling and PostgreSQL statement/lock/idle transaction timeouts",
+    "Added migration 022 for the live Brain foundation schema",
+    "Added CI and direct Neon backup automation"
+  ],
+  "protected_paths": [
+    ".github/workflows/"
+  ],
+  "non_destructive": true,
+  "database_reset": false,
+  "seed_reset": false,
+  "product_deletion": false,
+  "description": "Canonical LEXA Neon foundation for deterministic business intelligence, reporting, product performance, customer patterns, branch performance, and inventory health.",
+  "package_version": "2.5.0",
+  "phase": "1-5 hardening patch",
+  "phase_name": "Production Foundation & Source Convergence",
+  "phase_status": "SOURCE_PATCH_VERIFIED_MANUAL_DEPLOY_REQUIRED",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
-    "branch_name": "lexa-live",
     "database": "neondb"
   },
-  "migrations": [
-    "015_financial_architecture_lock",
-    "016_phase4a_sales_payments_reconciliation",
-    "017_phase4a_reconciliation_engine",
-    "018_phase4a_application_integrity",
-    "019_phase4a_customer_credit_allocation"
-  ],
-  "components": {
-    "backend": "FastAPI commerce routes with deterministic validation, idempotency, audit and outbox events",
-    "frontend": "Next.js commerce workspace and responsive sidebar fix",
-    "database": "Neon PostgreSQL canonical LEXA database only",
-    "payment_model": "Manual-first, integration-optional; Payment Method / Payment Channel terminology",
-    "mobile_sidebar_fix": "bounded transparent brand asset, explicit overflow and stacking containment"
+  "phase2_validation": {
+    "temporary_branch_id": "br-withered-thunder-b1699ugo",
+    "parent_branch_id": "br-soft-star-b1dj2m2w",
+    "migration_version": "013_phase2_universal_business_engine",
+    "live_branch_phase2_tables": 10,
+    "live_branch_migration_013": 1
+  },
+  "phase3_validation": {
+    "temporary_branch_id": "br-nameless-dew-b11k9xo1",
+    "parent_branch_id": "br-soft-star-b1dj2m2w",
+    "migration_version": "014_phase3_inventory_foundation",
+    "live_branch_phase3_tables": 9
+  },
+  "phase4b_validation": {
+    "migration_version": "020_phase4b_accounting_efris_foundation",
+    "live_accounting_accounts": 16,
+    "live_accounting_mappings": 17,
+    "live_accounting_periods": 1,
+    "forced_rls_tables": 12,
+    "rls_policies": 12,
+    "finance_permissions": 12
+  },
+  "phase5_validation": {
+    "migration_version": "021_phase5_analytics_foundation",
+    "analytics_tables": 6,
+    "forced_rls_tables": 6,
+    "analytics_permissions": 2,
+    "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "pytest": "84 passed",
-    "python_compileall": "passed",
-    "typescript_contract": "passed",
-    "visible_product_contract": "passed",
-    "canonical_neon_runtime": "passed for sale/payment/reversal/receivable/return/credit/reconciliation flows",
-    "live_validation_data_after_cleanup": "zero for test transactional rows and outbox"
-  },
-  "hosted_deployment": {
-    "vercel": "green per user, but current hosted UI needs this source fix deployed",
-    "render": "green per user after manual trigger; automatic deployment trigger remains a separate issue"
-  },
-  "non_destructive": true,
-  "database_reset": false,
-  "seed_reset": false
+    "python_tests": "94 passed",
+    "backend_compile": "pass",
+    "frontend_contract_tests": "pass",
+    "typescript_contract_compile": "pass",
+    "verified_with": "scripts/verify-phase1.sh"
+  }
 }
