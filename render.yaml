@@ -5,14 +5,12 @@ services:
     rootDir: apps/api
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
+    healthCheckPath: /ready
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.5
       - key: APP_ENV
         value: production
-      - key: LEXA_OPEN_DEV_MODE
-        value: "false"
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_URL_UNPOOLED

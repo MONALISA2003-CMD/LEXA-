@@ -24,7 +24,6 @@ Set these non-secret environment values before the first production deploy:
 
 ```text
 APP_ENV=production
-LEXA_OPEN_DEV_MODE=false
 DATABASE_APP_ROLE=lexa_app
 LEXA_NEON_PROJECT_ID=wispy-mud-75323042
 LEXA_NEON_BRANCH_ID=br-soft-star-b1dj2m2w

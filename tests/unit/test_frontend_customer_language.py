@@ -60,8 +60,8 @@ def test_open_development_mode_is_absent_from_production_surface():
     render = (ROOT / "render.yaml").read_text()
     assert "lexa_open_dev_mode" not in config
     assert '"/dev-session"' not in auth
-    assert "LEXA_OPEN_DEV_MODE" in render
-    assert 'value: "false"' in render
+    assert "LEXA_OPEN_DEV_MODE" not in render
+    assert "healthCheckPath: /ready" in render
 
 
 def test_workspace_does_not_open_directly_in_development():

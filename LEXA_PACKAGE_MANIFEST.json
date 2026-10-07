@@ -1,6 +1,6 @@
 {
   "package": "LEXA Production Hardening & Convergence",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -19,10 +19,15 @@
     "Moved refresh credentials to HttpOnly cookie rotation and access tokens to memory-only browser state",
     "Added Redis-backed authentication rate limits",
     "Added fail-closed production configuration checks",
-    "Applied lex\u0430_app role per transaction for PgBouncer-safe RLS enforcement",
+    "Applied lexа_app role per transaction for PgBouncer-safe RLS enforcement",
     "Added bounded SQLAlchemy pooling and PostgreSQL statement/lock/idle transaction timeouts",
     "Added migration 022 for the live Brain foundation schema",
-    "Added CI and direct Neon backup automation"
+    "Added CI and direct Neon backup automation",
+    "separate login-enabled lexa_runtime role inheriting NOLOGIN lexa_app",
+    "Render readiness now uses /ready",
+    "health readiness logs sanitized production-safe DB diagnostics",
+    "removed internal Business Engine and Kernel frontend routes",
+    "pinned web dependency versions"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -32,7 +37,7 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Canonical LEXA Neon foundation for deterministic business intelligence, reporting, product performance, customer patterns, branch performance, and inventory health.",
-  "package_version": "2.5.0",
+  "package_version": "2.5.1",
   "phase": "1-5 hardening patch",
   "phase_name": "Production Foundation & Source Convergence",
   "phase_status": "SOURCE_PATCH_VERIFIED_MANUAL_DEPLOY_REQUIRED",
@@ -71,10 +76,12 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": "94 passed",
+    "python_tests": "95 passed",
     "backend_compile": "pass",
     "frontend_contract_tests": "pass",
     "typescript_contract_compile": "pass",
-    "verified_with": "scripts/verify-phase1.sh"
-  }
+    "verified_with": "scripts/verify-phase1.sh",
+    "web_build": "pass in Vercel-equivalent build after internal route removal"
+  },
+  "release": "production-readiness-repair-2.5.1"
 }

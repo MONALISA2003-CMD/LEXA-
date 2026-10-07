@@ -1,9 +1,12 @@
+import logging
+
 from sqlalchemy import text
 
 from .db import engine
 from .config import settings
 
 EXPECTED_DATABASE = "neondb"
+logger = logging.getLogger("lexa.health")
 REQUIRED_TABLES = (
     "schema_migrations",
     "tenants",
@@ -118,4 +121,16 @@ def check_database() -> tuple[bool, str | dict[str, object] | None]:
 
         return True, None
     except Exception as exc:
+        # Keep production responses sanitized, but preserve the full DB exception in Render logs.
+        logger.exception(
+            "database_readiness_failed",
+            extra={
+                "database": EXPECTED_DATABASE,
+                "project_id": canonical_identity()["project_id"],
+                "branch_id": canonical_identity()["branch_id"],
+                "exception_type": exc.__class__.__name__,
+                "exception_message": str(exc)[:500],
+                "exception_cause": repr(exc.__cause__)[:500] if exc.__cause__ else "",
+            },
+        )
         return False, exc.__class__.__name__

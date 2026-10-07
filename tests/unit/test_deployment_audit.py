@@ -49,7 +49,7 @@ def test_render_runtime_contract_is_intact():
     assert "rootDir: apps/api" in render
     assert "pip install -r requirements.txt" in render
     assert "uvicorn app.main:app --host 0.0.0.0 --port $PORT" in render
-    assert "healthCheckPath: /health" in render
+    assert "healthCheckPath: /ready" in render
     assert "key: DATABASE_APP_ROLE" in render
 
 
@@ -107,3 +107,9 @@ def test_frontend_boot_verifies_authenticated_workspace_access():
     assert "getLocations" in page
     assert "verifyWorkspaceAccess" in page
 
+
+
+def test_readiness_returns_service_unavailable_when_database_is_not_ready():
+    source = (API / "app/main.py").read_text()
+    assert "JSONResponse(status_code=503" in source
+    assert '"Retry-After": "5"' in source

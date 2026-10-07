@@ -24,7 +24,7 @@ def test_production_configuration_is_fail_closed():
     assert "def validate_production_settings" in config
     assert 'database_app_role != "lexa_app"' in config
     assert 'value: production' in render
-    assert 'value: "false"' in render
+    assert "LEXA_OPEN_DEV_MODE" not in render
     assert "LEXA_OPEN_DEV_EMAIL" not in render
     assert "LEXA_OPEN_DEV_WORKSPACE_NAME" not in render
 

@@ -83,4 +83,6 @@ def readiness() -> dict[str, object]:
     }
     if not database_ok:
         payload["database_error_type"] = database_error if settings.app_env.strip().lower() != "production" else "LEXA_DATABASE_NOT_READY"
+        response = JSONResponse(status_code=503, content=payload, headers={"Retry-After": "5"})
+        return response
     return payload
