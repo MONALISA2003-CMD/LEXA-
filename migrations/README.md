@@ -21,17 +21,13 @@ Apply migrations in order. This repository contains the complete LEXA migration 
 17. `019_phase4a_customer_credit_allocation.sql`
 18. `020_phase4b_accounting_efris_foundation.sql`
 19. `021_phase5_analytics_foundation.sql`
-20. `022_phase6a_brain_foundation.sql`
-21. `023_phase2_identity_tenancy_authorization_foundation.sql`
 
-
+## Canonical live database for this release
 
 - Neon project: `wispy-mud-75323042`
 - Neon branch: `lexa-live` (`br-soft-star-b1dj2m2w`)
 - Database: `neondb`
 
-Migrations `015` through `022` are recorded on that canonical branch; migration `023` is this Phase 2 deployment package and has not been applied to the canonical branch.
+Migrations `015` through `021` are recorded on that canonical branch.
 
 Do not run destructive or unrelated database changes. Phase 4A, Phase 4B and Phase 5 are additive, tenant-scoped, and RLS protected. The Universal Business Engine remains internal technical infrastructure and is not exposed as a product module.
-20. `022_phase6a_brain_foundation.sql`
-21. `023_phase2_identity_tenancy_authorization_foundation.sql`

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { usePathname } from "next/navigation";
+import { AppShell } from "../../components/app-shell";
 import {
   closeReconciliation,
   createCommerceCustomer,
@@ -52,7 +54,8 @@ function short(v: string) {
 type PaymentRow = { channelId: string; amount: string };
 
 export default function CommercePage() {
-  const [tab, setTab] = useState("Sell");
+  const pathname = usePathname();
+  const [tab, setTab] = useState(pathname === "/customers" ? "Customers" : "Sell");
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<CommerceDashboard | null>(null);
@@ -147,6 +150,11 @@ export default function CommercePage() {
     // The initial load is intentionally one time only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (pathname === "/customers") setTab("Customers");
+    else if (pathname === "/sales") setTab("Sell");
+  }, [pathname]);
 
   function updatePayment(index: number, field: keyof PaymentRow, value: string) {
     setPaymentRows((rows) => rows.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
@@ -305,8 +313,12 @@ export default function CommercePage() {
 
   const totalPreview = Number(qty || 0) * Number(price || 0);
 
+  const pageTitle = pathname === "/customers" ? "Customers" : "Sales & Commerce";
+  const pageEyebrow = pathname === "/customers" ? "CUSTOMER RELATIONSHIPS" : "SALES OPERATIONS";
+
   return (
-    <main className="module-page commerce-page">
+    <AppShell title={pageTitle} eyebrow={pageEyebrow}>
+      <main className="module-page commerce-page">
       <div className="inventory-summary">
         <div>
           <span className="eyebrow">COMMERCE OPERATIONS</span>
@@ -398,6 +410,7 @@ export default function CommercePage() {
           {tab === "Sales History" && <div className="workflow-list">{sales.map((s) => <div className="workflow-row" key={s.id}><div><strong>{s.customer_name || "Walk-in"}</strong><small>{short(s.id)} · {s.status} · {new Date(s.created_at).toLocaleString()}</small></div><span>{money(s.total)}</span><span className={Number(s.amount_due) > 0 ? "status warn" : "status good"}>{Number(s.amount_due) > 0 ? `Due ${money(s.amount_due)}` : "PAID"}</span></div>)}</div>}
         </div>
       </section>
-    </main>
+      </main>
+    </AppShell>
   );
 }

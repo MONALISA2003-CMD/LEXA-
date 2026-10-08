@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Identity, Tenancy & Authorization",
-  "version": "2.6.0",
+  "package": "LEXA Production Hardening & Convergence",
+  "version": "2.8.0",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -19,7 +19,7 @@
     "Moved refresh credentials to HttpOnly cookie rotation and access tokens to memory-only browser state",
     "Added Redis-backed authentication rate limits",
     "Added fail-closed production configuration checks",
-    "Applied lex\u0430_app role per transaction for PgBouncer-safe RLS enforcement",
+    "Applied lexа_app role per transaction for PgBouncer-safe RLS enforcement",
     "Added bounded SQLAlchemy pooling and PostgreSQL statement/lock/idle transaction timeouts",
     "Added migration 022 for the live Brain foundation schema",
     "Added CI and direct Neon backup automation",
@@ -28,13 +28,17 @@
     "health readiness logs sanitized production-safe DB diagnostics",
     "removed internal Business Engine and Kernel frontend routes",
     "pinned web dependency versions",
-    "Added tenant settings and localization controls",
-    "Added tenant invitation and secure invitation acceptance flow",
-    "Added membership lifecycle and current-session management APIs",
-    "Added capability-based default role templates",
-    "Added branch assignment and database-enforced branch authorization",
-    "Added Administration, Settings and invitation-acceptance web surfaces",
-    "Added Phase 2 identity, tenancy and authorization contract tests"
+    "introduced shared authenticated workspace convergence across Home, Commerce, Finance, Reports and Compliance",
+    "deepened Products with variant lifecycle, SKU identity, pricing and barcode workflows",
+    "deepened Inventory with adjustment, count, transfer and location operations",
+    "added route-level loading and error boundaries for core Catalog and Inventory workspaces",
+    "added idempotency and audit/event persistence to warehouse and location creation",
+    "separated signed-out authentication failures from temporary API availability failures",
+    "updated frontend contract tests for the v2.8 workspace architecture",
+    "added global workspace search/command surface with Ctrl/Meta+K navigation",
+    "added explicit loading placeholders so unavailable or pending business data is never shown as fabricated zero state",
+    "added idempotent variant update, barcode creation, price-list creation and price creation contracts",
+    "added Phase 3.5 workspace convergence and inventory operations implementation contract"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -44,21 +48,21 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Canonical LEXA Neon foundation for deterministic business intelligence, reporting, product performance, customer patterns, branch performance, and inventory health.",
-  "package_version": "2.6.0",
-  "phase": "2",
-  "phase_name": "Identity, Tenancy & Authorization",
-  "phase_status": "SOURCE_COMPLETE_MANUAL_DEPLOY_REQUIRED",
+  "package_version": "2.8.0",
+  "phase": "3.5 workspace convergence and operational depth",
+  "phase_name": "Workspace Convergence & Inventory Operations",
+  "phase_status": "SOURCE_PATCH_VERIFIED_MANUAL_DEPLOY_REQUIRED",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
     "database": "neondb"
   },
   "phase2_validation": {
-    "migration_version": "023_phase2_identity_tenancy_authorization_foundation",
-    "disposable_neon_migration": "schema_slice_executed_successfully",
-    "rls_validation": "assigned_branch_visible_cross_tenant_invisible",
-    "production_neon_changed": false,
-    "production_exit_gate": "pending_manual_source_deploy_and_render_readiness"
+    "temporary_branch_id": "br-withered-thunder-b1699ugo",
+    "parent_branch_id": "br-soft-star-b1dj2m2w",
+    "migration_version": "013_phase2_universal_business_engine",
+    "live_branch_phase2_tables": 10,
+    "live_branch_migration_013": 1
   },
   "phase3_validation": {
     "temporary_branch_id": "br-nameless-dew-b11k9xo1",
@@ -83,12 +87,18 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": "101 passed",
+    "python_tests": 96,
     "backend_compile": "pass",
     "frontend_contract_tests": "pass",
-    "typescript_contract_compile": "pass",
-    "web_full_build": "not re-run locally because dependency tree is not installed in working container",
-    "phase2_verification_script": "scripts/verify-phase2.sh"
+    "typescript_syntax_transpile": "pass for 25 frontend ts/tsx files",
+    "verified_with": "scripts/verify-phase3.sh",
+    "web_build": "not run in local sandbox; node dependency tree unavailable and Vercel sandbox creation denied",
+    "phase3_ui_routes": "apps/web/app/products/page.tsx; apps/web/app/inventory/page.tsx; apps/web/components/app-shell.tsx",
+    "workspace_routes": "home; sales; inventory; purchasing; customers; products; accounting; reports; compliance; intelligence; administration; settings",
+    "web_typecheck": "not run in local sandbox; dependencies intentionally not reinstalled",
+    "workspace_route_contract": "pass",
+    "full_next_build": "not completed: npm install timed out in local container; Vercel sandbox creation denied (403)"
   },
-  "release": "identity-tenancy-authorization-2.6.0"
+  "release": "workspace-convergence-inventory-operations-2.8.0",
+  "release_name": "workspace-convergence-and-inventory-operations"
 }

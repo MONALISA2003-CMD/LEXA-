@@ -14,12 +14,11 @@ import redis
 
 from ..auth import create_access_token, hash_password, verify_password, new_refresh_token, hash_refresh_token
 from ..catalog_rules import request_hash
-from ..dependencies import get_db, tenant_db
+from ..dependencies import get_db
 from ..models import (
     Tenant, TenantMembership, User, Session as AuthSession, Device,
     Role, MembershipRole, Permission, RolePermission, BusinessProfile,
     RegistrationRequest, Branch, Warehouse, Location, Category, Brand, Unit, Product, ProductVariant, PriceList, ProductPrice,
-    TenantInvitation, UserSecurityToken,
 )
 from ..catalog import emit_event, write_audit
 from ..health import check_database
@@ -46,12 +45,6 @@ class LoginRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str | None = None
-
-
-class InvitationAcceptRequest(BaseModel):
-    token: str = Field(min_length=20, max_length=128)
-    password: str = Field(min_length=12, max_length=256)
-    display_name: str | None = Field(default=None, max_length=200)
 
 
 
@@ -172,7 +165,7 @@ def register(
             raise HTTPException(409, "User already exists")
 
         tenant = Tenant(name=tenant_name)
-        user = User(email=email, password_hash=hash_password(body.password), display_name=email.split("@", 1)[0][:200])
+        user = User(email=email, password_hash=hash_password(body.password))
         db.add_all([tenant, user])
         db.flush()
 
@@ -364,141 +357,3 @@ def logout(body: RefreshRequest, request: Request, response: Response, db: Sessi
         session.revoked_at = datetime.now(timezone.utc); db.commit()
     _clear_refresh_cookie(response)
     return {"status": "logged_out"}
-
-
-@router.get("/me")
-def me(ctx=Depends(tenant_db)):
-    db, user_id, tenant_id, session_id = ctx
-    user = db.get(User, user_id)
-    tenant = db.get(Tenant, tenant_id)
-    membership = db.scalar(select(TenantMembership).where(
-        TenantMembership.user_id == user_id,
-        TenantMembership.tenant_id == tenant_id,
-    ))
-    roles = db.scalars(
-        select(Role).join(MembershipRole, MembershipRole.role_id == Role.id).where(
-            MembershipRole.membership_id == membership.id, Role.tenant_id == tenant_id
-        ).order_by(Role.name)
-    ).all() if membership else []
-    branch_rows = db.execute(text("""
-      SELECT b.id,b.name,b.code,b.status
-      FROM membership_branch_assignments mba
-      JOIN branches b ON b.id=mba.branch_id AND b.tenant_id=:tenant_id
-      WHERE mba.tenant_id=:tenant_id AND mba.membership_id=:membership_id
-      ORDER BY b.name
-    """), {"tenant_id": str(tenant_id), "membership_id": str(membership.id)}).mappings().all() if membership else []
-    return {
-        "user": {"id": str(user.id), "email": user.email, "display_name": user.display_name, "is_active": user.is_active} if user else None,
-        "tenant": {"id": str(tenant.id), "name": tenant.name, "status": tenant.status} if tenant else None,
-        "membership": {"id": str(membership.id), "status": membership.status} if membership else None,
-        "roles": [{"id": str(r.id), "name": r.name} for r in roles],
-        "branches": [{"id": str(r["id"]), "name": r["name"], "code": r["code"], "status": r["status"]} for r in branch_rows],
-        "session_id": str(session_id),
-    }
-
-@router.get("/sessions")
-def sessions(ctx=Depends(tenant_db)):
-    db, user_id, tenant_id, session_id = ctx
-    rows = db.execute(text("""
-      SELECT s.id,s.created_at,s.last_used_at,s.expires_at,s.revoked_at,
-             d.id AS device_id,d.name AS device_name,d.platform
-      FROM sessions s
-      LEFT JOIN devices d ON d.id=s.device_id
-      WHERE s.tenant_id=:tenant_id AND s.user_id=:user_id
-      ORDER BY s.created_at DESC
-    """), {"tenant_id": str(tenant_id), "user_id": str(user_id)}).mappings().all()
-    return [{
-        "id": str(r["id"]), "current": str(r["id"]) == str(session_id),
-        "created_at": r["created_at"], "last_used_at": r["last_used_at"],
-        "expires_at": r["expires_at"], "revoked_at": r["revoked_at"],
-        "device_id": str(r["device_id"]) if r["device_id"] else None,
-        "device_name": r["device_name"], "platform": r["platform"],
-    } for r in rows]
-
-@router.post("/sessions/{session_id}/revoke")
-def revoke_session(session_id: UUID, ctx=Depends(tenant_db)):
-    db, user_id, tenant_id, current_session_id = ctx
-    if session_id == current_session_id:
-        raise HTTPException(400, "Use sign out to end the current session")
-    session = db.scalar(select(AuthSession).where(AuthSession.id == session_id, AuthSession.tenant_id == tenant_id, AuthSession.user_id == user_id))
-    if not session:
-        raise HTTPException(404, "Session not found")
-    session.revoked_at = datetime.now(timezone.utc)
-    db.commit()
-    return {"id": str(session.id), "status": "revoked"}
-
-
-@router.post("/invitations/accept")
-def accept_invitation(body: InvitationAcceptRequest, response: Response, db: Session = Depends(get_db)):
-    raw_token = body.token.strip()
-    token_hash = hash_refresh_token(raw_token)
-    invite = db.execute(text("""
-      SELECT invitation_id, tenant_id, email, role_id, status, expires_at
-      FROM public.lexa_get_invitation_by_token(:token_hash)
-    """), {"token_hash": token_hash}).mappings().first()
-    if not invite:
-        raise HTTPException(404, "Invitation not found")
-    now = datetime.now(timezone.utc)
-    if invite["status"] != "PENDING":
-        raise HTTPException(409, "Invitation is no longer available")
-    if invite["expires_at"] <= now:
-        raise HTTPException(410, "Invitation has expired")
-
-    tenant = db.get(Tenant, invite["tenant_id"])
-    if not tenant or tenant.status != "ACTIVE":
-        raise HTTPException(409, "Workspace is not active")
-
-    email = str(invite["email"]).lower().strip()
-    db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(invite["tenant_id"])})
-
-    user = db.scalar(select(User).where(User.email == email))
-    if user:
-        if not user.is_active:
-            raise HTTPException(409, "The invited account is inactive")
-        if not verify_password(body.password, user.password_hash):
-            raise HTTPException(401, "For an existing account, enter the current account password")
-        if body.display_name and body.display_name.strip():
-            user.display_name = body.display_name.strip()
-    else:
-        user = User(
-            email=email,
-            password_hash=hash_password(body.password),
-            display_name=(body.display_name or email.split("@", 1)[0]).strip()[:200],
-        )
-        db.add(user)
-        db.flush()
-
-    membership = db.scalar(select(TenantMembership).where(
-        TenantMembership.tenant_id == invite["tenant_id"], TenantMembership.user_id == user.id
-    ))
-    if membership and membership.status == "SUSPENDED":
-        membership.status = "ACTIVE"
-    elif membership and membership.status == "REMOVED":
-        raise HTTPException(409, "This account was previously removed from the workspace")
-    elif not membership:
-        membership = TenantMembership(tenant_id=invite["tenant_id"], user_id=user.id, status="ACTIVE")
-        db.add(membership)
-        db.flush()
-
-    if invite["role_id"]:
-        role = db.scalar(select(Role).where(Role.id == invite["role_id"], Role.tenant_id == invite["tenant_id"]))
-        if not role:
-            raise HTTPException(409, "Invitation role is no longer valid")
-        existing_role = db.scalar(select(MembershipRole).where(
-            MembershipRole.membership_id == membership.id, MembershipRole.role_id == role.id
-        ))
-        if not existing_role:
-            db.add(MembershipRole(membership_id=membership.id, role_id=role.id))
-
-    db.execute(text("""
-      UPDATE tenant_invitations
-      SET status='ACCEPTED', accepted_at=now()
-      WHERE id=:invitation_id AND status='PENDING'
-    """), {"invitation_id": str(invite["invitation_id"])})
-    db.commit()
-    return {
-      "user_id": str(user.id),
-      "tenant_id": str(invite["tenant_id"]),
-      "email": email,
-      "status": "accepted",
-    }

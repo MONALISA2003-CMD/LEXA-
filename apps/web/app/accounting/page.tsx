@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { getAccountingAccounts, getAccountingPeriods, getBalanceSheet, getIncomeStatement, getJournalEntries, getTrialBalance, type AccountingAccount, type AccountingPeriod, type JournalEntry } from "../../lib/api";
+import { AppShell } from "../../components/app-shell";
 
 function today(){ return new Date().toISOString().slice(0,10); }
 function monthStart(){ const d=new Date(); d.setDate(1); return d.toISOString().slice(0,10); }
@@ -11,7 +12,8 @@ export default function AccountingPage(){
   const [tb,setTb]=useState<any[]>([]); const [pl,setPl]=useState<any[]>([]); const [bs,setBs]=useState<any[]>([]); const [from,setFrom]=useState(monthStart()); const [to,setTo]=useState(today()); const [busy,setBusy]=useState(true); const [error,setError]=useState("");
   async function load(){setBusy(true);setError("");try{const [a,p,j,t,income,b]=await Promise.all([getAccountingAccounts(),getAccountingPeriods(),getJournalEntries(),getTrialBalance(from,to),getIncomeStatement(from,to),getBalanceSheet(to)]);setAccounts(a);setPeriods(p);setJournals(j);setTb(t);setPl(income);setBs(b);}catch(e){setError(e instanceof Error?e.message:"Unable to load accounting.");}finally{setBusy(false);}}
   useEffect(()=>{void load();},[]);
-  return <main className="workspace" style={{maxWidth:1500}}>
+  return <AppShell title="Accounting" eyebrow="Finance">
+  <main className="workspace" style={{maxWidth:1500}}>
     <div className="workspace-header"><div><span className="workspace-breadcrumb">LEXA · ACCOUNTING</span><h1>Accounting</h1><p>Deterministic double-entry accounting built on the LEXA transaction core.</p></div><div className="header-actions"><a className="button button-soft" href="/">Back</a><button className="button button-soft" onClick={load}>Refresh</button></div></div>
     {error&&<div className="inline-message">{error}</div>}
     <section className="workspace-section"><div className="section-head"><div><span className="section-label">PERIOD</span><h2>Financial reporting window</h2></div></div><div className="form-grid"><label>From<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>To<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label></div><button className="primary" style={{marginTop:12}} onClick={load} disabled={busy}>Refresh reports</button></section>
@@ -22,4 +24,5 @@ export default function AccountingPage(){
     <section className="workspace-section"><div className="section-head"><div><span className="section-label">JOURNAL HISTORY</span><h2>{journals.length} entries</h2></div></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Source</th><th>Description</th><th>Status</th></tr></thead><tbody>{journals.slice(0,100).map(j=><tr key={j.id}><td>{j.entry_date}</td><td>{j.source_type}/{j.entry_role}</td><td>{j.description}</td><td>{j.status}</td></tr>)}</tbody></table></div></section>
     <section className="workspace-section"><div className="section-head"><div><span className="section-label">ACCOUNTING PERIODS</span><h2>Period control</h2></div></div><div className="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Status</th></tr></thead><tbody>{periods.map(p=><tr key={p.id}><td>{p.period_name}</td><td>{p.start_date} → {p.end_date}</td><td>{p.status}</td></tr>)}</tbody></table></div></section>
   </main>
+  </AppShell>
 }

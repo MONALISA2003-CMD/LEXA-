@@ -25,9 +25,11 @@ def test_sqlalchemy_pool_is_bounded_and_pg_bouncer_safe():
 
 def test_web_auth_never_persists_access_tokens_and_refreshes_with_cookie():
     page = (WEB_ROOT / "app" / "page.tsx").read_text()
+    shell = (WEB_ROOT / "components" / "app-shell.tsx").read_text()
     api = (WEB_ROOT / "lib" / "api.ts").read_text()
     proxy = (WEB_ROOT / "app" / "api" / "lexa" / "[...path]" / "route.ts").read_text()
-    assert '"/login"' in page and '"/register"' in page
+    assert '"/login"' in shell
+    assert 'restoreSession' in shell
     assert "sessionStorage.setItem(\"lexa_access_token\"" not in page
     assert "sessionStorage.getItem(\"lexa_access_token\")" not in page
     assert "sessionStorage.getItem(\"lexa_access_token\")" not in api

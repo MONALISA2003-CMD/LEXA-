@@ -21,6 +21,14 @@ export class WorkspaceSelectionError extends Error {
     this.workspaces = workspaces;
   }
 }
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 function friendlyMessage(status: number, payload: unknown): string {
   const detail = typeof payload === "object" && payload !== null && "detail" in payload ? (payload as { detail?: unknown }).detail : null;
@@ -86,7 +94,7 @@ async function getJson<T>(path: string, init?: RequestInit, retried = false): Pr
       const workspaces = Array.isArray((detail as { workspaces?: unknown }).workspaces) ? (detail as { workspaces: unknown[] }).workspaces.filter((x): x is WorkspaceChoice => Boolean(x && typeof x === "object" && "tenant_id" in x && "tenant_name" in x)) : [];
       throw new WorkspaceSelectionError(workspaces);
     }
-    throw new Error(friendlyMessage(response.status, payload));
+    throw new ApiError(response.status, friendlyMessage(response.status, payload));
   }
   return payload as T;
 }
@@ -99,24 +107,35 @@ export type Brand = { id:string; tenant_id:string; name:string; code?:string|nul
 export type Unit = { id:string; tenant_id?:string|null; name:string; code:string; symbol:string; unit_type:string; allows_fraction:boolean; precision_scale:number; is_system:boolean };
 export type PriceList = { id:string; tenant_id:string; name:string; currency:string; price_type:string; status:string; effective_from:string; effective_to?:string|null };
 export type ProductPrice = { id:string; tenant_id:string; price_list_id:string; variant_id:string; unit_price:string; minimum_quantity:string; effective_from:string; effective_to?:string|null };
+export type Barcode = { id:string; tenant_id:string; variant_id:string; barcode:string; barcode_type:string; is_primary:boolean; status:string };
 export function getCategories() { return getJson<Page<Category>>('/api/v1/catalog/categories?limit=100'); }
 export function getBrands() { return getJson<Page<Brand>>('/api/v1/catalog/brands?limit=100'); }
 export function getUnits() { return getJson<Page<Unit>>('/api/v1/catalog/units?limit=100'); }
 export function createProduct(body: {name:string; category_id:string; brand_id?:string|null; description?:string|null; product_type?:string; has_variants?:boolean}) { return getJson<Product>('/api/v1/catalog/products', { method:'POST', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify(body) }); }
-export function createVariant(body: {product_id:string; name:string; sku:string; base_unit_id:string; track_inventory?:boolean; allow_fractional_quantity?:boolean}) { return getJson<Variant>('/api/v1/catalog/variants', { method:'POST', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify(body) }); }
+export function createVariant(body: {product_id:string; name:string; sku:string; base_unit_id:string; track_inventory?:boolean; allow_fractional_quantity?:boolean; costing_method?:string|null}) { return getJson<Variant>('/api/v1/catalog/variants', { method:'POST', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify(body) }); }
+export function updateVariant(id:string, body:{name?:string;base_unit_id?:string;track_inventory?:boolean;allow_fractional_quantity?:boolean;status?:string;costing_method?:string|null}) { return getJson<Variant>(`/api/v1/catalog/variants/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify(body) }); }
+export function getBarcodes(variantId?:string) { return getJson<Barcode[]>(variantId ? `/api/v1/catalog/barcodes?variant_id=${encodeURIComponent(variantId)}` : '/api/v1/catalog/barcodes'); }
+export function createBarcode(body:{variant_id:string;barcode:string;barcode_type?:string;is_primary?:boolean}) { return getJson<Barcode>('/api/v1/catalog/barcodes',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)}); }
 export function getPriceLists() { return getJson<PriceList[]>('/api/v1/catalog/price-lists'); }
+export function createPriceList(body:{name:string;currency?:string;price_type?:string;effective_from:string;effective_to?:string|null}) { return getJson<PriceList>('/api/v1/catalog/price-lists',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)}); }
 export function getPrices(params: {variant_id?:string; price_list_id?:string}={}) { const q=new URLSearchParams(); Object.entries(params).forEach(([k,v])=>v&&q.set(k,v)); return getJson<ProductPrice[]>(`/api/v1/catalog/prices?${q}`); }
+export function createPrice(body:{price_list_id:string;variant_id:string;unit_price:string;minimum_quantity?:string;effective_from:string;effective_to?:string|null}) { return getJson<ProductPrice>('/api/v1/catalog/prices',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)}); }
 
 export function getProducts(query = "", signal?: AbortSignal) { const params = new URLSearchParams({ limit: "50" }); if (query.trim()) params.set("q", query.trim()); return getJson<Page<Product>>(`/api/v1/catalog/products?${params.toString()}`, { signal }); }
 export function getVariants(productId: string) { return getJson<Variant[]>(`/api/v1/catalog/products/${productId}/variants`); }
 
-export function createWarehouse(body: {name:string; code:string; branch_id?:string|null}) { return getJson<{id:string;name:string;code:string}>("/api/v1/organization/warehouses", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }); }
-export function createLocation(body: {name:string; code:string; warehouse_id:string}) { return getJson<Location>("/api/v1/organization/locations", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }); }
+export type Branch = { id:string; tenant_id:string; name:string; code:string; status:string };
+export type Warehouse = { id:string; tenant_id:string; name:string; code:string; branch_id?:string|null; status:string };
+export function getBranches() { return getJson<Branch[]>("/api/v1/organization/branches"); }
+export function getWarehouses() { return getJson<Warehouse[]>("/api/v1/organization/warehouses"); }
+export function createWarehouse(body: {name:string; code:string; branch_id?:string|null}) { return getJson<Warehouse>("/api/v1/organization/warehouses", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
+export function createLocation(body: {name:string; code:string; warehouse_id:string}) { return getJson<Location>("/api/v1/organization/locations", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
 export function getLocations() { return getJson<Location[]>("/api/v1/organization/locations"); }
 export function getVariantOptions() { return getJson<VariantOption[]>("/api/v1/inventory/variant-options"); }
 export function getInventoryBalances(params: { location_id?: string; variant_id?: string; q?: string } = {}) { const q = new URLSearchParams(); q.set("limit", "500"); Object.entries(params).forEach(([k,v]) => v && q.set(k,v)); return getJson<InventoryBalance[]>(`/api/v1/inventory/balances?${q}`); }
 export function getInventoryIntegrity() { return getJson<{status:string;checked:number;mismatches:any[]}>("/api/v1/inventory/integrity"); }
-export function getInventoryLedger(params: { location_id?: string; variant_id?: string } = {}) { const q = new URLSearchParams(); q.set("limit", "500"); Object.entries(params).forEach(([k,v]) => v && q.set(k,v)); return getJson<InventoryLedger[]>(`/api/v1/inventory/ledger?${q}`); }
+export function getInventoryLedger(params: { location_id?: string; variant_id?: string; transaction_type?: string } = {}) { const q = new URLSearchParams(); q.set("limit", "500"); Object.entries(params).forEach(([k,v]) => v && q.set(k,v)); return getJson<InventoryLedger[]>(`/api/v1/inventory/ledger?${q}`); }
+export function getProductInventory(variantId:string) { return getJson<{balances:InventoryBalance[];ledger:InventoryLedger[]}>(`/api/v1/inventory/products/${variantId}`); }
 export function getAdjustments() { return getJson<InventoryAdjustment[]>("/api/v1/inventory/adjustments?limit=100"); }
 export function getStockCounts() { return getJson<StockCount[]>("/api/v1/inventory/stock-counts?limit=100"); }
 export function getTransfers() { return getJson<Transfer[]>("/api/v1/inventory/transfers?limit=100"); }
@@ -136,38 +155,18 @@ export function completeTransfer(id:string) { return getJson<{id:string;status:s
 export type LoginRequest = { email: string; password: string; tenant_id?: string; };
 export type AuthResponse = { access_token: string; token_type: string; session_id: string; tenant_id: string; tenant_name: string };
 export type RegisterResponse = { user_id: string; tenant_id: string };
-export type AuthMe = { user: { id:string; email:string; display_name?:string|null; is_active:boolean } | null; tenant: { id:string; name:string; status:string } | null; membership: { id:string; status:string } | null; roles:Array<{id:string;name:string}>; branches:Array<{id:string;name:string;code:string;status:string}>; session_id:string };
-export type AuthSession = { id:string; current:boolean; created_at:string; last_used_at?:string|null; expires_at:string; revoked_at?:string|null; device_id?:string|null; device_name?:string|null; platform?:string|null };
-export type TenantSettings = { tenant_id:string; timezone:string; locale:string; business_type?:string|null; industry?:string|null; fiscal_year_start_month:number };
-export type OrganizationBranch = { id:string; tenant_id:string; name:string; code:string; status:string };
-export type Role = { id:string; tenant_id:string; name:string; description?:string|null };
-export type TenantMember = { membership_id:string; user_id:string; email:string; display_name?:string|null; status:string; roles:string[]; branch_ids:string[] };
-export type InvitationResponse = { id:string; email:string; role_id:string; role_name:string; expires_at:string; status:string; invitation_token:string; delivery:string };
 export async function login(body: LoginRequest) { const response = await getJson<AuthResponse>("/api/v1/auth/login", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }); setAccessToken(response.access_token); return response; }
 export function register(body: { email:string; password:string; tenant_name:string }) { return getJson<RegisterResponse>("/api/v1/auth/register", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
-export function getMe() { return getJson<AuthMe>('/api/v1/auth/me'); }
-export function getAuthSessions() { return getJson<AuthSession[]>('/api/v1/auth/sessions'); }
-export function revokeAuthSession(id:string) { return getJson<{id:string;status:string}>(`/api/v1/auth/sessions/${id}/revoke`, { method:'POST', headers:{'Content-Type':'application/json'} }); }
-export function acceptInvitation(body:{token:string;password:string;display_name?:string}) { return getJson<{user_id:string;tenant_id:string;email:string;status:string}>('/api/v1/auth/invitations/accept', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }); }
-export function getOrganizationSettings() { return getJson<TenantSettings>('/api/v1/organization/settings'); }
-export function updateOrganizationSettings(body:Omit<TenantSettings,'tenant_id'>) { return getJson<TenantSettings>('/api/v1/organization/settings', { method:'PUT', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify(body) }); }
-export function getOrganizationBranches() { return getJson<OrganizationBranch[]>('/api/v1/organization/branches'); }
-export function getRbacRoles() { return getJson<Role[]>('/api/v1/rbac/roles'); }
-export function getRbacMembers() { return getJson<TenantMember[]>('/api/v1/rbac/members'); }
-export function updateRbacMember(id:string,status:'ACTIVE'|'SUSPENDED'|'REMOVED') { return getJson<{membership_id:string;status:string}>(`/api/v1/rbac/members/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify({status}) }); }
-export function assignMemberRole(membershipId:string,roleId:string) { return getJson<{membership_id:string;role_id:string;status:string}>('/api/v1/rbac/role-assignments',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify({membership_id:membershipId,role_id:roleId})}); }
-export function assignMemberBranch(membershipId:string,branchId:string) { return getJson<{membership_id:string;branch_id:string;status:string}>('/api/v1/rbac/branch-assignments',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify({membership_id:membershipId,branch_id:branchId})}); }
-export function unassignMemberBranch(membershipId:string,branchId:string) { return getJson<{membership_id:string;branch_id:string;status:string}>(`/api/v1/rbac/branch-assignments/${membershipId}/${branchId}`,{method:'DELETE'}); }
-export function createRbacInvitation(body:{email:string;role_id?:string|null}) { return getJson<InvitationResponse>('/api/v1/rbac/invitations',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)}); }
 
 export async function restoreSession() {
   try {
     const response = await getJson<AuthResponse>("/api/v1/auth/refresh", { method:"POST", headers:{"Content-Type":"application/json"} }, true);
     setAccessToken(response.access_token);
     return response;
-  } catch {
+  } catch (error) {
     setAccessToken(null);
-    return null;
+    if (error instanceof ApiError && error.status === 401) return null;
+    throw error;
   }
 }
 export async function logout() {

@@ -290,9 +290,15 @@ def create_variant(body: VariantIn, idempotency_key: str | None = Header(None, a
     commit_or_409(db, "SKU already exists for this tenant"); db.refresh(row); return row
 
 @router.patch("/variants/{variant_id}", response_model=VariantOut)
-def patch_variant(variant_id: UUID, body: VariantPatch, ctx=Depends(require_permission("catalog.manage"))):
+def patch_variant(variant_id: UUID, body: VariantPatch, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("catalog.manage"))):
     db, actor, tenant_id, _ = ctx; row = db.scalar(select(ProductVariant).where(ProductVariant.id == variant_id, ProductVariant.tenant_id == tenant_id, ProductVariant.deleted_at.is_(None)))
     if not row: raise HTTPException(404, "Variant not found")
+    try:
+        idem, replay = begin_idempotency(db, tenant_id=tenant_id, operation_type="catalog.variant.update", key=idempotency_key, payload=body.model_dump(mode="json") | {"variant_id": str(variant_id)})
+    except CatalogValidation as exc:
+        db.rollback(); raise HTTPException(409 if "different" in str(exc) else 422, str(exc)) from exc
+    if replay:
+        return JSONResponse(status_code=replay[0], content=replay[1])
     if body.base_unit_id is not None:
         unit = db.scalar(select(Unit).where(Unit.id == body.base_unit_id, (Unit.tenant_id == tenant_id) | (Unit.tenant_id.is_(None))))
         if not unit: raise HTTPException(400, "Unit does not belong to tenant")
@@ -308,7 +314,10 @@ def patch_variant(variant_id: UUID, body: VariantPatch, ctx=Depends(require_perm
         unit2 = db.scalar(select(Unit).where(Unit.id == row.base_unit_id, (Unit.tenant_id == tenant_id) | (Unit.tenant_id.is_(None))))
         if row.allow_fractional_quantity and (not unit2 or not unit2.allows_fraction): raise CatalogValidation("Variant cannot allow fractional quantity with a non-fractional base unit")
     except CatalogValidation as exc: raise HTTPException(422, str(exc)) from exc
-    db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.variant.updated", target_type="product_variant", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductVariantUpdated", aggregate_type="product_variant", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "sku": row.sku, "status": row.status}); commit_or_409(db, "Variant update conflicts with existing data"); db.refresh(row); return row
+    db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.variant.updated", target_type="product_variant", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductVariantUpdated", aggregate_type="product_variant", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "sku": row.sku, "status": row.status})
+    response_body = VariantOut.model_validate(row).model_dump(mode="json")
+    finish_idempotency(db, idem, status_code=200, response_body=response_body, resource_type="product_variant", resource_id=row.id)
+    commit_or_409(db, "Variant update conflicts with existing data"); db.refresh(row); return row
 
 @router.get("/variants/{variant_id}", response_model=VariantOut)
 def get_variant(variant_id: UUID, ctx=Depends(require_permission("catalog.read"))):
@@ -325,6 +334,14 @@ def lookup_sku(sku: str, ctx=Depends(require_permission("catalog.read"))):
     if not row: raise HTTPException(404, "SKU not found")
     return row
 
+@router.get("/barcodes", response_model=list[BarcodeOut])
+def list_barcodes(variant_id: UUID | None = None, ctx=Depends(require_permission("catalog.read"))):
+    db, _, tenant_id, _ = ctx
+    stmt = select(Barcode).where(Barcode.tenant_id == tenant_id, Barcode.status == "ACTIVE")
+    if variant_id:
+        stmt = stmt.where(Barcode.variant_id == variant_id)
+    return list(db.scalars(stmt.order_by(Barcode.is_primary.desc(), Barcode.barcode)))
+
 @router.get("/barcodes/{barcode}", response_model=BarcodeOut)
 def lookup_barcode(barcode: str, ctx=Depends(require_permission("catalog.read"))):
     db, _, tenant_id, _ = ctx; value = barcode.strip()
@@ -333,14 +350,24 @@ def lookup_barcode(barcode: str, ctx=Depends(require_permission("catalog.read"))
     return row
 
 @router.post("/barcodes", response_model=BarcodeOut, status_code=201)
-def create_barcode(body: BarcodeIn, ctx=Depends(require_permission("catalog.manage"))):
-    db, actor, tenant_id, _ = ctx; barcode = body.barcode.strip()
+def create_barcode(body: BarcodeIn, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("catalog.manage"))):
+    db, actor, tenant_id, _ = ctx
+    try:
+        idem, replay = begin_idempotency(db, tenant_id=tenant_id, operation_type="catalog.barcode.create", key=idempotency_key, payload=body.model_dump(mode="json"))
+    except CatalogValidation as exc:
+        db.rollback(); raise HTTPException(409 if "different" in str(exc) else 422, str(exc)) from exc
+    if replay:
+        return JSONResponse(status_code=replay[0], content=replay[1])
+    barcode = body.barcode.strip()
     if not barcode: raise HTTPException(422, "Barcode cannot be empty")
     variant = db.scalar(select(ProductVariant).where(ProductVariant.id == body.variant_id, ProductVariant.tenant_id == tenant_id, ProductVariant.deleted_at.is_(None), ProductVariant.status == "ACTIVE"))
     if not variant: raise HTTPException(400, "Variant does not belong to tenant or is inactive")
     row = Barcode(tenant_id=tenant_id, variant_id=body.variant_id, barcode=barcode, barcode_type=normalize_code(body.barcode_type, "Barcode type"), is_primary=body.is_primary); db.add(row); db.flush()
     if body.is_primary: db.query(Barcode).filter(Barcode.variant_id == body.variant_id, Barcode.tenant_id == tenant_id, Barcode.id != row.id).update({Barcode.is_primary: False}, synchronize_session=False)
-    write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.barcode.created", target_type="barcode", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="BarcodeCreated", aggregate_type="barcode", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "variant_id": str(body.variant_id), "barcode": barcode}); commit_or_409(db, "Barcode already belongs to another active catalog identity"); db.refresh(row); return row
+    write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.barcode.created", target_type="barcode", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="BarcodeCreated", aggregate_type="barcode", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "variant_id": str(body.variant_id), "barcode": barcode})
+    response_body = BarcodeOut.model_validate(row).model_dump(mode="json")
+    finish_idempotency(db, idem, status_code=201, response_body=response_body, resource_type="barcode", resource_id=row.id)
+    commit_or_409(db, "Barcode already belongs to another active catalog identity"); db.refresh(row); return row
 
 @router.get("/attribute-definitions", response_model=list[AttributeDefinitionOut])
 def attribute_definitions(ctx=Depends(require_permission("catalog.read"))):
@@ -386,10 +413,19 @@ def price_lists(ctx=Depends(require_permission("catalog.read"))):
     db, _, tenant_id, _ = ctx; return list(db.scalars(select(PriceList).where(PriceList.tenant_id == tenant_id).order_by(PriceList.effective_from.desc(), PriceList.id)))
 
 @router.post("/price-lists", response_model=PriceListOut, status_code=201)
-def create_price_list(body: PriceListIn, ctx=Depends(require_permission("catalog.manage"))):
+def create_price_list(body: PriceListIn, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("catalog.manage"))):
     db, actor, tenant_id, _ = ctx
+    try:
+        idem, replay = begin_idempotency(db, tenant_id=tenant_id, operation_type="catalog.price_list.create", key=idempotency_key, payload=body.model_dump(mode="json"))
+    except CatalogValidation as exc:
+        db.rollback(); raise HTTPException(409 if "different" in str(exc) else 422, str(exc)) from exc
+    if replay:
+        return JSONResponse(status_code=replay[0], content=replay[1])
     if body.effective_to and body.effective_to <= body.effective_from: raise HTTPException(422, "effective_to must be after effective_from")
-    row = PriceList(tenant_id=tenant_id, name=normalize_text(body.name,"Price list name"), currency=normalize_code(body.currency,"Currency"), price_type=normalize_code(body.price_type,"Price type"), effective_from=body.effective_from, effective_to=body.effective_to); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.price_list.created", target_type="price_list", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="PriceListCreated", aggregate_type="price_list", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "name": row.name, "currency": row.currency}); commit_or_409(db, "Price list conflicts with existing data"); db.refresh(row); return row
+    row = PriceList(tenant_id=tenant_id, name=normalize_text(body.name,"Price list name"), currency=normalize_code(body.currency,"Currency"), price_type=normalize_code(body.price_type,"Price type"), effective_from=body.effective_from, effective_to=body.effective_to); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.price_list.created", target_type="price_list", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="PriceListCreated", aggregate_type="price_list", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "name": row.name, "currency": row.currency})
+    response_body = PriceListOut.model_validate(row).model_dump(mode="json")
+    finish_idempotency(db, idem, status_code=201, response_body=response_body, resource_type="price_list", resource_id=row.id)
+    commit_or_409(db, "Price list conflicts with existing data"); db.refresh(row); return row
 
 @router.get("/prices", response_model=list[ProductPriceOut])
 def prices(variant_id: UUID | None = None, price_list_id: UUID | None = None, ctx=Depends(require_permission("catalog.read"))):
@@ -400,8 +436,14 @@ def prices(variant_id: UUID | None = None, price_list_id: UUID | None = None, ct
     return list(db.scalars(stmt.order_by(ProductPrice.effective_from.desc(), ProductPrice.minimum_quantity)))
 
 @router.post("/prices", response_model=ProductPriceOut, status_code=201)
-def create_price(body: ProductPriceIn, ctx=Depends(require_permission("catalog.manage"))):
+def create_price(body: ProductPriceIn, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("catalog.manage"))):
     db, actor, tenant_id, _ = ctx
+    try:
+        idem, replay = begin_idempotency(db, tenant_id=tenant_id, operation_type="catalog.price.create", key=idempotency_key, payload=body.model_dump(mode="json"))
+    except CatalogValidation as exc:
+        db.rollback(); raise HTTPException(409 if "different" in str(exc) else 422, str(exc)) from exc
+    if replay:
+        return JSONResponse(status_code=replay[0], content=replay[1])
     price_list = db.scalar(select(PriceList).where(PriceList.id == body.price_list_id, PriceList.tenant_id == tenant_id, PriceList.status == "ACTIVE")); variant = db.scalar(select(ProductVariant).where(ProductVariant.id == body.variant_id, ProductVariant.tenant_id == tenant_id, ProductVariant.deleted_at.is_(None)))
     if not price_list or not variant: raise HTTPException(400, "Price list and variant must belong to tenant")
     if body.effective_to and body.effective_to <= body.effective_from: raise HTTPException(422, "effective_to must be after effective_from")
@@ -415,4 +457,7 @@ def create_price(body: ProductPriceIn, ctx=Depends(require_permission("catalog.m
         or_(ProductPrice.effective_to.is_(None), ProductPrice.effective_to > body.effective_from),
     ).limit(1))
     if overlap: raise HTTPException(409, "Overlapping price interval exists for this variant, price list and minimum quantity")
-    row = ProductPrice(tenant_id=tenant_id, price_list_id=body.price_list_id, variant_id=body.variant_id, unit_price=body.unit_price, minimum_quantity=body.minimum_quantity, effective_from=body.effective_from, effective_to=body.effective_to); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product_price.created", target_type="product_price", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductPriceCreated", aggregate_type="product_price", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "variant_id": str(body.variant_id), "price_list_id": str(body.price_list_id)}); commit_or_409(db, "Overlapping or duplicate product price is not permitted"); db.refresh(row); return row
+    row = ProductPrice(tenant_id=tenant_id, price_list_id=body.price_list_id, variant_id=body.variant_id, unit_price=body.unit_price, minimum_quantity=body.minimum_quantity, effective_from=body.effective_from, effective_to=body.effective_to); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product_price.created", target_type="product_price", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductPriceCreated", aggregate_type="product_price", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "variant_id": str(body.variant_id), "price_list_id": str(body.price_list_id)})
+    response_body = ProductPriceOut.model_validate(row).model_dump(mode="json")
+    finish_idempotency(db, idem, status_code=201, response_body=response_body, resource_type="product_price", resource_id=row.id)
+    commit_or_409(db, "Overlapping or duplicate product price is not permitted"); db.refresh(row); return row

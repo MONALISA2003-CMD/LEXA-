@@ -43,9 +43,10 @@ def test_brand_assets_are_present():
 
 def test_workspace_requires_real_authentication_and_safe_network_states():
     page = (WEB / "app/page.tsx").read_text()
+    shell = (WEB / "components/app-shell.tsx").read_text()
     api = (WEB / "lib/api.ts").read_text()
-    assert '"/login"' in page
-    assert '"/register"' in page
+    assert '"/login"' in shell
+    assert "restoreSession" in shell
     assert "openDevSession" not in page
     assert "Preview" not in page
     assert "We couldn't connect to LEXA right now." in api

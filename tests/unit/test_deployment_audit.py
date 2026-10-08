@@ -104,8 +104,13 @@ def test_business_engine_user_surface_is_removed():
 
 def test_frontend_boot_verifies_authenticated_workspace_access():
     page = (ROOT / "apps/web/app/page.tsx").read_text()
-    assert "getLocations" in page
-    assert "verifyWorkspaceAccess" in page
+    shell = (ROOT / "apps/web/components/app-shell.tsx").read_text()
+    api = (ROOT / "apps/web/lib/api.ts").read_text()
+    inventory = (ROOT / "apps/web/app/inventory/page.tsx").read_text()
+    assert "AppShell" in page
+    assert "restoreSession" in shell
+    assert "getLocations" in api
+    assert "getLocations()" in inventory
 
 
 

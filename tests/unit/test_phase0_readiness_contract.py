@@ -38,9 +38,16 @@ def test_render_carries_canonical_neon_identity():
 
 
 def test_frontend_catalog_exit_condition_is_visible():
-    page = (ROOT / "apps/web/app/page.tsx").read_text()
-    assert "Sign in to manage your products, variants, SKUs and pricing." in page
+    page = (ROOT / "apps/web/app/products/page.tsx").read_text()
+    api = (ROOT / "apps/web/lib/api.ts").read_text()
+    assert "Products" in page
+    assert "Variants" in page
+    assert "SKU" in page
+    assert "Pricing" in page
+    assert "Barcodes" in page
     assert "getProducts" in page
+    assert "getBarcodes" in api
+    assert "createPrice" in api
 
 
 def test_readiness_requires_phase2_universal_business_engine_schema():

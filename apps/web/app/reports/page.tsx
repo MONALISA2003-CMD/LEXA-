@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { getAnalyticsOverview, getAnalyticsProducts, getAnalyticsCustomers, getAnalyticsInventoryHealth, getAnalyticsBranches, refreshAnalytics, type AnalyticsOverview, type AnalyticsProductMetric, type AnalyticsCustomerMetric, type AnalyticsInventoryHealth, type AnalyticsBranchMetric } from "../../lib/api";
+import { AppShell } from "../../components/app-shell";
 
 function today(){return new Date().toISOString().slice(0,10)}
 function monthStart(){const d=new Date();d.setDate(1);return d.toISOString().slice(0,10)}
@@ -11,7 +12,8 @@ export default function ReportsPage(){
  async function load(){setBusy(true);setMessage("");try{const [o,p,c,i,b]=await Promise.all([getAnalyticsOverview(from,to),getAnalyticsProducts(from,to),getAnalyticsCustomers(),getAnalyticsInventoryHealth(),getAnalyticsBranches(from,to)]);setOverview(o);setProducts(p);setCustomers(c);setInventory(i);setBranches(b);}catch(e){setMessage(e instanceof Error?e.message:"Unable to load reports.")}finally{setBusy(false)}}
  useEffect(()=>{void load()},[]);
  async function rebuild(){setMessage("");try{await refreshAnalytics(from,to);await load();setMessage("Analytics refreshed from authoritative transactions.")}catch(e){setMessage(e instanceof Error?e.message:"Unable to refresh analytics.")}}
- return <main className="workspace" style={{maxWidth:1500}}>
+ return <AppShell title="Reports & Business Intelligence" eyebrow="Reports">
+ <main className="workspace" style={{maxWidth:1500}}>
   <div className="workspace-header"><div><span className="workspace-breadcrumb">LEXA · BUSINESS INTELLIGENCE</span><h1>Reports & Business Intelligence</h1><p>Deterministic business reporting built from sales, payments, inventory and accounting truth.</p></div><div className="header-actions"><a className="button button-soft" href="/">Back</a><button className="button button-soft" onClick={load} disabled={busy}>Refresh</button></div></div>
   {message&&<div className="inline-message">{message}</div>}
   <section className="workspace-section"><div className="section-head"><div><span className="section-label">REPORTING WINDOW</span><h2>Performance period</h2></div><button className="primary" onClick={rebuild} disabled={busy}>Rebuild analytics</button></div><div className="form-grid"><label>From<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>To<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label></div></section>
@@ -22,4 +24,5 @@ export default function ReportsPage(){
   <div className="two-column"><section className="workspace-section"><div className="section-head"><div><span className="section-label">CUSTOMER PATTERNS</span><h2>Commercial relationships</h2></div></div><div className="table-wrap"><table><thead><tr><th>Customer</th><th>Net sales</th><th>Outstanding</th></tr></thead><tbody>{customers.map(r=><tr key={r.customer_party_id}><td>{r.customer_name||"Customer"}<small>Last sale {r.last_sale_date||"—"}</small></td><td>{money(r.net_sales)}</td><td>{money(r.outstanding_balance)}</td></tr>)}</tbody></table></div></section>
   <section className="workspace-section"><div className="section-head"><div><span className="section-label">INVENTORY HEALTH</span><h2>Current stock cover</h2></div></div><div className="table-wrap"><table><thead><tr><th>Product</th><th>Available</th><th>Value</th><th>Days cover</th></tr></thead><tbody>{inventory.map(r=><tr key={`${r.location_id}-${r.variant_id}`}><td><b>{r.product_name||"Product"}</b><small>{r.location_name||"Location"}</small></td><td>{Number(r.available).toLocaleString()}</td><td>{money(r.stock_value)}</td><td>{r.days_cover?Number(r.days_cover).toFixed(1):"No velocity"}</td></tr>)}</tbody></table></div></section></div>
  </main>
+ </AppShell>
 }

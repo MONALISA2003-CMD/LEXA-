@@ -61,14 +61,3 @@ def test_proxy_keeps_internal_diagnostics_out_of_browser_responses():
     assert 'LEXA is temporarily unavailable. Please try again shortly.' in source
 
 
-
-
-def test_phase2_auth_invitation_and_session_contracts():
-    source = AUTH.read_text()
-    assert "InvitationAcceptRequest" in source
-    assert '"/invitations/accept"' in source
-    assert '"/me"' in source
-    assert '"/sessions"' in source
-    assert '"/sessions/{session_id}/revoke"' in source
-    assert "verify_password(body.password, user.password_hash)" in source
-    assert "lexa_get_invitation_by_token" in source

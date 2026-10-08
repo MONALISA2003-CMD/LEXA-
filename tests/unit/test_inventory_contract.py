@@ -45,11 +45,24 @@ def test_inventory_domain_has_weighted_average_and_ledger_balance_logic():
 
 
 def test_frontend_inventory_is_live_data_only():
-    source = (ROOT / "apps" / "web" / "app" / "page.tsx").read_text()
+    source = (ROOT / "apps" / "web" / "app" / "inventory" / "page.tsx").read_text()
     assert "getInventoryBalances" in source
     assert "getInventoryLedger" in source
     assert "getAdjustments" in source
     assert "getStockCounts" in source
     assert "getTransfers" in source
-    assert "Your stock, movements and locations will appear here as soon as the workspace is connected." in source
+    assert "getLocations" in source
+    assert "Stock" in source and "Ledger" in source
+    assert "Adjustments" in source and "Counts" in source and "Transfers" in source
+    assert "Locations" in source
     assert "LIVE SYSTEM" not in source
+
+
+def test_inventory_location_creation_is_idempotent_end_to_end():
+    api = (ROOT / "apps" / "web" / "lib" / "api.ts").read_text()
+    org = (ROOT / "apps" / "api" / "app" / "routes" / "organization.py").read_text()
+    assert 'createWarehouse' in api and '"Idempotency-Key":key()' in api
+    assert 'createLocation' in api and '"Idempotency-Key":key()' in api
+    assert 'operation_type="organization.warehouse.create"' in org
+    assert 'operation_type="organization.location.create"' in org
+    assert 'finish_idempotency' in org
