@@ -1,0 +1,46 @@
+name: LEXA CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install API dependencies
+        working-directory: apps/api
+        run: python -m pip install --upgrade pip && pip install -e '.[dev]'
+      - name: Run full Python test suite
+        run: pytest -q
+      - name: Compile backend
+        run: python -m compileall -q apps/api/app
+
+  frontend-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: apps/web/package.json
+      - name: Install frontend dependencies
+        working-directory: apps/web
+        run: npm install --include=dev --no-audit --no-fund
+      - name: Typecheck frontend
+        working-directory: apps/web
+        run: npm run typecheck
+      - name: Run customer contract tests
+        working-directory: .
+        run: node --test apps/web/tests/visible-product-contract.test.mjs
+
+      - name: Build frontend
+        working-directory: apps/web
+        run: npm run build

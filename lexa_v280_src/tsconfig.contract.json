@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": false,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["apps/web/app/commerce/page.tsx", "apps/web/lib/api.ts", ".contract-stubs/react.d.ts"]
+}

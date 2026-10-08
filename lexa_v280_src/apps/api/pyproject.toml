@@ -1,0 +1,20 @@
+[project]
+name = "lexa-api"
+version = "0.1.0"
+description = "LEXA FastAPI foundation"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "pydantic[email]>=2.10,<3",
+  "pydantic-settings>=2.7,<3",
+  "sqlalchemy>=2.0,<3",
+  "psycopg[binary]>=3.2,<4",
+  "alembic>=1.14,<2",
+  "pyjwt>=2.10,<3",
+  "pwdlib[argon2]>=0.2,<1",
+  "redis>=5,<7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "httpx>=0.28,<1", "ruff>=0.9,<1", "mypy>=1.14,<2"]
