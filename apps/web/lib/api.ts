@@ -136,8 +136,29 @@ export function completeTransfer(id:string) { return getJson<{id:string;status:s
 export type LoginRequest = { email: string; password: string; tenant_id?: string; };
 export type AuthResponse = { access_token: string; token_type: string; session_id: string; tenant_id: string; tenant_name: string };
 export type RegisterResponse = { user_id: string; tenant_id: string };
+export type AuthMe = { user: { id:string; email:string; display_name?:string|null; is_active:boolean } | null; tenant: { id:string; name:string; status:string } | null; membership: { id:string; status:string } | null; roles:Array<{id:string;name:string}>; branches:Array<{id:string;name:string;code:string;status:string}>; session_id:string };
+export type AuthSession = { id:string; current:boolean; created_at:string; last_used_at?:string|null; expires_at:string; revoked_at?:string|null; device_id?:string|null; device_name?:string|null; platform?:string|null };
+export type TenantSettings = { tenant_id:string; timezone:string; locale:string; business_type?:string|null; industry?:string|null; fiscal_year_start_month:number };
+export type OrganizationBranch = { id:string; tenant_id:string; name:string; code:string; status:string };
+export type Role = { id:string; tenant_id:string; name:string; description?:string|null };
+export type TenantMember = { membership_id:string; user_id:string; email:string; display_name?:string|null; status:string; roles:string[]; branch_ids:string[] };
+export type InvitationResponse = { id:string; email:string; role_id:string; role_name:string; expires_at:string; status:string; invitation_token:string; delivery:string };
 export async function login(body: LoginRequest) { const response = await getJson<AuthResponse>("/api/v1/auth/login", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }); setAccessToken(response.access_token); return response; }
 export function register(body: { email:string; password:string; tenant_name:string }) { return getJson<RegisterResponse>("/api/v1/auth/register", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
+export function getMe() { return getJson<AuthMe>('/api/v1/auth/me'); }
+export function getAuthSessions() { return getJson<AuthSession[]>('/api/v1/auth/sessions'); }
+export function revokeAuthSession(id:string) { return getJson<{id:string;status:string}>(`/api/v1/auth/sessions/${id}/revoke`, { method:'POST', headers:{'Content-Type':'application/json'} }); }
+export function acceptInvitation(body:{token:string;password:string;display_name?:string}) { return getJson<{user_id:string;tenant_id:string;email:string;status:string}>('/api/v1/auth/invitations/accept', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }); }
+export function getOrganizationSettings() { return getJson<TenantSettings>('/api/v1/organization/settings'); }
+export function updateOrganizationSettings(body:Omit<TenantSettings,'tenant_id'>) { return getJson<TenantSettings>('/api/v1/organization/settings', { method:'PUT', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify(body) }); }
+export function getOrganizationBranches() { return getJson<OrganizationBranch[]>('/api/v1/organization/branches'); }
+export function getRbacRoles() { return getJson<Role[]>('/api/v1/rbac/roles'); }
+export function getRbacMembers() { return getJson<TenantMember[]>('/api/v1/rbac/members'); }
+export function updateRbacMember(id:string,status:'ACTIVE'|'SUSPENDED'|'REMOVED') { return getJson<{membership_id:string;status:string}>(`/api/v1/rbac/members/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify({status}) }); }
+export function assignMemberRole(membershipId:string,roleId:string) { return getJson<{membership_id:string;role_id:string;status:string}>('/api/v1/rbac/role-assignments',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify({membership_id:membershipId,role_id:roleId})}); }
+export function assignMemberBranch(membershipId:string,branchId:string) { return getJson<{membership_id:string;branch_id:string;status:string}>('/api/v1/rbac/branch-assignments',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify({membership_id:membershipId,branch_id:branchId})}); }
+export function unassignMemberBranch(membershipId:string,branchId:string) { return getJson<{membership_id:string;branch_id:string;status:string}>(`/api/v1/rbac/branch-assignments/${membershipId}/${branchId}`,{method:'DELETE'}); }
+export function createRbacInvitation(body:{email:string;role_id?:string|null}) { return getJson<InvitationResponse>('/api/v1/rbac/invitations',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)}); }
 
 export async function restoreSession() {
   try {

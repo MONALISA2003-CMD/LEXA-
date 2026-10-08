@@ -17,6 +17,10 @@ REQUIRED_TABLES = (
     "membership_roles",
     "business_profiles",
     "registration_requests",
+    "tenant_settings",
+    "membership_branch_assignments",
+    "tenant_invitations",
+    "user_security_tokens",
     # Phase 2 universal transaction/workflow kernel remains technical infrastructure; it is not a user-facing module.
     "business_capabilities",
     "business_configurations",

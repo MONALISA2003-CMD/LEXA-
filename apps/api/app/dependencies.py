@@ -1,13 +1,15 @@
 from uuid import UUID
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select, text
+from sqlalchemy import select, text, func
 from sqlalchemy.orm import Session
 from .auth import decode_access_token
 from .db import SessionLocal
-from .models import TenantMembership, Session as AuthSession
+from .models import TenantMembership, Session as AuthSession, Branch, MembershipBranchAssignment
 
 bearer = HTTPBearer(auto_error=False)
+BRANCH_HEADER = "X-LEXA-Branch-ID"
+
 
 def get_db():
     db = SessionLocal()
@@ -15,6 +17,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 def current_context(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
     if not credentials:
@@ -25,12 +28,26 @@ def current_context(credentials: HTTPAuthorizationCredentials | None = Depends(b
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token") from exc
 
-def tenant_db(db: Session = Depends(get_db), context=Depends(current_context)):
-    user_id, tenant_id, session_id = context
+
+def _apply_identity_context(db: Session, user_id: UUID, tenant_id: UUID) -> None:
     db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant_id)})
-    session = db.scalar(select(AuthSession).where(AuthSession.id == session_id, AuthSession.tenant_id == tenant_id, AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None)))
+    db.execute(text("SELECT set_config('app.user_id', :user_id, true)"), {"user_id": str(user_id)})
+
+
+def tenant_db(request: Request, db: Session = Depends(get_db), context=Depends(current_context)):
+    user_id, tenant_id, session_id = context
+    _apply_identity_context(db, user_id, tenant_id)
+
+    session = db.scalar(select(AuthSession).where(
+        AuthSession.id == session_id,
+        AuthSession.tenant_id == tenant_id,
+        AuthSession.user_id == user_id,
+        AuthSession.revoked_at.is_(None),
+        AuthSession.expires_at > func.now(),
+    ))
     if not session:
         raise HTTPException(status_code=401, detail="Session is revoked or invalid")
+
     membership = db.scalar(select(TenantMembership).where(
         TenantMembership.tenant_id == tenant_id,
         TenantMembership.user_id == user_id,
@@ -38,7 +55,44 @@ def tenant_db(db: Session = Depends(get_db), context=Depends(current_context)):
     ))
     if not membership:
         raise HTTPException(status_code=403, detail="Active tenant membership required")
+
+    branch_header = request.headers.get(BRANCH_HEADER)
+    request.state.tenant_id = tenant_id
+    request.state.user_id = user_id
+    request.state.membership_id = membership.id
+    request.state.branch_id = None
+
+    if branch_header:
+        try:
+            branch_id = UUID(branch_header.strip())
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid branch identifier") from exc
+        branch = db.scalar(select(Branch).where(Branch.id == branch_id, Branch.tenant_id == tenant_id))
+        if not branch:
+            raise HTTPException(status_code=404, detail="Branch not found")
+
+        assignment_count = db.scalar(select(func.count()).select_from(MembershipBranchAssignment).where(
+            MembershipBranchAssignment.tenant_id == tenant_id,
+            MembershipBranchAssignment.membership_id == membership.id,
+        )) or 0
+        if assignment_count and not db.scalar(select(MembershipBranchAssignment.branch_id).where(
+            MembershipBranchAssignment.tenant_id == tenant_id,
+            MembershipBranchAssignment.membership_id == membership.id,
+            MembershipBranchAssignment.branch_id == branch_id,
+        )):
+            raise HTTPException(status_code=403, detail="Branch access is not assigned to this membership")
+        db.execute(text("SELECT set_config('app.branch_id', :branch_id, true)"), {"branch_id": str(branch_id)})
+        request.state.branch_id = branch_id
+
     return db, user_id, tenant_id, session_id
+
+
+def require_branch(request: Request, ctx=Depends(tenant_db)):
+    branch_id = getattr(request.state, "branch_id", None)
+    if branch_id is None:
+        raise HTTPException(status_code=400, detail="A branch context is required")
+    return (*ctx, branch_id)
+
 
 def require_permission(permission_code: str):
     def dependency(ctx=Depends(tenant_db)):

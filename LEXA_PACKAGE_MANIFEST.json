@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Production Hardening & Convergence",
-  "version": "2.5.1",
+  "package": "LEXA Identity, Tenancy & Authorization",
+  "version": "2.6.0",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -19,7 +19,7 @@
     "Moved refresh credentials to HttpOnly cookie rotation and access tokens to memory-only browser state",
     "Added Redis-backed authentication rate limits",
     "Added fail-closed production configuration checks",
-    "Applied lexа_app role per transaction for PgBouncer-safe RLS enforcement",
+    "Applied lex\u0430_app role per transaction for PgBouncer-safe RLS enforcement",
     "Added bounded SQLAlchemy pooling and PostgreSQL statement/lock/idle transaction timeouts",
     "Added migration 022 for the live Brain foundation schema",
     "Added CI and direct Neon backup automation",
@@ -27,7 +27,14 @@
     "Render readiness now uses /ready",
     "health readiness logs sanitized production-safe DB diagnostics",
     "removed internal Business Engine and Kernel frontend routes",
-    "pinned web dependency versions"
+    "pinned web dependency versions",
+    "Added tenant settings and localization controls",
+    "Added tenant invitation and secure invitation acceptance flow",
+    "Added membership lifecycle and current-session management APIs",
+    "Added capability-based default role templates",
+    "Added branch assignment and database-enforced branch authorization",
+    "Added Administration, Settings and invitation-acceptance web surfaces",
+    "Added Phase 2 identity, tenancy and authorization contract tests"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -37,21 +44,21 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Canonical LEXA Neon foundation for deterministic business intelligence, reporting, product performance, customer patterns, branch performance, and inventory health.",
-  "package_version": "2.5.1",
-  "phase": "1-5 hardening patch",
-  "phase_name": "Production Foundation & Source Convergence",
-  "phase_status": "SOURCE_PATCH_VERIFIED_MANUAL_DEPLOY_REQUIRED",
+  "package_version": "2.6.0",
+  "phase": "2",
+  "phase_name": "Identity, Tenancy & Authorization",
+  "phase_status": "SOURCE_COMPLETE_MANUAL_DEPLOY_REQUIRED",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
     "database": "neondb"
   },
   "phase2_validation": {
-    "temporary_branch_id": "br-withered-thunder-b1699ugo",
-    "parent_branch_id": "br-soft-star-b1dj2m2w",
-    "migration_version": "013_phase2_universal_business_engine",
-    "live_branch_phase2_tables": 10,
-    "live_branch_migration_013": 1
+    "migration_version": "023_phase2_identity_tenancy_authorization_foundation",
+    "disposable_neon_migration": "schema_slice_executed_successfully",
+    "rls_validation": "assigned_branch_visible_cross_tenant_invisible",
+    "production_neon_changed": false,
+    "production_exit_gate": "pending_manual_source_deploy_and_render_readiness"
   },
   "phase3_validation": {
     "temporary_branch_id": "br-nameless-dew-b11k9xo1",
@@ -76,12 +83,12 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": "95 passed",
+    "python_tests": "101 passed",
     "backend_compile": "pass",
     "frontend_contract_tests": "pass",
     "typescript_contract_compile": "pass",
-    "verified_with": "scripts/verify-phase1.sh",
-    "web_build": "pass in Vercel-equivalent build after internal route removal"
+    "web_full_build": "not re-run locally because dependency tree is not installed in working container",
+    "phase2_verification_script": "scripts/verify-phase2.sh"
   },
-  "release": "production-readiness-repair-2.5.1"
+  "release": "identity-tenancy-authorization-2.6.0"
 }

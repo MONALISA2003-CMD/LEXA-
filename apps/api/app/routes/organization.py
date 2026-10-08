@@ -1,10 +1,10 @@
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
-from sqlalchemy.orm import Session
-from ..dependencies import tenant_db, require_permission
-from ..models import Branch, BusinessProfile, Warehouse, Location, PosTerminal
+from ..dependencies import require_permission
+from ..models import Branch, BusinessProfile, Warehouse, Location, PosTerminal, Tenant, TenantSettings
 
 router = APIRouter(prefix="/organization", tags=["organization"])
 
@@ -23,6 +23,21 @@ class LocationIn(BaseModel): name: str; code: str; warehouse_id: UUID
 class LocationOut(ORM): id: UUID; tenant_id: UUID; warehouse_id: UUID; name: str; code: str; status: str
 class PosIn(BaseModel): name: str; code: str; branch_id: UUID
 class PosOut(ORM): id: UUID; tenant_id: UUID; branch_id: UUID; name: str; code: str; status: str
+class TenantSettingsIn(BaseModel):
+    timezone: str = Field(min_length=1, max_length=64)
+    locale: str = Field(min_length=2, max_length=20)
+    business_type: str | None = Field(default=None, max_length=100)
+    industry: str | None = Field(default=None, max_length=100)
+    fiscal_year_start_month: int = Field(default=1, ge=1, le=12)
+class TenantSettingsOut(ORM):
+    tenant_id: UUID; timezone: str; locale: str; business_type: str | None; industry: str | None; fiscal_year_start_month: int
+
+def _validate_timezone(value: str) -> str:
+    try:
+        ZoneInfo(value)
+    except ZoneInfoNotFoundError as exc:
+        raise HTTPException(400, "Invalid IANA timezone") from exc
+    return value
 
 @router.get("/profile", response_model=BusinessProfileOut | None)
 def get_profile(ctx=Depends(require_permission("organization.read"))):
@@ -35,6 +50,29 @@ def create_profile(body: BusinessProfileIn, ctx=Depends(require_permission("orga
     if db.scalar(select(BusinessProfile).where(BusinessProfile.tenant_id == tenant_id)):
         raise HTTPException(409, "Business profile already exists")
     profile = BusinessProfile(tenant_id=tenant_id, **body.model_dump()); db.add(profile); db.commit(); db.refresh(profile); return profile
+
+@router.get("/settings", response_model=TenantSettingsOut)
+def get_settings(ctx=Depends(require_permission("tenant.settings.read"))):
+    db, _, tenant_id, _ = ctx
+    row = db.scalar(select(TenantSettings).where(TenantSettings.tenant_id == tenant_id))
+    if not row:
+        row = TenantSettings(tenant_id=tenant_id); db.add(row); db.commit(); db.refresh(row)
+    return row
+
+@router.put("/settings", response_model=TenantSettingsOut)
+def update_settings(body: TenantSettingsIn, ctx=Depends(require_permission("tenant.settings.manage"))):
+    db, _, tenant_id, _ = ctx
+    _validate_timezone(body.timezone)
+    row = db.scalar(select(TenantSettings).where(TenantSettings.tenant_id == tenant_id))
+    if not row:
+        row = TenantSettings(tenant_id=tenant_id)
+        db.add(row)
+    row.timezone = body.timezone.strip()
+    row.locale = body.locale.strip()
+    row.business_type = body.business_type.strip() if body.business_type else None
+    row.industry = body.industry.strip() if body.industry else None
+    row.fiscal_year_start_month = body.fiscal_year_start_month
+    db.commit(); db.refresh(row); return row
 
 @router.get("/branches", response_model=list[BranchOut])
 def list_branches(ctx=Depends(require_permission("organization.read"))):
