@@ -1,4 +1,4 @@
-# LEXA — Production Hardening v2.8.4
+# LEXA — Production Hardening v2.8.5
 
 LEXA is a real multi-tenant business operating and intelligence system. The canonical business system of record is Neon PostgreSQL project `LEXA`, branch `lexa-live`, database `neondb`.
 
@@ -31,10 +31,14 @@ Vercel serves `apps/web`. Render serves `apps/api`. Neon PostgreSQL is the only 
 
 See `docs/MANUAL_DEPLOY_v2.5.0.md` for the exact manual handoff procedure.
 
-## Phase 0 final auth/RLS increment (v2.8.4)
+## Phase 0 final auth/RLS increment (v2.8.5)
 
 - Cookie refresh now resolves the session through an opaque-token hash lookup, establishes tenant/user context, and rotates under a row lock.
 - `/api/v1/auth/me` is the authoritative identity contract used before the web workspace unlocks.
 - Protected database requests establish both tenant and user context for branch-aware RLS.
 - Migration 028 hardens empty RLS context and assigns a least-privilege Member role only to active memberships that currently have no role. Apply it only after checking the canonical Neon migration ledger.
-- Full production build and live auth smoke test remain deployment gates.
+- Readiness in this source package verifies migration 028 and its SECURITY DEFINER refresh lookup before reporting healthy.
+- Migration 028 was promoted to canonical Neon branch `lexa-live` after explicit approval. The live ledger row, lookup function, `lexa_app` grant, SECURITY DEFINER/RLS owner properties, and safe tenant policy expressions were verified after promotion.
+- Render logs confirmed the screenshot path: `/api/v1/auth/refresh` returned 500 because the lookup function was missing before migration 028. The previously failed refresh hash now resolves to one unrevoked, unexpired session through the new function.
+- Full browser/API acceptance is still pending. Render’s live `healthCheckPath` is blank while `render.yaml` declares `/ready`, and GitHub `main` still has the older health-readiness check. The Vercel `lexa-green.vercel.app` production deployment and both API-origin variables match the Render API and same commit, but the newly added readiness guard is not yet deployed. No repo write or application deployment was performed here; deploy this reviewed ZIP and verify the live browser/API flow before declaring Phase 0 complete.
+- See `LEXA_E2E_FORENSIC_AUDIT_2026-10-13.md` for the full evidence trail and exact acceptance checklist.

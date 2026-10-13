@@ -32,7 +32,7 @@ def test_production_configuration_is_fail_closed():
 def test_browser_session_restoration_uses_refresh_cookie_not_persistent_access_token():
     api = API.read_text()
     assert "restoreSession" in api
-    assert 'credentials: "same-origin"' in api
+    assert 'credentials: "include"' in api
     assert 'sessionStorage.getItem("lexa_access_token")' not in api
     assert 'sessionStorage.setItem("lexa_access_token"' not in api
 

@@ -55,9 +55,13 @@ def test_registration_hardening_migration_is_additive():
 def test_proxy_keeps_internal_diagnostics_out_of_browser_responses():
     proxy = ROOT / "apps/web/app/api/lexa/[...path]/route.ts"
     source = proxy.read_text()
-    assert 'response.headers.get("x-request-id")' not in source
-    assert 'out.headers.set("x-request-id", responseRequestId)' not in source
+    # Correlation IDs are intentionally exposed, but exception details are not.
+    assert 'response.headers.get("x-request-id")' in source
+    assert 'out.headers.set("x-request-id", responseRequestId)' in source
     assert 'response.status >= 500' in source
     assert 'LEXA is temporarily unavailable. Please try again shortly.' in source
+    assert 'responseRequestId || null' in source
+    assert 'traceback' not in source.lower()
+    assert 'exception_message' not in source
 
 

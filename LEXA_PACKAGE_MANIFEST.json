@@ -1,6 +1,6 @@
 {
   "package": "LEXA Production Hardening & Convergence",
-  "version": "2.8.4",
+  "version": "2.8.5",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -50,7 +50,15 @@
     "Added correlated server-side tracebacks and request-id-preserving Vercel proxy behavior",
     "Preserved multiple Set-Cookie headers through the Vercel API proxy",
     "Session restoration verifies current identity before unlocking business modules",
-    "Logout uses the same tenant-safe lookup; stale concurrent refresh-token rotations are rejected"
+    "Logout uses the same tenant-safe lookup; stale concurrent refresh-token rotations are rejected",
+    "Audited canonical Neon branch and confirmed migration 028 and the auth refresh lookup function are absent from the live ledger/schema at audit time",
+    "Readiness now verifies the auth migration, security-definer refresh lookup function, lexa_app execute privilege, and RLS-bypassing function owner",
+    "Hardened the 12 observed raw tenant-context RLS policies to use NULLIF on empty transaction-local tenant settings",
+    "Updated stale frontend/backend regression contracts and added auth-schema readiness contract checks",
+    "Added end-to-end forensic audit with production rollout gates and explicit unverified-deployment limitations",
+    "Promoted migration 028 to canonical Neon lexa-live after explicit approval; validated lookup function, grant, SECURITY DEFINER owner and hardened RLS predicates after promotion",
+    "Used the confirmed Render My Workspace LEXA service logs to identify the exact missing-function cause for auth refresh HTTP 500",
+    "Updated forensic report and manual rollout notes with production verification and outstanding deployment drift"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -60,10 +68,10 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Canonical LEXA Neon foundation for deterministic business intelligence, reporting, product performance, customer patterns, branch performance, and inventory health.",
-  "package_version": "2.8.2",
+  "package_version": "2.8.5",
   "phase": "0 reliability and deployment",
   "phase_name": "Authentication, Session and Build Reliability",
-  "phase_status": "PHASE0_SOURCE_REPAIR_PENDING_PRODUCTION_BUILD_VERIFICATION",
+  "phase_status": "PHASE0_MIGRATION_028_APPLIED_RENDER_ROOT_CAUSE_CONFIRMED_APP_DEPLOY_AND_BROWSER_SMOKE_PENDING",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -99,16 +107,17 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": "10 passed; 1 skipped because optional API test dependencies are unavailable in this environment",
+    "python_tests": "97 passed, 1 skipped; optional API test dependency unavailable in sandbox",
     "backend_compile": "pass: python -m compileall -q apps/api/app apps/api/tests",
     "frontend_contract_tests": "pass: 2 Node test files, 0 failures",
-    "typescript_syntax_transpile": "pass: 27 frontend TS/TSX files, 0 syntax errors",
-    "web_build": "not run locally: dependency-backed Next.js production build must be confirmed by Vercel after deploy",
-    "live_auth_smoke": "pending deployment after migration 028",
-    "migration": "028_phase0_auth_rls_runtime_hardening; additive; verify live ledger before applying",
-    "release": "phase-0-final-auth-rls-2.8.4",
-    "release_name": "phase-0-final-auth-session-authorization-runtime-hardening"
+    "typescript_syntax_transpile": "pass: 26 frontend TS/TSX non-declaration files checked, 0 syntax errors",
+    "web_build": "not run locally: internet/dependency-backed production build unavailable in this environment",
+    "live_auth_smoke": "pending authenticated browser/API smoke test; Render logs confirmed the missing refresh lookup function; the failed request hash now resolves through the live lookup after migration 028",
+    "migration": "028_phase0_auth_rls_runtime_hardening applied to canonical branch br-soft-star-b1dj2m2w (lexa-live); verified migration row, single lookup function, lexa_app EXECUTE grant, SECURITY DEFINER, owner BYPASSRLS, fake token returns zero rows, previously failed request hash resolves to one valid session, and zero raw tenant-context predicates",
+    "release": "phase0-e2e-auth-readiness-2.8.5-live-migration-verified",
+    "release_name": "phase-0-e2e-auth-readiness-and-live-schema-audit",
+    "deployment": "Vercel lexa-green.vercel.app production deployment READY on commit fd59d989a8c4ecc3c6a3689dbc2ece315376f34b, matching Render LEXA deployment; LEXA_API_URL and NEXT_PUBLIC_API_URL both target https://lexa-n10e.onrender.com; current deployed main still has older readiness code; live Render healthCheckPath is blank; Vercel runtime-error read returned 403; no source push or application deploy made"
   },
-  "release": "phase-0-final-auth-rls-2.8.4",
-  "release_name": "phase-0-final-auth-session-authorization-runtime-hardening"
+  "release": "phase0-e2e-auth-readiness-2.8.5-live-migration-verified",
+  "release_name": "phase-0-e2e-auth-readiness-with-live-migration-verification"
 }

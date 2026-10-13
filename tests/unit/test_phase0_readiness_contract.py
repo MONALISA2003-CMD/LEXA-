@@ -65,3 +65,13 @@ def test_readiness_requires_phase2_universal_business_engine_schema():
         "workflow_step_runs",
     ):
         assert f'"{table}"' in health
+
+
+def test_readiness_requires_auth_refresh_migration_and_safe_function():
+    health = HEALTH.read_text()
+    assert 'REQUIRED_AUTH_MIGRATION = "028_phase0_auth_rls_runtime_hardening"' in health
+    assert 'REQUIRED_AUTH_FUNCTION = "public.lexa_find_session_by_refresh_hash(text)"' in health
+    assert "to_regprocedure(:required_function) IS NOT NULL" in health
+    assert "app_role_can_execute" in health
+    assert "function_owner_bypasses_rls" in health
+    assert '"LEXA_AUTH_SCHEMA_NOT_READY"' in health

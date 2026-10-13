@@ -1,1 +1,1 @@
-LEXA v2.8.4 — Phase 0 final auth/RLS/runtime hardening
+LEXA v2.8.5 — E2E auth readiness; live migration 028 verified; app deployment/smoke test pending

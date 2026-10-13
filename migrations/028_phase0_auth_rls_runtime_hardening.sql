@@ -6,60 +6,63 @@ RETURNS TABLE(session_id uuid, tenant_id uuid, user_id uuid)
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path TO 'pg_catalog', 'public'
-AS $function$
-  SELECT s.id, s.tenant_id, s.user_id
-  FROM public.sessions AS s
-  WHERE s.refresh_token_hash = p_hash
-    AND s.revoked_at IS NULL
-    AND s.expires_at > now()
-  LIMIT 1;
-$function$;
+AS 'SELECT s.id, s.tenant_id, s.user_id
+    FROM public.sessions AS s
+    WHERE s.refresh_token_hash = p_hash
+      AND s.revoked_at IS NULL
+      AND s.expires_at > now()
+    LIMIT 1';
 
 REVOKE ALL ON FUNCTION public.lexa_find_session_by_refresh_hash(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.lexa_find_session_by_refresh_hash(text) TO lexa_app;
 
 -- Existing policies that cast an empty custom GUC directly to UUID can turn
--- a missing context into an internal 500. NULLIF makes absence fail closed.
-DO $migration$
-DECLARE
-  p record;
-  fixed_using text;
-  fixed_check text;
-BEGIN
-  FOR p IN
-    SELECT schemaname, tablename, policyname, qual, with_check
-    FROM pg_policies
-    WHERE schemaname = 'public'
-      AND (COALESCE(qual, '') LIKE '%current_setting(%'
-        OR COALESCE(with_check, '') LIKE '%current_setting(%')
-  LOOP
-    fixed_using := p.qual;
-    fixed_check := p.with_check;
-    IF fixed_using IS NOT NULL THEN
-      fixed_using := replace(fixed_using,
-        'current_setting(''app.tenant_id''::text, true)',
-        'NULLIF(current_setting(''app.tenant_id''::text, true), ''''::text)');
-      fixed_using := replace(fixed_using,
-        'current_setting(''app.user_id''::text, true)',
-        'NULLIF(current_setting(''app.user_id''::text, true), ''''::text)');
-    END IF;
-    IF fixed_check IS NOT NULL THEN
-      fixed_check := replace(fixed_check,
-        'current_setting(''app.tenant_id''::text, true)',
-        'NULLIF(current_setting(''app.tenant_id''::text, true), ''''::text)');
-      fixed_check := replace(fixed_check,
-        'current_setting(''app.user_id''::text, true)',
-        'NULLIF(current_setting(''app.user_id''::text, true), ''''::text)');
-    END IF;
-    IF fixed_using IS DISTINCT FROM p.qual THEN
-      EXECUTE format('ALTER POLICY %I ON %I.%I USING (%s)', p.policyname, p.schemaname, p.tablename, fixed_using);
-    END IF;
-    IF fixed_check IS DISTINCT FROM p.with_check THEN
-      EXECUTE format('ALTER POLICY %I ON %I.%I WITH CHECK (%s)', p.policyname, p.schemaname, p.tablename, fixed_check);
-    END IF;
-  END LOOP;
-END;
-$migration$;
+-- a missing context into an internal 500. Normalize the known Phase 0 policies
+-- directly and safely re-run them.
+ALTER POLICY audit_logs_isolation ON public.audit_logs
+  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+ALTER POLICY business_profiles_tenant_isolation ON public.business_profiles
+  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+ALTER POLICY devices_tenant_isolation ON public.devices
+  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+ALTER POLICY event_consumptions_tenant_isolation ON public.event_consumptions
+  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+ALTER POLICY idempotency_records_tenant_isolation ON public.idempotency_records
+  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+ALTER POLICY locations_tenant_isolation ON public.locations
+  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+ALTER POLICY membership_roles_tenant_isolation ON public.membership_roles
+  USING (EXISTS (SELECT 1 FROM public.tenant_memberships m
+    WHERE m.id = membership_roles.membership_id
+      AND m.tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.tenant_memberships m
+    WHERE m.id = membership_roles.membership_id
+      AND m.tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid));
+ALTER POLICY outbox_events_tenant_isolation ON public.outbox_events
+  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+ALTER POLICY role_permissions_tenant_isolation ON public.role_permissions
+  USING (EXISTS (SELECT 1 FROM public.roles r
+    WHERE r.id = role_permissions.role_id
+      AND r.tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.roles r
+    WHERE r.id = role_permissions.role_id
+      AND r.tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid));
+ALTER POLICY roles_tenant_isolation ON public.roles
+  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+ALTER POLICY sessions_tenant_isolation ON public.sessions
+  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+ALTER POLICY tenant_memberships_isolation ON public.tenant_memberships
+  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
 
 -- Active memberships without a role can authenticate but otherwise hit 403s
 -- across every module. Give only those memberships a least-privilege Member

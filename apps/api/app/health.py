@@ -6,6 +6,8 @@ from .db import engine
 from .config import settings
 
 EXPECTED_DATABASE = "neondb"
+REQUIRED_AUTH_MIGRATION = "028_phase0_auth_rls_runtime_hardening"
+REQUIRED_AUTH_FUNCTION = "public.lexa_find_session_by_refresh_hash(text)"
 logger = logging.getLogger("lexa.health")
 REQUIRED_TABLES = (
     "schema_migrations",
@@ -118,6 +120,47 @@ def check_database() -> tuple[bool, str | dict[str, object] | None]:
                         "missing_tables": missing,
                     }
                 return False, "LEXA_SCHEMA_NOT_READY"
+
+            # A reachable database and all expected tables are not sufficient:
+            # the API cannot restore a cookie-backed session unless the auth
+            # lookup migration is installed, executable by lexa_app, and owned
+            # by a SECURITY DEFINER role that bypasses RLS.
+            auth_contract = connection.execute(
+                text("""
+                    SELECT
+                        EXISTS (
+                            SELECT 1 FROM public.schema_migrations
+                            WHERE version = :required_migration
+                        ) AS migration_present,
+                        to_regprocedure(:required_function) IS NOT NULL AS function_present,
+                        COALESCE(
+                            has_function_privilege(
+                                'lexa_app', to_regprocedure(:required_function), 'EXECUTE'
+                            ), false
+                        ) AS app_role_can_execute,
+                        EXISTS (
+                            SELECT 1
+                            FROM pg_proc p
+                            JOIN pg_roles owner_role ON owner_role.oid = p.proowner
+                            WHERE p.oid = to_regprocedure(:required_function)
+                              AND p.prosecdef
+                              AND owner_role.rolbypassrls
+                        ) AS function_owner_bypasses_rls
+                """),
+                {
+                    "required_migration": REQUIRED_AUTH_MIGRATION,
+                    "required_function": REQUIRED_AUTH_FUNCTION,
+                },
+            ).mappings().one()
+            if not all(bool(auth_contract[key]) for key in (
+                "migration_present", "function_present", "app_role_can_execute", "function_owner_bypasses_rls"
+            )):
+                if settings.app_env.strip().lower() != "production":
+                    return False, {
+                        "code": "LEXA_AUTH_SCHEMA_NOT_READY",
+                        **{key: bool(auth_contract[key]) for key in auth_contract},
+                    }
+                return False, "LEXA_AUTH_SCHEMA_NOT_READY"
 
         return True, None
     except Exception as exc:
