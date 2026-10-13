@@ -23,18 +23,21 @@ export default function HomePage() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [readiness, setReadiness] = useState("checking");
   const [busy, setBusy] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [message, setMessage] = useState("");
 
   async function load() {
-    setBusy(true); setMessage("");
+    setBusy(true); setLoadError(false); setMessage("");
     try {
       const [d, a, b, adj, cnt, tr, r] = await Promise.all([
         getCommerceDashboard(today()), getAnalyticsOverview(monthStart(), today()), getInventoryBalances(),
         getAdjustments(), getStockCounts(), getTransfers(), getReadiness(),
       ]);
       setDashboard(d); setAnalytics(a); setBalances(b); setAdjustments(adj); setCounts(cnt); setTransfers(tr); setReadiness(r.status);
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to load the Command Centre."); }
-    finally { setBusy(false); }
+    } catch (error) {
+      setLoadError(true);
+      setMessage(error instanceof Error ? error.message : "Unable to load the Command Centre.");
+    } finally { setBusy(false); }
   }
 
   useEffect(() => { void load(); }, []);
@@ -62,17 +65,17 @@ export default function HomePage() {
     <section className="home-status-row"><span className={`status ${readiness === "ready" || readiness === "ok" ? "good" : "warn"}`}>● {readiness === "ready" || readiness === "ok" ? "Workspace ready" : "Dependency attention"}</span><span>Today · {today()}</span></section>
 
     <div className="command-kpis">
-      <div className="command-kpi"><span>Today's sales</span><strong>{busy ? "—" : money(dashboard?.sales.sales || 0)}</strong><small>{busy ? "Loading authoritative state" : dashboard?.sales.credit ? `Credit ${money(dashboard.sales.credit)}` : "Completed sales"}</small></div>
-      <div className="command-kpi"><span>Collected</span><strong>{busy ? "—" : money(dashboard?.sales.collected || 0)}</strong><small>{busy ? "Loading authoritative state" : "Recorded payments"}</small></div>
-      <div className="command-kpi"><span>Month-to-date net sales</span><strong>{busy ? "—" : money(analytics?.totals.net_sales || 0)}</strong><small>{busy ? "Loading authoritative state" : `${analytics?.totals.sale_count || 0} completed sales`}</small></div>
-      <div className="command-kpi"><span>Inventory value</span><strong>{busy ? "—" : money(balances.reduce((sum, row) => sum + Number(row.stock_value), 0))}</strong><small>{busy ? "Loading authoritative state" : `${balances.length} balance rows`}</small></div>
+      <div className="command-kpi"><span>Today's sales</span><strong>{busy ? "—" : loadError || !dashboard ? "Unavailable" : money(dashboard.sales.sales)}</strong><small>{busy ? "Loading authoritative state" : loadError || !dashboard ? "Business data could not be loaded" : dashboard.sales.credit ? `Credit ${money(dashboard.sales.credit)}` : "Completed sales"}</small></div>
+      <div className="command-kpi"><span>Collected</span><strong>{busy ? "—" : loadError || !dashboard ? "Unavailable" : money(dashboard.sales.collected)}</strong><small>{busy ? "Loading authoritative state" : loadError || !dashboard ? "Business data could not be loaded" : "Recorded payments"}</small></div>
+      <div className="command-kpi"><span>Month-to-date net sales</span><strong>{busy ? "—" : loadError || !analytics ? "Unavailable" : money(analytics.totals.net_sales)}</strong><small>{busy ? "Loading authoritative state" : loadError || !analytics ? "Business data could not be loaded" : `${analytics.totals.sale_count} completed sales`}</small></div>
+      <div className="command-kpi"><span>Inventory value</span><strong>{busy ? "—" : loadError ? "Unavailable" : money(balances.reduce((sum, row) => sum + Number(row.stock_value), 0))}</strong><small>{busy ? "Loading authoritative state" : loadError ? "Business data could not be loaded" : `${balances.length} balance rows`}</small></div>
     </div>
 
     <div className="command-grid">
-      <section className="panel command-panel"><div className="panel-head"><div><p className="eyebrow">NEEDS ATTENTION</p><h2>Actions worth opening now</h2></div><Link href="/inventory" className="panel-link">Open inventory →</Link></div><div className="attention-list">{busy ? <div className="loading-placeholder">Loading operational exceptions…</div> : attention.length ? attention.map((item, i) => <Link href={item.href} className="attention-row" key={`${item.title}-${i}`}><span className={`attention-dot ${item.tone}`}/><div><strong>{item.title}</strong><small>{item.detail}</small></div><span>›</span></Link>) : <div className="empty-state compact"><strong>Nothing urgent</strong><span>LEXA has no immediate operational exceptions in the loaded workspace.</span></div>}</div></section>
-      <section className="panel command-panel"><div className="panel-head"><div><p className="eyebrow">TODAY'S WORK</p><h2>Operational queue</h2></div></div><div className="work-list">{openWork.map(item=><Link className="work-card" href={item.href} key={item.label}><strong>{busy ? "—" : item.value}</strong><span>{item.label}</span><small>Open →</small></Link>)}</div></section>
+      <section className="panel command-panel"><div className="panel-head"><div><p className="eyebrow">NEEDS ATTENTION</p><h2>Actions worth opening now</h2></div><Link href="/inventory" className="panel-link">Open inventory →</Link></div><div className="attention-list">{busy ? <div className="loading-placeholder">Loading operational exceptions…</div> : loadError ? <div className="empty-state compact"><strong>Exceptions unavailable</strong><span>LEXA could not verify operational data. Refresh to try again.</span></div> : attention.length ? attention.map((item, i) => <Link href={item.href} className="attention-row" key={`${item.title}-${i}`}><span className={`attention-dot ${item.tone}`}/><div><strong>{item.title}</strong><small>{item.detail}</small></div><span>›</span></Link>) : <div className="empty-state compact"><strong>Nothing urgent</strong><span>LEXA has no immediate operational exceptions in the loaded workspace.</span></div>}</div></section>
+      <section className="panel command-panel"><div className="panel-head"><div><p className="eyebrow">TODAY'S WORK</p><h2>Operational queue</h2></div></div><div className="work-list">{openWork.map(item=><Link className="work-card" href={item.href} key={item.label}><strong>{busy ? "—" : loadError ? "Unavailable" : item.value}</strong><span>{item.label}</span><small>Open →</small></Link>)}</div></section>
     </div>
 
-    <div className="command-grid"><section className="panel command-panel"><div className="panel-head"><div><p className="eyebrow">BUSINESS SIGNAL</p><h2>Daily movement</h2></div><Link href="/reports" className="panel-link">Reports →</Link></div><div className="signal-grid">{busy ? <div className="loading-placeholder">Loading business movement…</div> : analytics?.daily.slice(-7).map(day=><div className="signal-row" key={day.business_date}><span>{day.business_date}</span><strong>{money(day.net_sales)}</strong><small>{money(day.payments_collected)} collected</small></div>)}</div></section><section className="panel command-panel"><div className="panel-head"><div><p className="eyebrow">FAST PATHS</p><h2>Open a workspace</h2></div></div><div className="quick-links"><Link href="/products">Products <small>SKUs · barcodes · prices</small></Link><Link href="/inventory">Inventory <small>Stock · ledger · counts · transfers</small></Link><Link href="/sales">Sales <small>POS · payments · returns</small></Link><Link href="/accounting">Finance <small>Accounts · journals · reporting</small></Link></div></section></div>
+    <div className="command-grid"><section className="panel command-panel"><div className="panel-head"><div><p className="eyebrow">BUSINESS SIGNAL</p><h2>Daily movement</h2></div><Link href="/reports" className="panel-link">Reports →</Link></div><div className="signal-grid">{busy ? <div className="loading-placeholder">Loading business movement…</div> : loadError || !analytics ? <div className="empty-state compact"><strong>Business movement unavailable</strong><span>The reporting data did not load. Refresh to try again.</span></div> : analytics.daily.length ? analytics.daily.slice(-7).map(day=><div className="signal-row" key={day.business_date}><span>{day.business_date}</span><strong>{money(day.net_sales)}</strong><small>{money(day.payments_collected)} collected</small></div>) : <div className="empty-state compact"><strong>No recorded movement</strong><span>No completed transactions were found for this reporting window.</span></div>}</div></section><section className="panel command-panel"><div className="panel-head"><div><p className="eyebrow">FAST PATHS</p><h2>Open a workspace</h2></div></div><div className="quick-links"><Link href="/products">Products <small>SKUs · barcodes · prices</small></Link><Link href="/inventory">Inventory <small>Stock · ledger · counts · transfers</small></Link><Link href="/sales">Sales <small>POS · payments · returns</small></Link><Link href="/accounting">Finance <small>Accounts · journals · reporting</small></Link></div></section></div>
   </AppShell>;
 }

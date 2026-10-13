@@ -17,7 +17,7 @@ echo "[2/5] Backend + Phase 0 tests"
 python -m pytest -q
 
 echo "[3/5] Frontend static contracts"
-node --test apps/web/tests/visible-product-contract.test.mjs
+node --test apps/web/tests/*.test.mjs
 
 echo "[4/5] Shell syntax"
 bash -n scripts/verify-phase0.sh

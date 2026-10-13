@@ -1,1 +1,1 @@
-LEXA v2.8.1 — Frontend Build Repair
+LEXA v2.8.2 — Phase 0 reliability repair

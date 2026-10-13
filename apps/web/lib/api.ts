@@ -47,9 +47,22 @@ function friendlyMessage(status: number, payload: unknown): string {
 }
 
 let accessToken: string | null = null;
+let refreshInFlight: Promise<AuthResponse> | null = null;
 export function setAccessToken(token: string | null) { accessToken = token; }
 
+function requiresSession(path: string): boolean {
+  if (/^\/(health|ready)$/.test(path)) return false;
+  if (/^\/api\/v1\/auth\/(login|register|refresh|logout)$/.test(path)) return false;
+  return true;
+}
+
 async function getJson<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
+  // Protected pages often mount several data loaders at once. Restore the
+  // cookie-backed session before sending those requests so they do not all
+  // race into 401 -> refresh, and so failed auth never looks like empty data.
+  if (!accessToken && requiresSession(path)) {
+    await refreshSession();
+  }
   const auth = accessToken;
   const headers: HeadersInit = { Accept: "application/json", ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(init?.headers || {}) };
   const method = (init?.method || "GET").toUpperCase();
@@ -79,10 +92,9 @@ async function getJson<T>(path: string, init?: RequestInit, retried = false): Pr
   let payload: unknown = null;
   try { payload = text ? JSON.parse(text) : null; } catch { payload = text; }
   if (!response.ok) {
-    if (response.status === 401 && !retried && path !== "/api/v1/auth/login" && path !== "/api/v1/auth/refresh" && path !== "/api/v1/auth/logout") {
+    if (response.status === 401 && !retried && path !== "/api/v1/auth/login" && path !== "/api/v1/auth/refresh" && path !== "/api/v1/auth/logout" && path !== "/api/v1/auth/register") {
       try {
-        const refreshed = await getJson<{access_token:string}>("/api/v1/auth/refresh", { method:"POST", headers:{"Content-Type":"application/json"} }, true);
-        accessToken = refreshed.access_token;
+        await refreshSession();
         return getJson<T>(path, init, true);
       } catch {
         accessToken = null;
@@ -155,14 +167,35 @@ export function completeTransfer(id:string) { return getJson<{id:string;status:s
 export type LoginRequest = { email: string; password: string; tenant_id?: string; };
 export type AuthResponse = { access_token: string; token_type: string; session_id: string; tenant_id: string; tenant_name: string };
 export type RegisterResponse = { user_id: string; tenant_id: string };
+
+/**
+ * Refresh via the HttpOnly cookie. Share the promise across simultaneous page
+ * loaders so refresh-token rotation only happens once at a time.
+ */
+function refreshSession(): Promise<AuthResponse> {
+  if (!refreshInFlight) {
+    refreshInFlight = getJson<AuthResponse>("/api/v1/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    }, true)
+      .then((response) => {
+        setAccessToken(response.access_token);
+        return response;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
+
 export async function login(body: LoginRequest) { const response = await getJson<AuthResponse>("/api/v1/auth/login", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }); setAccessToken(response.access_token); return response; }
 export function register(body: { email:string; password:string; tenant_name:string }) { return getJson<RegisterResponse>("/api/v1/auth/register", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
 
 export async function restoreSession() {
   try {
-    const response = await getJson<AuthResponse>("/api/v1/auth/refresh", { method:"POST", headers:{"Content-Type":"application/json"} }, true);
-    setAccessToken(response.access_token);
-    return response;
+    return await refreshSession();
   } catch (error) {
     setAccessToken(null);
     if (error instanceof ApiError && error.status === 401) return null;

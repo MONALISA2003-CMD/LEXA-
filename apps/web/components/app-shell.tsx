@@ -27,12 +27,14 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
   const router = useRouter();
   const [session, setSession] = useState<AuthResponse | null>(null);
   const [authState, setAuthState] = useState<"checking" | "ready" | "signed_out" | "unavailable">("checking");
+  const [authAttempt, setAuthAttempt] = useState(0);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
+    setAuthState("checking");
     void restoreSession().then((value) => {
       if (!active) return;
       setSession(value);
@@ -42,7 +44,7 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
       if (active) setAuthState("unavailable");
     });
     return () => { active = false; };
-  }, [router]);
+  }, [router, authAttempt]);
   useEffect(() => { setOpen(false); }, [pathname]);
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -56,7 +58,22 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  async function signOut() { await logout(); router.replace("/login"); }
+  function retrySession() {
+    setAuthState("checking");
+    setAuthAttempt((attempt) => attempt + 1);
+  }
+
+  async function signOut() {
+    try {
+      await logout();
+    } catch {
+      // Signing out locally must remain possible when the API is unreachable.
+    } finally {
+      setSession(null);
+      setAuthState("signed_out");
+      router.replace("/login");
+    }
+  }
   function submitSearch(event?: { preventDefault(): void }) {
     event?.preventDefault();
     const q = search.trim();
@@ -83,7 +100,7 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
       <div className="app-brand"><span className="app-brand-mark">L</span><div><strong>LEXA</strong><small>Business workspace</small></div></div>
       <div className="workspace-switch"><small>WORKSPACE</small><strong>{session?.tenant_name || "Your business"}</strong><span>⌄</span></div>
       <nav className="app-nav">{nav(primary)}<div className="nav-divider" />{nav(secondary)}</nav>
-      <div className="sidebar-foot"><span className="status-dot" /> Online<span className="sidebar-version">v2.8</span></div>
+      <div className="sidebar-foot"><span className={`status-dot ${authState === "ready" ? "" : "warning"}`} /> {authState === "ready" ? "Session active" : authState === "checking" ? "Checking session" : authState === "signed_out" ? "Signed out" : "Connection issue"}<span className="sidebar-version">v2.8</span></div>
     </aside>
     {open && <button aria-label="Close navigation" className="app-scrim" onClick={() => setOpen(false)} />}
     <main className="app-main">
@@ -103,9 +120,18 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
         </div>
       </div>}
       <section className="app-content">
-        {authState === "unavailable" && <div className="workspace-banner attention"><span className="banner-icon">!</span><div><strong>LEXA is temporarily unavailable</strong><p>Your session could not be checked because the application service is unavailable. No transaction has been reported as complete.</p></div></div>}
-        {(title || eyebrow) && <div className="page-heading"><div>{eyebrow && <div className="page-eyebrow">{eyebrow}</div>}<h1>{title}</h1></div><div className="page-context"><span className="status-dot" /> Live workspace</div></div>}
-        {children}
+        {authState !== "ready" ? (
+          <div className="workspace-section" role={authState === "unavailable" ? "alert" : "status"} aria-live="polite">
+            {authState === "checking" && <><span className="section-label">SECURE SESSION</span><h2>Checking your workspace…</h2><p>We’re confirming your sign-in before loading business records.</p></>}
+            {authState === "signed_out" && <><span className="section-label">SIGN IN REQUIRED</span><h2>Your session has ended</h2><p>Returning you to sign in. You can also open the sign-in page directly.</p><Link className="text-link" href="/login">Go to sign in</Link></>}
+            {authState === "unavailable" && <><span className="section-label">CONNECTION ISSUE</span><h2>LEXA could not verify your session</h2><p>Your business records have not been reported as changed. Check your connection and retry; we won’t show stale values as if they were current.</p><div className="header-actions"><button type="button" className="button button-soft" onClick={retrySession}>Retry connection</button><Link className="button button-soft" href="/login">Return to sign in</Link></div></>}
+          </div>
+        ) : (
+          <>
+            {(title || eyebrow) && <div className="page-heading"><div>{eyebrow && <div className="page-eyebrow">{eyebrow}</div>}<h1>{title}</h1></div><div className="page-context"><span className="status-dot" /> Live workspace</div></div>}
+            {children}
+          </>
+        )}
       </section>
     </main>
     <nav className="mobile-nav">{primary.slice(0,5).map(([href,label,icon]) => <Link key={href} href={href} className={pathname === href ? "active" : ""}><span>{icon}</span><small>{label}</small></Link>)}</nav>

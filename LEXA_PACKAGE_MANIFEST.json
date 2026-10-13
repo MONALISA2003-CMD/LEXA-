@@ -1,6 +1,6 @@
 {
   "package": "LEXA Production Hardening & Convergence",
-  "version": "2.8.1",
+  "version": "2.8.2",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -40,7 +40,9 @@
     "added idempotent variant update, barcode creation, price-list creation and price creation contracts",
     "added Phase 3.5 workspace convergence and inventory operations implementation contract",
     "Replaced the orphaned invitation-acceptance UI with a safe unavailable state because the backend has no invitation endpoint; added a regression contract and clarified the Vercel apps/web root.",
-    "Added an explicit, safety-bounded cleanup script for obsolete user-facing Business Engine/Kernel web routes and the generated TypeScript build cache."
+    "Added an explicit, safety-bounded cleanup script for obsolete user-facing Business Engine/Kernel web routes and the generated TypeScript build cache.",
+    "Phase 0: allow cookie-only refresh requests, use single-flight browser refresh, restore sessions before protected reads, gate workspace UI until session verification, and show unavailable dashboard values on failed reads.",
+    "Standardized Next.js build command in apps/web/vercel.json and included a ZIP deletion manifest for obsolete frontend-only routes so the repository ZIP extractor removes them from existing checkouts."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -50,10 +52,10 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Canonical LEXA Neon foundation for deterministic business intelligence, reporting, product performance, customer patterns, branch performance, and inventory health.",
-  "package_version": "2.8.1",
-  "phase": "3.5 workspace convergence and operational depth",
-  "phase_name": "Workspace Convergence & Inventory Operations",
-  "phase_status": "FRONTEND_IMPORT_REPAIR_VERIFIED_MANUAL_DEPLOY_REQUIRED",
+  "package_version": "2.8.2",
+  "phase": "0 reliability and deployment",
+  "phase_name": "Authentication, Session and Build Reliability",
+  "phase_status": "PHASE0_SOURCE_REPAIR_PENDING_PRODUCTION_BUILD_VERIFICATION",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -89,20 +91,21 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": 96,
-    "backend_compile": "pass",
-    "frontend_contract_tests": "pass after invitation-route regression coverage",
-    "typescript_syntax_transpile": "pass for 25 frontend ts/tsx files",
-    "verified_with": "scripts/verify-phase3.sh",
-    "web_build": "not run in local sandbox; node dependency tree unavailable and Vercel sandbox creation denied",
+    "python_tests": "96 passed; 1 skipped (cookie-only TestClient test skipped locally because FastAPI API dependencies are missing; run after pip install -e apps/api[dev])",
+    "backend_compile": "pass: python -m compileall -q apps/api/app apps/api/tests",
+    "frontend_contract_tests": "pass: 2 Node test files, 0 failures",
+    "typescript_syntax_transpile": "pass: 26 frontend TS/TSX files, 0 syntax errors (global TypeScript transpile parser)",
+    "verified_with": "scripts/verify-phase0.sh",
+    "web_build": "not run locally: npm registry unavailable in this environment; Vercel must confirm dependency-backed typecheck/build after push",
     "phase3_ui_routes": "apps/web/app/products/page.tsx; apps/web/app/inventory/page.tsx; apps/web/components/app-shell.tsx",
     "workspace_routes": "home; sales; inventory; purchasing; customers; products; accounting; reports; compliance; intelligence; administration; settings",
-    "web_typecheck": "not run in local sandbox; dependencies intentionally not reinstalled",
+    "web_typecheck": "not run: npm dependencies could not be installed in local environment",
     "workspace_route_contract": "pass",
-    "full_next_build": "not completed: npm install timed out in local container; Vercel sandbox creation denied (403)",
+    "full_next_build": "pending Vercel confirmation after ZIP extraction/push",
     "invite_route": "safe unavailable state; no unresolved acceptInvitation import",
-    "web_route_cleanup": "script included; run manually and review deletions before commit"
+    "web_route_cleanup": "obsolete apps/web/app/business-engine and apps/web/app/kernel paths included in the archive deletion manifest; script is also supplied for local checkout cleanup",
+    "session_refresh_contract": "frontend session preflight + single-flight refresh + cookie-only API body contract covered by source checks; live request/response must be verified after deploy"
   },
-  "release": "frontend-build-repair-2.8.1",
-  "release_name": "frontend-build-repair"
+  "release": "phase-0-reliability-2.8.2",
+  "release_name": "phase-0-auth-session-build-reliability"
 }

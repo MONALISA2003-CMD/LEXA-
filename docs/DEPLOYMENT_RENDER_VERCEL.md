@@ -31,7 +31,7 @@ Create a Next.js project from the same repository:
 - Install Command: auto-detected from `apps/web/package.json`
 - Output Directory: auto-detected
 
-The currently configured temporary command `rm -rf app/business-engine app/kernel && npm run build` is relative to this `apps/web` root. It is a workaround for legacy technical route folders that should not be user-facing. Before promoting this source, run `bash scripts/cleanup-obsolete-frontend-routes.sh` from the repository root, review the resulting deletions, and commit them; then set Build Command to the standard `npm run build`. The cleanup script only removes the obsolete web route folders and generated TypeScript build cache, not backend routes or data. The recent `acceptInvitation` failure is separate: the invite page referenced an API export and backend endpoint that do not exist in this source contract.
+The source includes `apps/web/vercel.json` with `buildCommand: npm run build`, which overrides the obsolete dashboard shell command. The obsolete Business Engine and Kernel frontend route modules are removed from this increment; the backend infrastructure is not removed. The cleanup script remains available for existing checkouts, but is no longer required by the Vercel build.
 
 Set `NEXT_PUBLIC_API_URL` to the exact HTTPS URL of the Render API, for example:
 

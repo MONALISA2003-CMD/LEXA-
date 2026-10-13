@@ -321,8 +321,8 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
 
 
 @router.post("/refresh")
-def refresh(body: RefreshRequest, request: Request, response: Response, db: Session = Depends(get_db)):
-    refresh_token = request.cookies.get("lexa_refresh_token") or body.refresh_token
+def refresh(request: Request, response: Response, db: Session = Depends(get_db), body: RefreshRequest | None = None):
+    refresh_token = request.cookies.get("lexa_refresh_token") or (body.refresh_token if body else None)
     if not refresh_token:
         raise HTTPException(401, "Authentication session expired")
     token_hash = hash_refresh_token(refresh_token)
