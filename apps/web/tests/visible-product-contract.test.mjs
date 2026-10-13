@@ -7,6 +7,7 @@ const inventory = fs.readFileSync(new URL('../app/inventory/page.tsx', import.me
 const shell = fs.readFileSync(new URL('../components/app-shell.tsx', import.meta.url), 'utf8');
 const api = fs.readFileSync(new URL('../lib/api.ts', import.meta.url), 'utf8');
 const proxy = fs.readFileSync(new URL('../app/api/lexa/[...path]/route.ts', import.meta.url), 'utf8');
+const invite = fs.readFileSync(new URL('../app/invite/page.tsx', import.meta.url), 'utf8');
 
 assert.match(api, /fetch\(`\/api\/lexa\$\{path\}`/);
 assert.match(page, /Command Centre/);
@@ -30,6 +31,9 @@ assert.doesNotMatch(page, /BUILD PREVIEW/);
 assert.match(proxy, /LEXA_API_URL \|\| process\.env\.NEXT_PUBLIC_API_URL/);
 assert.match(proxy, /DEFAULT_API_ORIGIN/);
 assert.match(proxy, /authorization/);
+assert.doesNotMatch(invite, /acceptInvitation/);
+assert.match(invite, /Invitation acceptance is not enabled in this deployment/);
+assert.match(invite, /href="\/login"/);
 console.log('visible product contract: PASS');
 
 assert.doesNotMatch(page, /LEXA_SCHEMA_NOT_READY|WORKSPACE_DATABASE_FAILURE|WORKSPACE_REGISTRATION_FAILURE|request id|request-id|transactional database/i);

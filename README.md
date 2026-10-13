@@ -1,8 +1,8 @@
-# LEXA — Production Hardening v2.5.0
+# LEXA — Production Hardening v2.8.1
 
 LEXA is a real multi-tenant business operating and intelligence system. The canonical business system of record is Neon PostgreSQL project `LEXA`, branch `lexa-live`, database `neondb`.
 
-## v2.5.0 hardening
+## Production hardening carried forward from v2.5.0
 
 This release repairs the production weaknesses identified during the Phase 1 deep review:
 

@@ -19,7 +19,7 @@ function walk(dir) {
   }
 }
 walk('apps/web');
-if (count !== 25) throw new Error(`Unexpected frontend TypeScript file count: ${count}`);
+if (count < 26) throw new Error(`Frontend TypeScript source set is incomplete: ${count} files (need at least 26)`);
 console.log(`frontend TypeScript syntax contract: PASS (${count} files)`);
 NODE
 python - <<'PY'

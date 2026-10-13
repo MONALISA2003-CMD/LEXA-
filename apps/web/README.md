@@ -20,3 +20,8 @@ The public experience does not display internal service diagnostics, request ide
 During active product development the web app can requires normal sign-in. The shipped build does not expose an open development workspace session.
 
 This mode does not remove database isolation or permissions; it only removes the browser authentication interruption.
+
+
+## Invitation route
+
+The `/invite` route is a customer-safe placeholder only. Invitation acceptance is not available until the FastAPI API provides a tested invitation contract; the UI must not imply that a membership was activated without an authoritative backend response.

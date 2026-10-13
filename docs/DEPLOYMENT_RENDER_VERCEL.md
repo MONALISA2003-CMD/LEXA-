@@ -25,11 +25,13 @@ Set the secret values listed in the deployment runbook. `sync: false` variables 
 
 Create a Next.js project from the same repository:
 
-- Root Directory: `apps/web`
+- Root Directory: `apps/web` (required; do not point this project at the repository root or an older nested package)
 - Framework Preset: Next.js
-- Build Command: auto-detected (`next build`)
-- Install Command: auto-detected
+- Build Command: `npm run build` (or auto-detected `next build`)
+- Install Command: auto-detected from `apps/web/package.json`
 - Output Directory: auto-detected
+
+The currently configured temporary command `rm -rf app/business-engine app/kernel && npm run build` is relative to this `apps/web` root. It is a workaround for legacy technical route folders that should not be user-facing. Before promoting this source, run `bash scripts/cleanup-obsolete-frontend-routes.sh` from the repository root, review the resulting deletions, and commit them; then set Build Command to the standard `npm run build`. The cleanup script only removes the obsolete web route folders and generated TypeScript build cache, not backend routes or data. The recent `acceptInvitation` failure is separate: the invite page referenced an API export and backend endpoint that do not exist in this source contract.
 
 Set `NEXT_PUBLIC_API_URL` to the exact HTTPS URL of the Render API, for example:
 

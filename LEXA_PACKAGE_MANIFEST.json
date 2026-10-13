@@ -1,6 +1,6 @@
 {
   "package": "LEXA Production Hardening & Convergence",
-  "version": "2.8.0",
+  "version": "2.8.1",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -19,7 +19,7 @@
     "Moved refresh credentials to HttpOnly cookie rotation and access tokens to memory-only browser state",
     "Added Redis-backed authentication rate limits",
     "Added fail-closed production configuration checks",
-    "Applied lexа_app role per transaction for PgBouncer-safe RLS enforcement",
+    "Applied lex\u0430_app role per transaction for PgBouncer-safe RLS enforcement",
     "Added bounded SQLAlchemy pooling and PostgreSQL statement/lock/idle transaction timeouts",
     "Added migration 022 for the live Brain foundation schema",
     "Added CI and direct Neon backup automation",
@@ -38,7 +38,9 @@
     "added global workspace search/command surface with Ctrl/Meta+K navigation",
     "added explicit loading placeholders so unavailable or pending business data is never shown as fabricated zero state",
     "added idempotent variant update, barcode creation, price-list creation and price creation contracts",
-    "added Phase 3.5 workspace convergence and inventory operations implementation contract"
+    "added Phase 3.5 workspace convergence and inventory operations implementation contract",
+    "Replaced the orphaned invitation-acceptance UI with a safe unavailable state because the backend has no invitation endpoint; added a regression contract and clarified the Vercel apps/web root.",
+    "Added an explicit, safety-bounded cleanup script for obsolete user-facing Business Engine/Kernel web routes and the generated TypeScript build cache."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -48,10 +50,10 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Canonical LEXA Neon foundation for deterministic business intelligence, reporting, product performance, customer patterns, branch performance, and inventory health.",
-  "package_version": "2.8.0",
+  "package_version": "2.8.1",
   "phase": "3.5 workspace convergence and operational depth",
   "phase_name": "Workspace Convergence & Inventory Operations",
-  "phase_status": "SOURCE_PATCH_VERIFIED_MANUAL_DEPLOY_REQUIRED",
+  "phase_status": "FRONTEND_IMPORT_REPAIR_VERIFIED_MANUAL_DEPLOY_REQUIRED",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -89,7 +91,7 @@
   "verification": {
     "python_tests": 96,
     "backend_compile": "pass",
-    "frontend_contract_tests": "pass",
+    "frontend_contract_tests": "pass after invitation-route regression coverage",
     "typescript_syntax_transpile": "pass for 25 frontend ts/tsx files",
     "verified_with": "scripts/verify-phase3.sh",
     "web_build": "not run in local sandbox; node dependency tree unavailable and Vercel sandbox creation denied",
@@ -97,8 +99,10 @@
     "workspace_routes": "home; sales; inventory; purchasing; customers; products; accounting; reports; compliance; intelligence; administration; settings",
     "web_typecheck": "not run in local sandbox; dependencies intentionally not reinstalled",
     "workspace_route_contract": "pass",
-    "full_next_build": "not completed: npm install timed out in local container; Vercel sandbox creation denied (403)"
+    "full_next_build": "not completed: npm install timed out in local container; Vercel sandbox creation denied (403)",
+    "invite_route": "safe unavailable state; no unresolved acceptInvitation import",
+    "web_route_cleanup": "script included; run manually and review deletions before commit"
   },
-  "release": "workspace-convergence-inventory-operations-2.8.0",
-  "release_name": "workspace-convergence-and-inventory-operations"
+  "release": "frontend-build-repair-2.8.1",
+  "release_name": "frontend-build-repair"
 }

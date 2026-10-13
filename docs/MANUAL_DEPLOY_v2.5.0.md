@@ -64,8 +64,8 @@ Use the Next.js framework defaults and the package's existing build scripts.
 Set:
 
 ```text
-NEXT_PUBLIC_API_URL=https://lexa-n10.onrender.com
-LEXA_API_URL=https://lexa-n10.onrender.com
+NEXT_PUBLIC_API_URL=<exact HTTPS URL of the deployed Render API>
+LEXA_API_URL=<same exact HTTPS URL of the deployed Render API>
 ```
 
 The browser talks to the Next.js same-origin proxy. Refresh credentials remain in an HttpOnly cookie; access tokens remain memory-only.
