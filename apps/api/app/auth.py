@@ -11,7 +11,11 @@ def hash_password(password: str) -> str:
     return password_hash.hash(password)
 
 def verify_password(password: str, hashed: str) -> bool:
-    return password_hash.verify(password, hashed)
+    # Legacy or corrupted hashes must fail closed, not turn login into a 500.
+    try:
+        return password_hash.verify(password, hashed)
+    except (ValueError, TypeError, AttributeError):
+        return False
 
 def create_access_token(user_id: UUID, tenant_id: UUID, session_id: UUID) -> str:
     now = datetime.now(timezone.utc)

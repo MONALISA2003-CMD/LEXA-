@@ -19,8 +19,10 @@ def test_sqlalchemy_pool_is_bounded_and_pg_bouncer_safe():
     assert "max_overflow=5" in source
     assert "pool_timeout=10" in source
     assert '"prepare_threshold": None' in source
-    assert "statement_timeout" in source
-    assert "idle_in_transaction_session_timeout" in source
+    assert '"options"' not in source
+    assert "SET LOCAL statement_timeout" in source
+    assert "SET LOCAL lock_timeout" in source
+    assert "SET LOCAL idle_in_transaction_session_timeout" in source
 
 
 def test_web_auth_never_persists_access_tokens_and_refreshes_with_cookie():
