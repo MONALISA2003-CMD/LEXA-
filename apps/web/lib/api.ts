@@ -71,7 +71,7 @@ async function getJson<T>(path: string, init?: RequestInit, retried = false): Pr
   let lastNetworkError: unknown = null;
   for (let attempt = 0; attempt < (retryable ? 4 : 1); attempt += 1) {
     try {
-      response = await fetch(`/api/lexa${path}`, { credentials: "same-origin", cache: "no-store", ...init, headers });
+      response = await fetch(`/api/lexa${path}`, { credentials: "include", cache: "no-store", ...init, headers });
       if (!retryable || ![502, 503, 504].includes(response.status) || attempt === 3) break;
       const retryAfter = Number(response.headers.get("retry-after") || "0");
       const delay = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 4000) : 500 * (attempt + 1);
