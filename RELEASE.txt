@@ -1,1 +1,1 @@
-LEXA v2.8.2 — Phase 0 reliability repair
+LEXA v2.8.4 — Phase 0 final auth/RLS/runtime hardening

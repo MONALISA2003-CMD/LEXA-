@@ -23,35 +23,43 @@ except ModuleNotFoundError as exc:
     )
 
 
+class FakeResult:
+    def __init__(self, row=None):
+        self.row = row
+    def mappings(self):
+        return self
+    def first(self):
+        return self.row
+
+
 class FakeDb:
     def __init__(self):
         self.user_id = uuid4()
         self.tenant_id = uuid4()
         self.auth_session = SimpleNamespace(
-            id=uuid4(),
-            user_id=self.user_id,
-            tenant_id=self.tenant_id,
-            revoked_at=None,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=1),
-            refresh_token_hash="old-hash",
-            last_used_at=None,
+            id=uuid4(), user_id=self.user_id, tenant_id=self.tenant_id,
+            revoked_at=None, expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            refresh_token_hash="old-hash", last_used_at=None,
         )
         self.scalar_calls = 0
         self.commits = 0
-
+        self.exec_calls = 0
+    def execute(self, statement, params=None):
+        self.exec_calls += 1
+        if "lexa_find_session_by_refresh_hash" in str(statement):
+            return FakeResult({"session_id": self.auth_session.id, "tenant_id": self.tenant_id, "user_id": self.user_id})
+        return FakeResult()
     def scalar(self, _statement):
         self.scalar_calls += 1
         if self.scalar_calls == 1:
             return self.auth_session
         return SimpleNamespace(status="ACTIVE")
-
     def get(self, model, _identity):
         if model is auth.User:
-            return SimpleNamespace(id=self.user_id, is_active=True)
+            return SimpleNamespace(id=self.user_id, email="member@example.test", is_active=True)
         if model is auth.Tenant:
-            return SimpleNamespace(id=self.tenant_id, name="Test workspace")
+            return SimpleNamespace(id=self.tenant_id, name="Test workspace", status="ACTIVE")
         return None
-
     def commit(self):
         self.commits += 1
 
@@ -74,3 +82,4 @@ def test_cookie_refresh_accepts_request_without_json_body():
     assert payload["tenant_name"] == "Test workspace"
     assert "lexa_refresh_token" in response.cookies
     assert db.commits == 1
+    assert db.exec_calls >= 2  # token lookup + tenant/user RLS context

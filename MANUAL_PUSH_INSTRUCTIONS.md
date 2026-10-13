@@ -1,4 +1,4 @@
-# LEXA v2.8.2 — Phase 0 reliability repair / manual push
+# LEXA v2.8.4 — Phase 0 final authentication/RLS hardening / manual push
 
 This archive is a complete root-level project tree. The repository has a ZIP-extractor workflow: pushing this ZIP to the repository root lets the workflow extract the files and consume the root `DELETE.txt` manifest to remove the obsolete frontend-only routes. If you extract locally instead, run `bash scripts/cleanup-obsolete-frontend-routes.sh` and remove `DELETE.txt` before staging; do not commit the deletion manifest itself. Review all changes before pushing. Keep local `.env` files out of Git.
 
@@ -15,7 +15,7 @@ npm run typecheck
 npm run build
 ```
 
-The new backend test verifies that an HttpOnly-cookie refresh request without a JSON body succeeds (it is skipped in this local sandbox because the API dependency stack is not installed). Frontend contract tests verify preflight session restoration, single-flight refresh, auth-gated UI, no fabricated zero values on request failure, and the standard Vercel build command. Python suite: 96 passed / 1 skipped. Node contract tests: 2 passed. TypeScript syntax parsing: 26 files, zero syntax errors. The full Next.js production build must be confirmed by Vercel after you push; no production deployment is claimed here.
+The backend refresh test verifies cookie-only refresh through the security-definer session lookup. The additive migration 028 must be reviewed and applied to the canonical Neon branch before the backend is deployed; do not replay older migrations or reset the database. Frontend contract tests verify preflight session restoration, single-flight refresh, auth-gated UI, no fabricated zero values on request failure, and the standard Vercel build command. Python suite: 10 passed / 1 skipped. Node contract tests: 2 passed. TypeScript syntax parsing: 27 files, zero syntax errors. The full Next.js production build must be confirmed by Vercel after you push; no production deployment is claimed here.
 
 ## Vercel configuration
 
@@ -32,4 +32,13 @@ git commit -m "fix: stabilize Phase 0 auth refresh and Vercel build"
 git push origin main
 ```
 
-Render is configured to auto-deploy from `main`. Its service uses `apps/api`; the only API change in this increment makes cookie-based refresh accept an optional body. No database schema or data changes are included.
+Render is configured to auto-deploy from `main`. Its service uses `apps/api`; the API changes include tenant-safe refresh lookup, identity verification, RLS context and correlated error logging. Migration 028 is an additive schema/security change and a conservative read-only role backfill. Apply only migration 028 after verifying the live ledger; it does not alter existing Owner/Admin roles or attach accounts to unrelated tenants.
+
+
+## Phase 0.4 — required deploy order
+
+1. Inspect the live Neon `schema_migrations` ledger and confirm migration 028 has not already been applied.
+2. Apply only `migrations/028_phase0_auth_rls_runtime_hardening.sql` to the canonical `lexa-live` branch. It creates the refresh lookup function, hardens empty RLS context handling, and adds a least-privilege Member role only for active memberships with no role.
+3. Deploy the API code to Render, then deploy the web app to Vercel.
+4. Verify `/ready`, login, cookie-backed refresh, `/api/v1/auth/me`, hard reload, protected inventory and dashboard requests, and logout. Check logs by `X-Request-ID` if any request remains 5xx.
+5. Never grant Owner to every account. Accounts with no active tenant membership must be invited/attached by a tenant administrator; Phase 0 cannot safely infer their workspace.

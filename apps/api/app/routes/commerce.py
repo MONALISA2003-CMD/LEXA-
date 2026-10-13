@@ -176,18 +176,19 @@ def dashboard(business_date: date | None = None, ctx=Depends(require_permission(
     db, _, tenant_id, _ = ctx
     today = business_date or date.today()
     sales = db.execute(text("""
-      SELECT COALESCE(SUM(total),0) sales, COALESCE(SUM(amount_paid),0) collected,
-             COALESCE(SUM(amount_due),0) credit
-      FROM sales WHERE tenant_id=:tenant_id AND created_at::date=:business_date AND status='COMPLETED'
+      SELECT COALESCE(SUM(s.total),0) sales, COALESCE(SUM(s.amount_paid),0) collected,
+             COALESCE(SUM(s.amount_due),0) credit
+      FROM public.sales AS s
+      WHERE s.tenant_id=:tenant_id AND s.created_at::date=:business_date AND s.status='COMPLETED'
     """), {"tenant_id": str(tenant_id), "business_date": today}).mappings().one()
     channels = db.execute(text("""
       SELECT pc.id,pc.name,pc.channel_type,pc.currency_code,pc.active,
              COALESCE(SUM(p.amount) FILTER (WHERE p.status='RECORDED' AND p.business_date=:business_date),0)
              - COALESCE((SELECT SUM(r.amount) FROM refund_records r WHERE r.tenant_id=pc.tenant_id AND r.payment_channel_id=pc.id AND r.business_date=:business_date AND r.status='RECORDED'),0) expected
-      FROM payment_channels pc LEFT JOIN payments p ON p.payment_channel_id=pc.id AND p.tenant_id=pc.tenant_id
+      FROM public.payment_channels AS pc LEFT JOIN public.payments AS p ON p.payment_channel_id=pc.id AND p.tenant_id=pc.tenant_id
       WHERE pc.tenant_id=:tenant_id GROUP BY pc.id ORDER BY pc.name
     """), {"tenant_id": str(tenant_id), "business_date": today}).mappings().all()
-    recv = db.execute(text("SELECT COALESCE(SUM(balance),0) outstanding FROM receivables WHERE tenant_id=:tenant_id AND status IN ('OPEN','PARTIALLY_PAID')"), {"tenant_id":str(tenant_id)}).mappings().one()
+    recv = db.execute(text("SELECT COALESCE(SUM(r.balance),0) outstanding FROM public.receivables AS r WHERE r.tenant_id=:tenant_id AND r.status IN ('OPEN','PARTIALLY_PAID')"), {"tenant_id":str(tenant_id)}).mappings().one()
     return {"business_date": today, "sales": out(sales), "payment_channels":[out(x) for x in channels], "outstanding_receivables":str(recv["outstanding"])}
 
 

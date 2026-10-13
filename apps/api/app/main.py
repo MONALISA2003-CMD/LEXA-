@@ -1,4 +1,5 @@
 from uuid import UUID, uuid4
+import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +11,7 @@ from .routes import auth, organization, rbac, catalog, inventory, commerce, fina
 from .kernel import router as kernel_router
 
 app = FastAPI(title="LEXA API", version="1.0.0")
+logger = logging.getLogger("lexa.api")
 
 
 @app.middleware("http")
@@ -23,6 +25,7 @@ async def request_id_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
     except Exception:
+        logger.exception("unhandled_request_error", extra={"request_id": request_id, "path": request.url.path, "method": request.method})
         response = JSONResponse(status_code=500, content={"detail": {"code": "INTERNAL_ERROR", "message": "LEXA could not complete the request.", "request_id": request_id}})
     response.headers["X-Request-ID"] = request_id
     return response

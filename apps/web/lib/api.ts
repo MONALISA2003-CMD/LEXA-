@@ -193,9 +193,21 @@ function refreshSession(): Promise<AuthResponse> {
 export async function login(body: LoginRequest) { const response = await getJson<AuthResponse>("/api/v1/auth/login", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }); setAccessToken(response.access_token); return response; }
 export function register(body: { email:string; password:string; tenant_name:string }) { return getJson<RegisterResponse>("/api/v1/auth/register", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
 
+export type CurrentIdentity = {
+  user: { id: string; email: string; is_active: boolean };
+  workspace: { id: string; name: string; status: string };
+  membership: { id: string; status: string };
+  roles: string[];
+  permissions: string[];
+};
+export function getCurrentIdentity() { return getJson<CurrentIdentity>("/api/v1/auth/me"); }
+
 export async function restoreSession() {
   try {
-    return await refreshSession();
+    const session = await refreshSession();
+    // Do not unlock the workspace until the API confirms user + tenant membership.
+    await getCurrentIdentity();
+    return session;
   } catch (error) {
     setAccessToken(null);
     if (error instanceof ApiError && error.status === 401) return null;

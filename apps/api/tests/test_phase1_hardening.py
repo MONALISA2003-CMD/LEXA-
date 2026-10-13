@@ -36,7 +36,7 @@ def test_web_auth_never_persists_access_tokens_and_refreshes_with_cookie():
     assert "sessionStorage.getItem(\"lexa_access_token\")" not in page
     assert "sessionStorage.getItem(\"lexa_access_token\")" not in api
     assert 'const cookie = request.headers.get("cookie")' in proxy
-    assert "credentials: \"same-origin\"" in api
+    assert "credentials: \"include\"" in api
 
 
 def test_auth_rate_limit_and_refresh_cookie_are_present():

@@ -1,6 +1,6 @@
 {
   "package": "LEXA Production Hardening & Convergence",
-  "version": "2.8.2",
+  "version": "2.8.4",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -42,7 +42,15 @@
     "Replaced the orphaned invitation-acceptance UI with a safe unavailable state because the backend has no invitation endpoint; added a regression contract and clarified the Vercel apps/web root.",
     "Added an explicit, safety-bounded cleanup script for obsolete user-facing Business Engine/Kernel web routes and the generated TypeScript build cache.",
     "Phase 0: allow cookie-only refresh requests, use single-flight browser refresh, restore sessions before protected reads, gate workspace UI until session verification, and show unavailable dashboard values on failed reads.",
-    "Standardized Next.js build command in apps/web/vercel.json and included a ZIP deletion manifest for obsolete frontend-only routes so the repository ZIP extractor removes them from existing checkouts."
+    "Standardized Next.js build command in apps/web/vercel.json and included a ZIP deletion manifest for obsolete frontend-only routes so the repository ZIP extractor removes them from existing checkouts.",
+    "Added SECURITY DEFINER refresh-token hash lookup so cookie refresh can establish tenant RLS context safely",
+    "Added authoritative /api/v1/auth/me identity, workspace, membership, role and permission endpoint",
+    "Set both app.tenant_id and app.user_id for protected database requests",
+    "Added additive migration 028 to harden empty RLS context and backfill least-privilege roles for roleless active memberships",
+    "Added correlated server-side tracebacks and request-id-preserving Vercel proxy behavior",
+    "Preserved multiple Set-Cookie headers through the Vercel API proxy",
+    "Session restoration verifies current identity before unlocking business modules",
+    "Logout uses the same tenant-safe lookup; stale concurrent refresh-token rotations are rejected"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -91,21 +99,16 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": "96 passed; 1 skipped (cookie-only TestClient test skipped locally because FastAPI API dependencies are missing; run after pip install -e apps/api[dev])",
+    "python_tests": "10 passed; 1 skipped because optional API test dependencies are unavailable in this environment",
     "backend_compile": "pass: python -m compileall -q apps/api/app apps/api/tests",
     "frontend_contract_tests": "pass: 2 Node test files, 0 failures",
-    "typescript_syntax_transpile": "pass: 26 frontend TS/TSX files, 0 syntax errors (global TypeScript transpile parser)",
-    "verified_with": "scripts/verify-phase0.sh",
-    "web_build": "not run locally: npm registry unavailable in this environment; Vercel must confirm dependency-backed typecheck/build after push",
-    "phase3_ui_routes": "apps/web/app/products/page.tsx; apps/web/app/inventory/page.tsx; apps/web/components/app-shell.tsx",
-    "workspace_routes": "home; sales; inventory; purchasing; customers; products; accounting; reports; compliance; intelligence; administration; settings",
-    "web_typecheck": "not run: npm dependencies could not be installed in local environment",
-    "workspace_route_contract": "pass",
-    "full_next_build": "pending Vercel confirmation after ZIP extraction/push",
-    "invite_route": "safe unavailable state; no unresolved acceptInvitation import",
-    "web_route_cleanup": "obsolete apps/web/app/business-engine and apps/web/app/kernel paths included in the archive deletion manifest; script is also supplied for local checkout cleanup",
-    "session_refresh_contract": "frontend session preflight + single-flight refresh + cookie-only API body contract covered by source checks; live request/response must be verified after deploy"
+    "typescript_syntax_transpile": "pass: 27 frontend TS/TSX files, 0 syntax errors",
+    "web_build": "not run locally: dependency-backed Next.js production build must be confirmed by Vercel after deploy",
+    "live_auth_smoke": "pending deployment after migration 028",
+    "migration": "028_phase0_auth_rls_runtime_hardening; additive; verify live ledger before applying",
+    "release": "phase-0-final-auth-rls-2.8.4",
+    "release_name": "phase-0-final-auth-session-authorization-runtime-hardening"
   },
-  "release": "phase-0-reliability-2.8.2",
-  "release_name": "phase-0-auth-session-build-reliability"
+  "release": "phase-0-final-auth-rls-2.8.4",
+  "release_name": "phase-0-final-auth-session-authorization-runtime-hardening"
 }

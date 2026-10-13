@@ -1,4 +1,4 @@
-# LEXA — Production Hardening v2.8.2
+# LEXA — Production Hardening v2.8.4
 
 LEXA is a real multi-tenant business operating and intelligence system. The canonical business system of record is Neon PostgreSQL project `LEXA`, branch `lexa-live`, database `neondb`.
 
@@ -30,3 +30,11 @@ This release repairs the production weaknesses identified during the Phase 1 dee
 Vercel serves `apps/web`. Render serves `apps/api`. Neon PostgreSQL is the only authoritative LEXA business database. Do not create a second transactional database.
 
 See `docs/MANUAL_DEPLOY_v2.5.0.md` for the exact manual handoff procedure.
+
+## Phase 0 final auth/RLS increment (v2.8.4)
+
+- Cookie refresh now resolves the session through an opaque-token hash lookup, establishes tenant/user context, and rotates under a row lock.
+- `/api/v1/auth/me` is the authoritative identity contract used before the web workspace unlocks.
+- Protected database requests establish both tenant and user context for branch-aware RLS.
+- Migration 028 hardens empty RLS context and assigns a least-privilege Member role only to active memberships that currently have no role. Apply it only after checking the canonical Neon migration ledger.
+- Full production build and live auth smoke test remain deployment gates.

@@ -25,12 +25,18 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const out = new NextResponse(body, { status: response.status, statusText: response.statusText });
     const responseType = response.headers.get("content-type");
     if (responseType) out.headers.set("content-type", responseType);
-    const setCookie = response.headers.get("set-cookie");
-    if (setCookie) out.headers.set("set-cookie", setCookie);
+    const responseRequestId = response.headers.get("x-request-id");
+    if (responseRequestId) out.headers.set("x-request-id", responseRequestId);
+    const responseHeaders = response.headers as Headers & { getSetCookie?: () => string[] };
+    const cookies = responseHeaders.getSetCookie ? responseHeaders.getSetCookie() : (response.headers.get("set-cookie") ? [response.headers.get("set-cookie") as string] : []);
+    for (const cookie of cookies) out.headers.append("set-cookie", cookie);
     const retryAfter = response.headers.get("retry-after");
     if (retryAfter) out.headers.set("retry-after", retryAfter);
     if (response.status >= 500) {
-      return NextResponse.json({ detail: "LEXA is temporarily unavailable. Please try again shortly." }, { status: response.status, headers: retryAfter ? { "Retry-After": retryAfter } : undefined });
+      const headers = new Headers();
+      if (retryAfter) headers.set("Retry-After", retryAfter);
+      if (responseRequestId) headers.set("X-Request-ID", responseRequestId);
+      return NextResponse.json({ detail: { code: "UPSTREAM_UNAVAILABLE", message: "LEXA is temporarily unavailable. Please try again shortly.", request_id: responseRequestId || null } }, { status: response.status, headers });
     }
     return out;
   } catch {

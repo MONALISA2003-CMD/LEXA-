@@ -31,3 +31,8 @@ Apply migrations in order. This repository contains the complete LEXA migration 
 Migrations `015` through `021` are recorded on that canonical branch.
 
 Do not run destructive or unrelated database changes. Phase 4A, Phase 4B and Phase 5 are additive, tenant-scoped, and RLS protected. The Universal Business Engine remains internal technical infrastructure and is not exposed as a product module.
+
+
+## Phase 0 final hardening (migration 028)
+
+`028_phase0_auth_rls_runtime_hardening.sql` adds a narrowly scoped security-definer lookup for opaque refresh-token hashes, makes tenant/user RLS predicates fail closed for empty transaction-local settings, and assigns a least-privilege read-only `Member` role only to already-active memberships that have no role. It does not attach users to tenants, grant Owner/Admin privileges, reset data, or change secrets. Review the live `schema_migrations` ledger and apply this migration once to the canonical Neon branch before deploying the backend that calls the new function.

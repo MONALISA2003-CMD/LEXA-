@@ -14,7 +14,7 @@ import redis
 
 from ..auth import create_access_token, hash_password, verify_password, new_refresh_token, hash_refresh_token
 from ..catalog_rules import request_hash
-from ..dependencies import get_db
+from ..dependencies import get_db, current_context
 from ..models import (
     Tenant, TenantMembership, User, Session as AuthSession, Device,
     Role, MembershipRole, Permission, RolePermission, BusinessProfile,
@@ -320,25 +320,88 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
     }
 
 
+@router.get("/me")
+def current_identity(context=Depends(current_context), db: Session = Depends(get_db)):
+    user_id, tenant_id, session_id = context
+    db.execute(
+        text("SELECT set_config('app.tenant_id', :tenant_id, true), set_config('app.user_id', :user_id, true)"),
+        {"tenant_id": str(tenant_id), "user_id": str(user_id)},
+    )
+    session = db.scalar(select(AuthSession).where(
+        AuthSession.id == session_id,
+        AuthSession.tenant_id == tenant_id,
+        AuthSession.user_id == user_id,
+        AuthSession.revoked_at.is_(None),
+    ))
+    user = db.get(User, user_id)
+    tenant = db.get(Tenant, tenant_id)
+    membership = db.scalar(select(TenantMembership).where(
+        TenantMembership.tenant_id == tenant_id,
+        TenantMembership.user_id == user_id,
+        TenantMembership.status == "ACTIVE",
+    ))
+    now = datetime.now(timezone.utc)
+    if not session or session.expires_at <= now or not user or not user.is_active or not tenant or tenant.status != "ACTIVE" or not membership:
+        raise HTTPException(401, "Your session or workspace is no longer active")
+    roles = db.execute(text("""
+        SELECT DISTINCT r.name FROM membership_roles mr
+        JOIN roles r ON r.id = mr.role_id AND r.tenant_id = :tenant_id
+        WHERE mr.membership_id = :membership_id ORDER BY r.name
+    """), {"tenant_id": str(tenant_id), "membership_id": str(membership.id)}).scalars().all()
+    permissions = db.execute(text("""
+        SELECT DISTINCT p.code FROM membership_roles mr
+        JOIN roles r ON r.id = mr.role_id AND r.tenant_id = :tenant_id
+        JOIN role_permissions rp ON rp.role_id = r.id
+        JOIN permissions p ON p.id = rp.permission_id
+        WHERE mr.membership_id = :membership_id ORDER BY p.code
+    """), {"tenant_id": str(tenant_id), "membership_id": str(membership.id)}).scalars().all()
+    return {
+        "user": {"id": str(user.id), "email": user.email, "is_active": user.is_active},
+        "workspace": {"id": str(tenant.id), "name": tenant.name, "status": tenant.status},
+        "membership": {"id": str(membership.id), "status": membership.status},
+        "roles": roles,
+        "permissions": permissions,
+    }
+
+
 @router.post("/refresh")
 def refresh(request: Request, response: Response, db: Session = Depends(get_db), body: RefreshRequest | None = None):
     refresh_token = request.cookies.get("lexa_refresh_token") or (body.refresh_token if body else None)
     if not refresh_token:
         raise HTTPException(401, "Authentication session expired")
     token_hash = hash_refresh_token(refresh_token)
-    session = db.scalar(select(AuthSession).where(AuthSession.refresh_token_hash == token_hash, AuthSession.revoked_at.is_(None)))
+    # sessions is RLS-protected by tenant_id, but the tenant is not known until
+    # the opaque cookie is looked up. This SECURITY DEFINER function returns
+    # only the minimal identifiers needed to establish tenant context.
+    lookup = db.execute(
+        text("SELECT session_id, tenant_id, user_id FROM public.lexa_find_session_by_refresh_hash(:token_hash)"),
+        {"token_hash": token_hash},
+    ).mappings().first()
+    if not lookup:
+        raise HTTPException(401, "Invalid or expired refresh token")
+    db.execute(
+        text("SELECT set_config('app.tenant_id', :tenant_id, true), set_config('app.user_id', :user_id, true)"),
+        {"tenant_id": str(lookup["tenant_id"]), "user_id": str(lookup["user_id"])},
+    )
+    session = db.scalar(select(AuthSession).where(
+        AuthSession.id == lookup["session_id"],
+        AuthSession.tenant_id == lookup["tenant_id"],
+        AuthSession.user_id == lookup["user_id"],
+        AuthSession.refresh_token_hash == token_hash,
+        AuthSession.revoked_at.is_(None),
+    ).with_for_update())
     now = datetime.now(timezone.utc)
     if not session or session.expires_at <= now:
         raise HTTPException(401, "Invalid or expired refresh token")
     user = db.get(User, session.user_id)
     membership = db.scalar(select(TenantMembership).where(TenantMembership.user_id == session.user_id, TenantMembership.tenant_id == session.tenant_id, TenantMembership.status == "ACTIVE"))
-    if not user or not user.is_active or not membership:
+    tenant = db.get(Tenant, session.tenant_id)
+    if not user or not user.is_active or not membership or not tenant or tenant.status != "ACTIVE":
         raise HTTPException(401, "Session is no longer active")
     session.last_used_at = now
     new_refresh = new_refresh_token()
     session.refresh_token_hash = hash_refresh_token(new_refresh)
     db.commit()
-    tenant = db.get(Tenant, session.tenant_id)
     _set_refresh_cookie(response, new_refresh)
     return {
         "access_token": create_access_token(user.id, session.tenant_id, session.id),
@@ -350,10 +413,28 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db),
 
 
 @router.post("/logout")
-def logout(body: RefreshRequest, request: Request, response: Response, db: Session = Depends(get_db)):
-    refresh_token = request.cookies.get("lexa_refresh_token") or body.refresh_token
-    session = db.scalar(select(AuthSession).where(AuthSession.refresh_token_hash == hash_refresh_token(refresh_token), AuthSession.revoked_at.is_(None))) if refresh_token else None
-    if session:
-        session.revoked_at = datetime.now(timezone.utc); db.commit()
+def logout(request: Request, response: Response, db: Session = Depends(get_db), body: RefreshRequest | None = None):
+    refresh_token = request.cookies.get("lexa_refresh_token") or (body.refresh_token if body else None)
+    if refresh_token:
+        token_hash = hash_refresh_token(refresh_token)
+        lookup = db.execute(
+            text("SELECT session_id, tenant_id, user_id FROM public.lexa_find_session_by_refresh_hash(:token_hash)"),
+            {"token_hash": token_hash},
+        ).mappings().first()
+        if lookup:
+            db.execute(
+                text("SELECT set_config('app.tenant_id', :tenant_id, true), set_config('app.user_id', :user_id, true)"),
+                {"tenant_id": str(lookup["tenant_id"]), "user_id": str(lookup["user_id"])},
+            )
+            session = db.scalar(select(AuthSession).where(
+                AuthSession.id == lookup["session_id"],
+                AuthSession.tenant_id == lookup["tenant_id"],
+                AuthSession.user_id == lookup["user_id"],
+                AuthSession.refresh_token_hash == token_hash,
+                AuthSession.revoked_at.is_(None),
+            ).with_for_update())
+            if session:
+                session.revoked_at = datetime.now(timezone.utc)
+                db.commit()
     _clear_refresh_cookie(response)
     return {"status": "logged_out"}
