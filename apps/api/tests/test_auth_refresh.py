@@ -83,3 +83,32 @@ def test_cookie_refresh_accepts_request_without_json_body():
     assert "lexa_refresh_token" in response.cookies
     assert db.commits == 1
     assert db.exec_calls >= 2  # token lookup + tenant/user RLS context
+
+
+def test_refresh_without_cookie_or_body_returns_401_not_422():
+    db = FakeDb()
+    app = FastAPI()
+    app.include_router(auth.router, prefix="/api/v1")
+    app.dependency_overrides[auth.get_db] = lambda: db
+
+    with TestClient(app) as client:
+        response = client.post("/api/v1/auth/refresh")
+
+    assert response.status_code == 401, response.text
+    assert response.json()["detail"] == "Authentication session expired"
+    assert db.exec_calls == 0
+
+
+def test_logout_without_cookie_or_body_is_idempotent_and_clears_cookie():
+    db = FakeDb()
+    app = FastAPI()
+    app.include_router(auth.router, prefix="/api/v1")
+    app.dependency_overrides[auth.get_db] = lambda: db
+
+    with TestClient(app) as client:
+        response = client.post("/api/v1/auth/logout")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"status": "logged_out"}
+    assert "lexa_refresh_token" in response.headers.get("set-cookie", "")
+    assert db.exec_calls == 0

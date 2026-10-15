@@ -1,1 +1,1 @@
-LEXA v2.8.5 — E2E auth readiness; live migration 028 verified; app deployment/smoke test pending
+LEXA v2.8.7 — Phase 0 reliability implementation handoff. Local source and available tests verified; live deployment settings, seven historical migration sources, and credentialed hosted E2E remain release gates.

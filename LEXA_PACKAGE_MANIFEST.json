@@ -1,6 +1,6 @@
 {
   "package": "LEXA Production Hardening & Convergence",
-  "version": "2.8.5",
+  "version": "2.8.7",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -19,7 +19,7 @@
     "Moved refresh credentials to HttpOnly cookie rotation and access tokens to memory-only browser state",
     "Added Redis-backed authentication rate limits",
     "Added fail-closed production configuration checks",
-    "Applied lex\u0430_app role per transaction for PgBouncer-safe RLS enforcement",
+    "Applied lexа_app role per transaction for PgBouncer-safe RLS enforcement",
     "Added bounded SQLAlchemy pooling and PostgreSQL statement/lock/idle transaction timeouts",
     "Added migration 022 for the live Brain foundation schema",
     "Added CI and direct Neon backup automation",
@@ -58,7 +58,25 @@
     "Added end-to-end forensic audit with production rollout gates and explicit unverified-deployment limitations",
     "Promoted migration 028 to canonical Neon lexa-live after explicit approval; validated lookup function, grant, SECURITY DEFINER owner and hardened RLS predicates after promotion",
     "Used the confirmed Render My Workspace LEXA service logs to identify the exact missing-function cause for auth refresh HTTP 500",
-    "Updated forensic report and manual rollout notes with production verification and outstanding deployment drift"
+    "Updated forensic report and manual rollout notes with production verification and outstanding deployment drift",
+    "Corrected migration 022 dynamic Brain RLS policy identifier construction and empty tenant-context SQL quoting",
+    "Added dated canonical Neon migration ledger snapshot and explicit manifest for seven unavailable historical migration sources",
+    "Added migration source reconciliation checker with strict release-gate mode",
+    "Corrected deployment guide to distinguish /health liveness from /ready dependency readiness",
+    "Expanded packaged GitHub Actions checks to run both frontend contract suites and enforce strict migration replay readiness",
+    "Recovered migration 019_phase4a_customer_credit_allocation byte-for-byte from its historical GitHub commit and verified its Git blob SHA",
+    "Generated and included apps/web/package-lock.json; CI now uses npm ci for deterministic frontend install",
+    "Aligned Render blueprint service name with existing LEXA service; kept /ready as readiness health check",
+    "Verified public Render liveness/readiness and Vercel login endpoints using read-only HTTP probes; observed live readiness remains on older database-only payload",
+    "Updated source-gap manifest from eight to seven unrecovered applied migrations without inventing SQL",
+    "Fixed Brain RLS dynamic policy SQL with PostgreSQL format identifier/literal quoting and validated it on disposable Neon branch lexa-convergence-test-2026-10-08",
+    "Re-queried canonical Neon migration ledger on 2026-10-15 and verified migration 028 plus refresh lookup function/grant/owner properties read-only",
+    "Added 2026-10-15 canonical migration ledger snapshot, retaining 2026-10-13 snapshot for historical comparison",
+    "Added Phase 0 anonymous/credentialed HTTP acceptance runner for refresh-cookie rotation, /auth/me, protected catalog reads, logout and revocation",
+    "Added deletion-manifest applier and listed obsolete unregistered API business_engine route module for checkout cleanup",
+    "Scoped pytest collection to canonical tests and separated strict migration replay into a manual release gate",
+    "Retried GitHub branch creation on 2026-10-15; integration still returns HTTP 403 and no code was pushed",
+    "Live Render 2026-10-15: /health 200, /ready 200 but database-only readiness payload, first bodyless refresh probe timed out before a warmed retry returned 401, anonymous logout 200"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -68,10 +86,10 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Canonical LEXA Neon foundation for deterministic business intelligence, reporting, product performance, customer patterns, branch performance, and inventory health.",
-  "package_version": "2.8.5",
+  "package_version": "2.8.7",
   "phase": "0 reliability and deployment",
   "phase_name": "Authentication, Session and Build Reliability",
-  "phase_status": "PHASE0_MIGRATION_028_APPLIED_RENDER_ROOT_CAUSE_CONFIRMED_APP_DEPLOY_AND_BROWSER_SMOKE_PENDING",
+  "phase_status": "PHASE0_SOURCE_HANDOFF_VERIFIED_LOCAL_104_PASSED_1_LOCAL_DEPENDENCY_SKIP_LIVE_READY_CACHE_CODE_NOT_DEPLOYED_SEVEN_MIGRATION_GAPS_AND_CREDENTIALLED_E2E_PENDING",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -107,17 +125,17 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": "97 passed, 1 skipped; optional API test dependency unavailable in sandbox",
+    "python_tests": "104 passed, 1 skipped; local offline environment does not have redis runtime dependency, so apps/api/tests/test_auth_refresh.py is skipped locally; CI installs declared API dependencies",
     "backend_compile": "pass: python -m compileall -q apps/api/app apps/api/tests",
     "frontend_contract_tests": "pass: 2 Node test files, 0 failures",
     "typescript_syntax_transpile": "pass: 26 frontend TS/TSX non-declaration files checked, 0 syntax errors",
-    "web_build": "not run locally: internet/dependency-backed production build unavailable in this environment",
-    "live_auth_smoke": "pending authenticated browser/API smoke test; Render logs confirmed the missing refresh lookup function; the failed request hash now resolves through the live lookup after migration 028",
-    "migration": "028_phase0_auth_rls_runtime_hardening applied to canonical branch br-soft-star-b1dj2m2w (lexa-live); verified migration row, single lookup function, lexa_app EXECUTE grant, SECURITY DEFINER, owner BYPASSRLS, fake token returns zero rows, previously failed request hash resolves to one valid session, and zero raw tenant-context predicates",
-    "release": "phase0-e2e-auth-readiness-2.8.5-live-migration-verified",
-    "release_name": "phase-0-e2e-auth-readiness-and-live-schema-audit",
-    "deployment": "Vercel lexa-green.vercel.app production deployment READY on commit fd59d989a8c4ecc3c6a3689dbc2ece315376f34b, matching Render LEXA deployment; LEXA_API_URL and NEXT_PUBLIC_API_URL both target https://lexa-n10e.onrender.com; current deployed main still has older readiness code; live Render healthCheckPath is blank; Vercel runtime-error read returned 403; no source push or application deploy made"
+    "web_build": "npm ci, npm run typecheck, npm test, and npm run build passed in a separate Vercel sandbox against matching frontend sources; lockfile root deps match package.json",
+    "live_auth_smoke": "Anonymous probes on 2026-10-15: Render /health 200; /ready 200 but only database dependency is reported; first bodyless refresh timed out at 30 seconds, retry after warm-up returned 401 instead of 422 in 0.316 seconds; anonymous logout returned 200. Credentialed login/rotation/identity/protected-read/logout-revocation awaits dedicated test-account credentials.",
+    "migration": "Neon ledger rechecked 2026-10-15 (27 rows); migration 028 and refresh lookup grant/owner properties verified read-only; migration 022 policy block executed and policy expressions verified on a disposable Neon validation branch; seven exact historical migration sources still missing, strict replay blocked",
+    "release": "phase0-implementation-handoff-2.8.7-2026-10-15; source ZIP validated locally; not a production-accepted release",
+    "release_name": "phase-0-reliability-implementation-handoff-production-settings-and-credentialed-e2e-pending",
+    "deployment": "No GitHub write or production deploy. Branch creation retry returned 403. Render LEXA live healthCheckPath remains blank, and /ready uses the older database-only handler. Only existing Render LEXA service and existing Neon test branch used; canonical Neon was read-only during this work."
   },
-  "release": "phase0-e2e-auth-readiness-2.8.5-live-migration-verified",
-  "release_name": "phase-0-e2e-auth-readiness-with-live-migration-verification"
+  "release": "phase0-implementation-candidate-2.8.6-2026-10-13",
+  "release_name": "phase-0-reliability-source-candidate-live-deployment-acceptance-pending"
 }

@@ -1,4 +1,4 @@
-# LEXA — Production Hardening v2.8.5
+# LEXA — Production Hardening v2.8.7 Phase 0 Handoff
 
 LEXA is a real multi-tenant business operating and intelligence system. The canonical business system of record is Neon PostgreSQL project `LEXA`, branch `lexa-live`, database `neondb`.
 
@@ -42,3 +42,24 @@ See `docs/MANUAL_DEPLOY_v2.5.0.md` for the exact manual handoff procedure.
 - Render logs confirmed the screenshot path: `/api/v1/auth/refresh` returned 500 because the lookup function was missing before migration 028. The previously failed refresh hash now resolves to one unrevoked, unexpired session through the new function.
 - Full browser/API acceptance is still pending. Render’s live `healthCheckPath` is blank while `render.yaml` declares `/ready`, and GitHub `main` still has the older health-readiness check. The Vercel `lexa-green.vercel.app` production deployment and both API-origin variables match the Render API and same commit, but the newly added readiness guard is not yet deployed. No repo write or application deployment was performed here; deploy this reviewed ZIP and verify the live browser/API flow before declaring Phase 0 complete.
 - See `LEXA_E2E_FORENSIC_AUDIT_2026-10-13.md` for the full evidence trail and exact acceptance checklist.
+
+
+## Phase 0 reliability handoff (15 October 2026)
+
+This package includes additional source-side hardening and release gates:
+
+- Corrected the dynamic Brain RLS policy SQL in migration 022 using `format(%I, %L)` and verified the generated policy expressions on a disposable Neon validation branch.
+- Added refreshed read-only canonical Neon ledger evidence dated 15 October 2026 and an explicit manifest of unrecovered historical migration SQL sources.
+- Added `scripts/check_migration_sources.py`; normal mode ensures all gaps remain documented, while `--strict` fails until the exact migration sources are recovered.
+- Corrected deployment documentation to treat `/health` as liveness and `/ready` as dependency-aware database/cache readiness. The readiness check now verifies Redis/Valkey using bounded timeouts.
+- Recovered `019_phase4a_customer_credit_allocation.sql` byte-for-byte from historical GitHub commit `d850ce04c8930134f01a63cd65c5d1947a17b17d` (verified Git blob SHA documented in `migrations/SOURCE_RECOVERY.md`).
+- Added `scripts/smoke_phase0.py` for public liveness/readiness/bodyless-auth probes and optional credentialed login/refresh/me/protected-read/logout acceptance.
+- Added `pytest.ini` to exclude archived package copies from canonical test collection, fixed API test import paths, and separated the strict migration replay gate from ordinary code CI.
+- Added `scripts/apply-deletion-manifest.sh` and marked the obsolete unregistered backend Business Engine route module for removal from existing checkouts.
+- Added a complete `apps/web/package-lock.json` and changed CI to use `npm ci` for deterministic frontend dependency installation.
+- Aligned `render.yaml`'s blueprint service name to the existing Render service `LEXA` so this package does not imply creating a second `lexa-api` service. The blueprint declares `/ready`; the live Render service setting still needs reconciliation.
+
+**This is not a claim that Phase 0 is fully accepted.** Current local checks report 104 passed and 1 skipped (the local offline environment lacks the `redis` dependency); frontend contract tests pass. A disposable-branch SQL check confirms the corrected Brain policy block compiles. On 15 October, live Render `/health` returned 200, `/ready` returned 200 with the older database-only payload, bodyless refresh returned 401 instead of 422 on retry, and anonymous logout returned 200. Seven applied migration SQL sources remain absent from the inspected repository history: 010, 011, 023 purchasing core, 024 purchasing security, 025 purchasing permissions, 026 membership/branch integrity, and 027 release convergence. Their SQL was not reconstructed from schema inference. The strict migration source check intentionally remains blocked until authoritative source files are recovered. GitHub branch creation was denied, so this is a local source package rather than a pushed commit. Live Render still returns the older readiness payload (database only), the live health-check path is blank, and credentialed browser sign-in/refresh/logout acceptance remains pending.
+
+
+For execution order and dedicated-account smoke acceptance, see `docs/PHASE0_RUNBOOK.md`. The current detailed acceptance status is `docs/PHASE0_IMPLEMENTATION_REPORT.md`.

@@ -1,5 +1,6 @@
 import logging
 
+import redis
 from sqlalchemy import text
 
 from .db import engine
@@ -59,6 +60,32 @@ def canonical_identity() -> dict[str, str]:
 
 def _diagnostic(settings_key: str, expected: str, actual: str) -> dict[str, str]:
     return {"field": settings_key, "expected": expected, "actual": actual}
+
+
+def check_redis() -> tuple[bool, str | None]:
+    """Check the required Redis-compatible cache without leaking its URL."""
+    client = None
+    try:
+        client = redis.Redis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        client.ping()
+        return True, None
+    except Exception as exc:
+        logger.warning(
+            "cache_readiness_failed",
+            extra={"dependency": "redis", "exception_type": exc.__class__.__name__},
+        )
+        return False, exc.__class__.__name__
+    finally:
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
 
 
 def check_database() -> tuple[bool, str | dict[str, object] | None]:

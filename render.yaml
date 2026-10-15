@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: lexa-api
+    name: LEXA
     runtime: python
     rootDir: apps/api
     buildCommand: pip install -r requirements.txt

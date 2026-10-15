@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .config import settings
-from .health import check_database
+from .health import check_database, check_redis
 from .routes import auth, organization, rbac, catalog, inventory, commerce, finance, analytics
 from .kernel import router as kernel_router
 
@@ -78,14 +78,26 @@ def health() -> dict[str, str]:
 @app.get("/api/ready", tags=["system"], include_in_schema=False)
 def readiness() -> dict[str, object]:
     database_ok, database_error = check_database()
+    cache_ok, cache_error = check_redis()
+    ready = database_ok and cache_ok
     payload: dict[str, object] = {
-        "status": "ready" if database_ok else "not_ready",
+        "status": "ready" if ready else "not_ready",
         "service": "lexa-api",
         "environment": settings.app_env,
-        "dependencies": {"database": "ok" if database_ok else "error"},
+        "dependencies": {
+            "database": "ok" if database_ok else "error",
+            "cache": "ok" if cache_ok else "error",
+        },
     }
-    if not database_ok:
-        payload["database_error_type"] = database_error if settings.app_env.strip().lower() != "production" else "LEXA_DATABASE_NOT_READY"
+    if not ready:
+        if settings.app_env.strip().lower() == "production":
+            # Keep externally visible diagnostics stable and non-sensitive.
+            payload["failure_code"] = "LEXA_DEPENDENCY_NOT_READY"
+        else:
+            if not database_ok:
+                payload["database_error_type"] = database_error
+            if not cache_ok:
+                payload["cache_error_type"] = cache_error
         response = JSONResponse(status_code=503, content=payload, headers={"Retry-After": "5"})
         return response
     return payload

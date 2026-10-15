@@ -53,11 +53,13 @@ def test_render_runtime_contract_is_intact():
     assert "key: DATABASE_APP_ROLE" in render
 
 
-def test_health_import_contract_has_no_missing_redis_symbol():
+def test_readiness_imports_required_database_and_cache_checks():
     main = (API / "app/main.py").read_text()
     health = (API / "app/health.py").read_text()
-    assert "check_redis" not in main
+    assert "check_redis" in main
+    assert "from .health import check_database, check_redis" in main
     assert "def check_database" in health
+    assert "def check_redis" in health
 
 
 def test_system_routes_are_declared():

@@ -1,40 +1,39 @@
-# LEXA migrations
+# LEXA migrations and source-of-truth controls
 
-Apply migrations in order. This directory contains the historical SQL migration files included in this source package; it is **not a complete from-zero replay bundle**. The live ledger includes several historical versions whose SQL files are not present here. Always verify `public.schema_migrations` and the canonical branch before any change; do not replay every file against an existing production database.
+## Important safety boundary
 
-1. `001_phase1_foundation.sql`
-2. `002_identity_rbac_organization.sql`
-3. `003_rbac_sessions_organization_completion.sql`
-4. `004_catalog_and_rbac_hardening.sql`
-5. `005_inventory_foundation.sql`
-6. `006_phase1_security_reliability.sql`
-7. `007_phase2_catalog_hardening.sql`
-8. `008_workspace_registration_hardening.sql`
-9. `009_auth_workspace_picker.sql`
-10. `012_phase1_business_kernel.sql`
-11. `013_phase2_universal_business_engine.sql`
-12. `014_phase3_inventory_foundation.sql`
-13. `015_financial_architecture_lock.sql`
-14. `016_phase4a_sales_payments_reconciliation.sql`
-15. `017_phase4a_reconciliation_engine.sql`
-16. `018_phase4a_application_integrity.sql`
-17. `019_phase4a_customer_credit_allocation.sql`
-18. `020_phase4b_accounting_efris_foundation.sql`
-19. `021_phase5_analytics_foundation.sql`
-20. `022_phase6a_brain_foundation.sql`
-21. `028_phase0_auth_rls_runtime_hardening.sql`
+This directory is **not yet a complete from-zero replay bundle**. Do not reset Neon, blindly replay the SQL files, or reconstruct missing migrations from table names. The canonical live database contains historical migrations whose exact SQL is not present in this package. Unknown applied SQL must be recovered from an authoritative commit/artifact or formally documented as unrecoverable before schema-changing work.
+
+The historical read-only ledger snapshot in `live_ledger_snapshot_2026-10-13.json` records the 13 October state. The current snapshot, `live_ledger_snapshot_2026-10-15.json`, was refreshed from canonical Neon `lexa-live` (`br-soft-star-b1dj2m2w`), database `neondb`, on 15 October 2026. Both are audit evidence, not live database credentials or deployment instructions; re-query before any migration action.
+
+## Source coverage
+
+Run:
+
+```bash
+python scripts/check_migration_sources.py
+```
+
+The checker verifies that every observed ledger version either has a matching `*.sql` source or a documented source-gap entry. Use `--strict` to fail while any source gap remains. CI should run the non-strict reconciliation check to ensure the gaps stay visible; production readiness remains blocked until the strict check passes in a disposable database/replay environment.
+
+The current seven source gaps are tracked in `source_gaps.json`: migration versions `010`, `011`, the purchasing/security versions under the `023`–`026` prefix, and `027_release_convergence`. Version `019_phase4a_customer_credit_allocation` has been recovered byte-for-byte from historical GitHub commit `d850ce04c8930134f01a63cd65c5d1947a17b17d`; see `SOURCE_RECOVERY.md`. Do not infer missing SQL from version names or current schema. In the live ledger, two distinct migrations share numeric prefix `023`; migration identity must always use the full version string.
+
+## Safe validation sequence
+
+1. Re-query `public.schema_migrations` on the canonical branch and compare it with the checked-in snapshot.
+2. Recover missing SQL from the exact historical source/package that was applied; verify checksums or reviewed diffs where available.
+3. Resolve the duplicate numeric prefix in migration tooling without renaming historical ledger records on the live database.
+4. Run the complete ordered chain against a disposable Neon branch/database and verify tables, functions, grants, RLS policies, indexes, and constraints.
+5. Only after review and explicit approval should a separate planned migration be applied to canonical Neon. Phase 0 UX/auth code changes do not need to mutate the live schema.
 
 ## Canonical live database for this release
 
-- Neon project: `wispy-mud-75323042`
+- Neon project: `wispy-mud-75323042` (`LEXA`)
 - Neon branch: `lexa-live` (`br-soft-star-b1dj2m2w`)
 - Database: `neondb`
 
-Migrations through `027_release_convergence` were recorded on that canonical branch at the 2026-10-13 audit. Migration `028_phase0_auth_rls_runtime_hardening` was absent and has been tested on a temporary branch only; it has not been applied to the canonical branch.
+## Phase 0 authentication migration
 
-Do not run destructive or unrelated database changes. Phase 4A, Phase 4B and Phase 5 are additive, tenant-scoped, and RLS protected. The Universal Business Engine remains internal technical infrastructure and is not exposed as a product module.
+`028_phase0_auth_rls_runtime_hardening.sql` is the additive Phase 0 hardening migration. It creates the narrowly scoped SECURITY DEFINER lookup for opaque refresh-token hashes, hardens known empty tenant-context RLS predicates, assigns the least-privilege `Member` role only to already-active memberships that have no role, and records its migration version. The live ledger and function/grant/owner properties were re-verified read-only on 15 October 2026. Do not rerun it on production as a substitute for deployment verification.
 
-
-## Phase 0 final hardening (migration 028)
-
-`028_phase0_auth_rls_runtime_hardening.sql` adds a narrowly scoped security-definer lookup for opaque refresh-token hashes, makes tenant/user RLS predicates fail closed for empty transaction-local settings, and assigns a least-privilege read-only `Member` role only to already-active memberships that have no role. It does not attach users to tenants, grant Owner/Admin privileges, reset data, or change secrets. The API now checks that migration 028, its SECURITY DEFINER function, the `lexa_app` execute grant, and an RLS-bypassing function owner are present before `/ready` reports success. Review the live ledger and apply this migration once to the canonical Neon branch before deploying the backend that calls the new function.
+`022_phase6a_brain_foundation.sql` now contains corrected dynamic policy naming and quoted empty-string handling. This fixes the source defect for future validation; it is **not** proof that a fresh full migration replay succeeds. The corrected policy-creation block was validated against the seven existing Brain tables on the disposable `lexa-convergence-test-2026-10-08` branch. This verifies that dynamic SQL block, not a full from-zero migration replay; validate the complete chain only after exact historical migration sources are recovered.

@@ -89,6 +89,29 @@ CREATE INDEX IF NOT EXISTS idx_brain_tool_runs_run ON brain_tool_runs (tenant_id
 ALTER TABLE brain_model_routes ENABLE ROW LEVEL SECURITY; ALTER TABLE brain_runs ENABLE ROW LEVEL SECURITY; ALTER TABLE brain_evidence ENABLE ROW LEVEL SECURITY; ALTER TABLE brain_memories ENABLE ROW LEVEL SECURITY; ALTER TABLE brain_recommendations ENABLE ROW LEVEL SECURITY; ALTER TABLE brain_tool_definitions ENABLE ROW LEVEL SECURITY; ALTER TABLE brain_tool_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE brain_model_routes FORCE ROW LEVEL SECURITY; ALTER TABLE brain_runs FORCE ROW LEVEL SECURITY; ALTER TABLE brain_evidence FORCE ROW LEVEL SECURITY; ALTER TABLE brain_memories FORCE ROW LEVEL SECURITY; ALTER TABLE brain_recommendations FORCE ROW LEVEL SECURITY; ALTER TABLE brain_tool_definitions FORCE ROW LEVEL SECURITY; ALTER TABLE brain_tool_runs FORCE ROW LEVEL SECURITY;
 
-DO $$ DECLARE t text; BEGIN FOR t IN SELECT unnest(ARRAY['brain_model_routes','brain_runs','brain_evidence','brain_memories','brain_recommendations','brain_tool_definitions','brain_tool_runs']) LOOP EXECUTE format('DROP POLICY IF EXISTS %I_tenant_isolation ON %I', t, t); EXECUTE format('CREATE POLICY %I_tenant_isolation ON %I USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), )::uuid) WITH CHECK (tenant_id = NULLIF(current_setting(app.tenant_id, true), )::uuid)', t, t); END LOOP; END $$;
+DO $$
+DECLARE
+  t text;
+  policy_name text;
+BEGIN
+  FOR t IN
+    SELECT unnest(ARRAY[
+      'brain_model_routes', 'brain_runs', 'brain_evidence', 'brain_memories',
+      'brain_recommendations', 'brain_tool_definitions', 'brain_tool_runs'
+    ])
+  LOOP
+    policy_name := t || '_tenant_isolation';
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', policy_name, t);
+    EXECUTE format(
+      'CREATE POLICY %I ON %I USING (tenant_id = NULLIF(current_setting(%L, true), %L)::uuid) WITH CHECK (tenant_id = NULLIF(current_setting(%L, true), %L)::uuid)',
+      policy_name,
+      t,
+      'app.tenant_id',
+      '',
+      'app.tenant_id',
+      ''
+    );
+  END LOOP;
+END $$;
 
 INSERT INTO schema_migrations(version) VALUES ('022_phase6a_brain_foundation') ON CONFLICT (version) DO NOTHING;

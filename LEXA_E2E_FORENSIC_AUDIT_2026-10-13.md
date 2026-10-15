@@ -93,3 +93,22 @@ Live database checks were repeated after promotion and passed as listed in secti
 **Still outstanding:** deploy the reviewed source in this ZIP to the LEXA GitHub/Render/Vercel pipeline; configure the actual Render service health-check path to `/ready`; the Vercel runtime error API was not accessible for post-fix logs; then perform a real browser login → refresh-cookie rotation → `/api/v1/auth/me` → dashboard/catalog/inventory reads → logout/revocation test. The user should retry the app now; if the browser still shows a connection issue, sign in again and capture the current request ID and Render logs. Do not mark Phase 0 fully accepted until that flow succeeds.
 
 Only LEXA's Neon project/branch and LEXA Render service were inspected or changed. No other workspace services, databases or projects were modified.
+
+
+## 7. Phase 0 candidate follow-up implementation
+
+The follow-up source package corrects the broken dynamic policy SQL in `migrations/022_phase6a_brain_foundation.sql`. Policy identifiers are now built as a single identifier (`table_name || '_tenant_isolation'`) and `current_setting('app.tenant_id', true)` uses an explicit empty-string normalization. This is a source repair only; it has not been executed against canonical Neon.
+
+The initial candidate had eight applied migration versions without matching SQL files. Migration `019_phase4a_customer_credit_allocation` was subsequently recovered byte-for-byte from historical GitHub commit `d850ce04c8930134f01a63cd65c5d1947a17b17d` and its Git blob SHA verified. Seven SQL sources remain unavailable in the inspected GitHub history: `010_phase2_catalog_intelligence`, `011_phase2_catalog_runtime_constraints`, `023_phase4_purchasing_core`, `024_phase4_purchasing_security`, `025_phase4_purchasing_permissions`, `026_phase4_membership_branch_integrity`, and `027_release_convergence`. The duplicate numeric `023` prefix is separately documented. `migrations/source_gaps.json` and `migrations/live_ledger_snapshot_2026-10-13.json` make this discrepancy machine-checkable. Do not fabricate replacement migrations.
+
+`docs/DEPLOYMENT_RENDER_VERCEL.md` now distinguishes liveness `/health` from readiness `/ready`. The source declares `/ready`, but Render's live dashboard still reports an empty health-check path; that control-plane setting was not changed. The CI workflow now runs both frontend contract tests and includes a strict gate that intentionally remains red until the missing exact migration sources have been recovered.
+
+Validation to run from the package root:
+
+```bash
+bash scripts/verify-phase0.sh
+python scripts/check_migration_sources.py --strict  # expected to fail while the seven documented gaps remain
+cd apps/web && npm run typecheck && npm test && npm run build
+```
+
+The Python and frontend static contract suites pass in the local environment. A full Next.js dependency-backed build could not be completed in this network-restricted environment because `apps/web/package-lock.json` is absent and the npm registry could not be resolved. No Vercel/Render settings, GitHub refs, or live database objects were changed by this follow-up implementation.

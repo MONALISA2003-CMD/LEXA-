@@ -75,3 +75,14 @@ def test_readiness_requires_auth_refresh_migration_and_safe_function():
     assert "app_role_can_execute" in health
     assert "function_owner_bypasses_rls" in health
     assert '"LEXA_AUTH_SCHEMA_NOT_READY"' in health
+
+
+def test_readiness_requires_cache_and_database_before_claiming_ready():
+    main = (ROOT / "apps/api/app/main.py").read_text()
+    health = (ROOT / "apps/api/app/health.py").read_text()
+    assert "cache_ok, cache_error = check_redis()" in main
+    assert "ready = database_ok and cache_ok" in main
+    assert '"cache": "ok" if cache_ok else "error"' in main
+    assert "socket_connect_timeout=2" in health
+    assert "socket_timeout=2" in health
+    assert '"failure_code"] = "LEXA_DEPENDENCY_NOT_READY"' in main
