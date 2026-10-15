@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AppShell } from "../../components/app-shell";
+import { ResponsiveDataTable } from "../../components/ui";
 import {
   createBarcode, createPrice, createPriceList, createProduct, createVariant,
   getBarcodes, getBrands, getCategories, getInventoryBalances, getPriceLists,
@@ -21,6 +22,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]), [categories, setCategories] = useState<Category[]>([]), [brands, setBrands] = useState<Brand[]>([]), [units, setUnits] = useState<Unit[]>([]), [priceLists, setPriceLists] = useState<PriceList[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]), [selected, setSelected] = useState<Product | null>(null), [selectedVariant, setSelectedVariant] = useState<Variant | null>(null), [prices, setPrices] = useState<ProductPrice[]>([]), [barcodes, setBarcodes] = useState<Barcode[]>([]), [balances, setBalances] = useState<InventoryBalance[]>([]);
   const [tab, setTab] = useState<DetailTab>("Overview"), [search, setSearch] = useState(""), [busy, setBusy] = useState(true), [message, setMessage] = useState("");
+  const [catalogState, setCatalogState] = useState<"loading" | "success" | "error">("loading");
   const [productName, setProductName] = useState(""), [productDescription, setProductDescription] = useState(""), [category, setCategory] = useState(""), [brand, setBrand] = useState("");
   const [variantName, setVariantName] = useState(""), [sku, setSku] = useState(""), [unit, setUnit] = useState(""), [variantCosting, setVariantCosting] = useState("WEIGHTED_AVERAGE");
   const [barcode, setBarcode] = useState(""), [barcodeType, setBarcodeType] = useState("EAN"), [barcodePrimary, setBarcodePrimary] = useState(false);
@@ -32,12 +34,12 @@ export default function ProductsPage() {
   const priceListMap = useMemo(() => new Map(priceLists.map((x) => [x.id, x])), [priceLists]);
 
   async function loadCatalog() {
-    setBusy(true); setMessage("");
+    setBusy(true); setMessage(""); setProducts([]); setCatalogState("loading");
     try {
       const [p, c, b, u, pl] = await Promise.all([getProducts(search), getCategories(), getBrands(), getUnits(), getPriceLists()]);
-      setProducts(p.items); setCategories(c.items); setBrands(b.items); setUnits(u.items); setPriceLists(pl);
+      setProducts(p.items); setCategories(c.items); setBrands(b.items); setUnits(u.items); setPriceLists(pl); setCatalogState("success");
       if (!category && c.items[0]) setCategory(c.items[0].id); if (!unit && u.items[0]) setUnit(u.items[0].id); if (!priceListId && pl[0]) setPriceListId(pl[0].id);
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to load the product catalogue."); }
+    } catch (error) { setProducts([]); setCatalogState("error"); setMessage(error instanceof Error ? error.message : "Unable to load the product catalogue."); }
     finally { setBusy(false); }
   }
 
@@ -102,16 +104,30 @@ export default function ProductsPage() {
   }
 
   return <AppShell title="Products" eyebrow="Catalog">
-    <div className="module-toolbar"><div><strong>Product catalogue</strong><span>{products.length} visible products · structured SKU, barcode and pricing identity</span></div><button className="button button-dark" onClick={() => document.getElementById("new-product")?.scrollIntoView({behavior:"smooth"})}>+ New product</button></div>
+    <div className="module-toolbar"><div><strong>Product catalogue</strong><span>{catalogState === "loading" ? "Checking current catalogue…" : catalogState === "error" ? "Catalogue unavailable" : `${products.length} visible products · structured SKU, barcode and pricing identity`}</span></div><button className="button button-dark" onClick={() => document.getElementById("new-product")?.scrollIntoView({behavior:"smooth"})}>+ New product</button></div>
     {message && <div className="notice">{message}</div>}
 
     <div className="workspace-grid">
       <section className="panel panel-wide"><div className="panel-head"><div><h2>Products</h2><p>Product records describe what the business sells or stocks. Sellable identity lives in variants.</p></div><div className="table-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search product, SKU or barcode" /></div></div>
-        <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Product</th><th>Category</th><th>Brand</th><th>Identity</th><th>Status</th><th /></tr></thead><tbody>
-          {products.map((product) => <tr key={product.id} className={selected?.id===product.id?"selected-row":""} onClick={() => void loadProductDetail(product)}><td><strong>{product.name}</strong><small>{product.description||product.product_type}</small></td><td>{categoryMap.get(product.category_id)||"—"}</td><td>{brandMap.get(product.brand_id||"")||"—"}</td><td>{product.has_variants?"Variant-based":"Single item"}</td><td><span className={`status-pill ${statusClass(product.status)}`}>{product.status}</span></td><td>›</td></tr>)}
-          {busy&&!products.length&&<tr><td colSpan={6}><div className="loading-placeholder">Loading authoritative catalogue…</div></td></tr>}
-          {!products.length&&!busy&&<tr><td colSpan={6}><div className="empty-state"><strong>No products found</strong><span>Create the first catalogue record or refine the search.</span></div></td></tr>}
-        </tbody></table></div>
+        <ResponsiveDataTable
+          rows={products}
+          getKey={(product) => product.id}
+          mobileTitle={(product) => product.name}
+          mobileSubtitle={(product) => product.description || product.product_type}
+          state={catalogState === "loading" ? "loading" : catalogState === "error" ? "error" : products.length ? "success" : "empty"}
+          stateTitle={catalogState === "error" ? "Product catalogue could not be loaded" : catalogState === "loading" ? "Loading product catalogue" : "No products found"}
+          stateDescription={catalogState === "error" ? "The latest catalogue could not be confirmed. Retry before making changes." : catalogState === "loading" ? "Checking the current records from your workspace." : "Create your first catalogue record or refine your search."}
+          onRetry={() => void loadCatalog()}
+          onRowClick={(product) => void loadProductDetail(product)}
+          emptyAction={<button type="button" className="button button-dark button-small" onClick={() => document.getElementById("new-product")?.scrollIntoView({ behavior: "smooth" })}>+ New product</button>}
+          columns={[
+            { key: "product", label: "Product", hideOnMobile: true, render: (product) => <><strong>{product.name}</strong><small>{product.description || product.product_type}</small></> },
+            { key: "category", label: "Category", render: (product) => categoryMap.get(product.category_id) || "—" },
+            { key: "brand", label: "Brand", render: (product) => brandMap.get(product.brand_id || "") || "—" },
+            { key: "identity", label: "Identity", render: (product) => product.has_variants ? "Variant-based" : "Single item" },
+            { key: "status", label: "Status", render: (product) => <span className={`status-pill ${statusClass(product.status)}`}>{product.status}</span> },
+          ]}
+        />
       </section>
 
       <aside className="panel detail-panel">{selected ? <>

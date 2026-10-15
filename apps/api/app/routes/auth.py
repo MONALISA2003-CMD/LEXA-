@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.dialects.postgresql import insert
@@ -32,6 +32,24 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=12, max_length=256)
     tenant_name: str = Field(min_length=2, max_length=200)
+    country_code: str = Field(default="UG", pattern=r"^[A-Z]{2}$")
+    currency_code: str = Field(default="UGX", pattern=r"^[A-Z]{3}$")
+    branch_name: str = Field(default="Main branch", min_length=2, max_length=200)
+    warehouse_name: str = Field(default="Main warehouse", min_length=2, max_length=200)
+    location_name: str = Field(default="Main location", min_length=2, max_length=200)
+
+    @field_validator("tenant_name", "branch_name", "warehouse_name", "location_name")
+    @classmethod
+    def normalize_workspace_names(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 2:
+            raise ValueError("Enter at least two characters.")
+        return normalized
+
+    @field_validator("country_code", "currency_code", mode="before")
+    @classmethod
+    def normalize_country_and_currency(cls, value: object) -> object:
+        return value.strip().upper() if isinstance(value, str) else value
 
 
 class LoginRequest(BaseModel):
@@ -112,6 +130,11 @@ def _registration_hash(body: RegisterRequest) -> str:
         "email": body.email.lower(),
         "password": body.password,
         "tenant_name": body.tenant_name.strip(),
+        "country_code": body.country_code,
+        "currency_code": body.currency_code,
+        "branch_name": body.branch_name.strip(),
+        "warehouse_name": body.warehouse_name.strip(),
+        "location_name": body.location_name.strip(),
     })
 
 
@@ -176,11 +199,23 @@ def register(
             tenant_id=tenant.id,
             legal_name=tenant_name,
             display_name=tenant_name,
-            country_code="UG",
-            currency_code="UGX",
+            country_code=body.country_code,
+            currency_code=body.currency_code,
         )
         membership = TenantMembership(tenant_id=tenant.id, user_id=user.id, status="ACTIVE")
         db.add_all([profile, membership])
+        db.flush()
+
+        # First-run defaults are created in the same transaction as the workspace.
+        # A retry therefore cannot leave a tenant half-onboarded with no stock location.
+        branch = Branch(tenant_id=tenant.id, name=body.branch_name, code="MAIN")
+        db.add(branch)
+        db.flush()
+        warehouse = Warehouse(tenant_id=tenant.id, branch_id=branch.id, name=body.warehouse_name, code="MAIN")
+        db.add(warehouse)
+        db.flush()
+        location = Location(tenant_id=tenant.id, warehouse_id=warehouse.id, name=body.location_name, code="MAIN")
+        db.add(location)
         db.flush()
 
         owner = Role(tenant_id=tenant.id, name="Owner", description="Initial tenant owner")
@@ -211,12 +246,12 @@ def register(
             event_type="workspace.created",
             aggregate_type="tenant",
             aggregate_id=tenant.id,
-            payload={"tenant_id": str(tenant.id), "user_id": str(user.id), "business_name": tenant_name},
+            payload={"tenant_id": str(tenant.id), "user_id": str(user.id), "business_name": tenant_name, "branch_id": str(branch.id), "warehouse_id": str(warehouse.id), "location_id": str(location.id)},
             actor_user_id=user.id,
             correlation_id=correlation_id,
         )
 
-        response = {"user_id": str(user.id), "tenant_id": str(tenant.id)}
+        response = {"user_id": str(user.id), "tenant_id": str(tenant.id), "branch_id": str(branch.id), "warehouse_id": str(warehouse.id), "location_id": str(location.id)}
         registration.response_status = 201
         registration.response_body = response
         registration.user_id = user.id

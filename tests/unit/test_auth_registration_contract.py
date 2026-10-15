@@ -11,8 +11,11 @@ def test_registration_bootstraps_business_profile_and_is_idempotent():
     source = AUTH.read_text()
     assert "RegistrationRequest" in source
     assert "BusinessProfile(" in source
-    assert 'country_code="UG"' in source
-    assert 'currency_code="UGX"' in source
+    assert 'country_code=body.country_code' in source
+    assert 'currency_code=body.currency_code' in source
+    assert 'branch = Branch(tenant_id=tenant.id, name=body.branch_name, code="MAIN")' in source
+    assert 'warehouse = Warehouse(tenant_id=tenant.id, branch_id=branch.id, name=body.warehouse_name, code="MAIN")' in source
+    assert 'location = Location(tenant_id=tenant.id, warehouse_id=warehouse.id, name=body.location_name, code="MAIN")' in source
     assert "with_for_update()" in source
     assert "Idempotency-Key" in source
     assert 'event_type="workspace.created"' in source

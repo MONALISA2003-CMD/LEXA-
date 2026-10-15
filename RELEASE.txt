@@ -1,1 +1,1 @@
-LEXA v2.8.7 — Phase 0 reliability implementation handoff. Local source and available tests verified; live deployment settings, seven historical migration sources, and credentialed hosted E2E remain release gates.
+LEXA v2.9.0 — Phase 1 UX foundation handoff. Responsive shared UI, navigation, sign-in, resumable workspace onboarding, and centralized API error copy implemented. Source contract/regression checks pass; full frontend install/typecheck/build, viewport screenshots, credentialed hosted E2E, and Phase 0 release blockers remain pending. Not production-deployed.

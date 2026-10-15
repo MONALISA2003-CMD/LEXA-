@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AppShell } from "../../components/app-shell";
+import { ResponsiveDataTable } from "../../components/ui";
 import {
   approveAdjustment, approveStockCount, approveTransfer, completeTransfer, createAdjustment, createLocation,
   createStockCount, createTransfer, createWarehouse, dispatchTransfer, getAdjustments, getBranches,
@@ -42,6 +43,7 @@ export default function InventoryPage() {
   const [locationFilter, setLocationFilter] = useState("");
   const [ledgerType, setLedgerType] = useState("");
   const [busy, setBusy] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -74,7 +76,7 @@ export default function InventoryPage() {
   const selectedCount = useMemo(() => counts.find((x) => x.id === selectedCountId) || null, [counts, selectedCountId]);
 
   async function load() {
-    setBusy(true); setError("");
+    setBusy(true); setError(""); setHasLoaded(false); setBalances([]);
     try {
       const [l, w, b, v, bal, led, adj, cnt, tr, check] = await Promise.all([
         getLocations(), getWarehouses(), getBranches(), getVariantOptions(),
@@ -82,14 +84,17 @@ export default function InventoryPage() {
         getInventoryLedger({ location_id: locationFilter || undefined, transaction_type: ledgerType || undefined }),
         getAdjustments(), getStockCounts(), getTransfers(), getInventoryIntegrity(),
       ]);
-      setLocations(l); setWarehouses(w); setBranches(b); setVariants(v); setBalances(bal); setLedger(led); setAdjustments(adj); setCounts(cnt); setTransfers(tr); setIntegrity(check.status);
+      setLocations(l); setWarehouses(w); setBranches(b); setVariants(v); setBalances(bal); setLedger(led); setAdjustments(adj); setCounts(cnt); setTransfers(tr); setIntegrity(check.status); setHasLoaded(true);
       if (!adjustLocation && l[0]) setAdjustLocation(l[0].id);
       if (!countLocation && l[0]) setCountLocation(l[0].id);
       if (!transferFrom && l[0]) setTransferFrom(l[0].id);
       if (!transferTo && l[1]) setTransferTo(l[1].id);
       if (!locationWarehouse && w[0]) setLocationWarehouse(w[0].id);
       if (!selectedCountId && cnt[0]) setSelectedCountId(cnt[0].id);
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to load inventory."); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to load inventory.");
+      setHasLoaded(false); setLocations([]); setWarehouses([]); setBranches([]); setVariants([]); setBalances([]); setLedger([]); setAdjustments([]); setCounts([]); setTransfers([]); setIntegrity("unavailable");
+    }
     finally { setBusy(false); }
   }
 
@@ -184,15 +189,35 @@ export default function InventoryPage() {
   const low = balances.filter((row) => Number(row.available) > 0 && Number(row.available) <= 5).length;
   const out = balances.filter((row) => Number(row.available) <= 0).length;
   const mismatch = integrity === "mismatch";
+  const metricUnavailable = !hasLoaded || Boolean(error);
+  const stockTableState = error ? "error" : !hasLoaded && busy ? "loading" : balances.length ? "success" : "empty";
 
   return <AppShell title="Inventory" eyebrow="Operations">
     <div className="module-toolbar"><div><strong>Stock control</strong><span>Historical ledger · projected balances · controlled operational workflows</span></div><div className="toolbar-actions"><button className="button button-soft" onClick={() => void load()} disabled={busy}>Refresh</button><button className="button button-dark" onClick={() => setTab("Adjustments")}>+ Inventory action</button></div></div>
     {message && <div className="notice">{message}</div>}{error && <div className="notice notice-error">{error}</div>}
-    <div className="metric-strip"><div><span>Stock value</span><strong>{money(total)}</strong><small>Projected from posted inventory state</small></div><div><span>Locations</span><strong>{locations.length}</strong><small>{warehouses.length} warehouses</small></div><div><span>Low stock</span><strong>{low}</strong><small>Available quantity ≤ 5</small></div><div><span>Out of stock</span><strong>{out}</strong><small>Available quantity ≤ 0</small></div></div>
+    <div className="metric-strip" aria-label="Inventory summary"><div><span>Stock value</span><strong>{metricUnavailable ? "—" : money(total)}</strong><small>{metricUnavailable ? "Current total unavailable" : "Projected from posted inventory state"}</small></div><div><span>Locations</span><strong>{metricUnavailable ? "—" : locations.length}</strong><small>{metricUnavailable ? "Not confirmed" : `${warehouses.length} warehouses`}</small></div><div><span>Low stock</span><strong>{metricUnavailable ? "—" : low}</strong><small>Available quantity ≤ 5</small></div><div><span>Out of stock</span><strong>{metricUnavailable ? "—" : out}</strong><small>Available quantity ≤ 0</small></div></div>
 
     <section className="panel"><div className="module-tabs">{tabs.map((name) => <button key={name} className={tab===name?"active":""} onClick={()=>setTab(name)}>{name}</button>)}</div>
 
-      {tab === "Stock" && <><div className="panel-head"><div><h2>Current stock</h2><p>On-hand, reservations and available stock are projections backed by the authoritative inventory ledger.</p></div><div className="filter-row"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search product or SKU"/><select value={locationFilter} onChange={e=>setLocationFilter(e.target.value)}><option value="">All locations</option>{locations.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></div></div><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Item</th><th>Location</th><th>On hand</th><th>Available</th><th>Avg. cost</th><th>Value</th><th>Updated</th></tr></thead><tbody>{balances.map(row=><tr key={row.id}><td><strong>{variantMap.get(row.variant_id)?.name || short(row.variant_id)}</strong><small>{variantMap.get(row.variant_id)?.sku || "Variant"}</small></td><td>{locationMap.get(row.location_id)?.name || short(row.location_id)}</td><td>{qty(row.on_hand)}</td><td className={Number(row.available)<=0?"number-danger":Number(row.available)<=5?"number-warning":""}>{qty(row.available)}</td><td>{money(row.average_cost)}</td><td>{money(row.stock_value)}</td><td>{new Date(row.updated_at).toLocaleString("en-GB")}</td></tr>)}{!balances.length&&!busy&&<tr><td colSpan={7}><div className="empty-state"><strong>No stock rows</strong><span>Stock appears here as inventory balances are established.</span></div></td></tr>}</tbody></table></div><div className={`integrity-line ${mismatch?"integrity-bad":""}`}><span className={`status-dot ${mismatch?"warning":""}`}/>{mismatch?"Inventory integrity mismatch detected. Investigate before using balance projections.":`Ledger integrity ${integrity} · ${balances.length} visible balance rows`}<button onClick={()=>void load()}>Recheck</button></div></>}
+      {tab === "Stock" && <><div className="panel-head"><div><h2>Current stock</h2><p>On-hand, reservations and available stock are projections backed by the authoritative inventory ledger.</p></div><div className="filter-row"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search product or SKU"/><select value={locationFilter} onChange={e=>setLocationFilter(e.target.value)}><option value="">All locations</option>{locations.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></div></div><ResponsiveDataTable
+        rows={balances}
+        getKey={(row) => row.id}
+        mobileTitle={(row) => variantMap.get(row.variant_id)?.name || short(row.variant_id)}
+        mobileSubtitle={(row) => variantMap.get(row.variant_id)?.sku || "Variant"}
+        state={stockTableState}
+        stateTitle={error ? "Stock balances could not be loaded" : busy ? "Checking current stock" : "No stock rows"}
+        stateDescription={error ? "The current inventory state could not be confirmed. Retry before making stock decisions." : busy ? "Checking posted ledger balances and location data." : "Stock will appear here after inventory balances are established."}
+        onRetry={() => void load()}
+        columns={[
+          { key: "item", label: "Item", hideOnMobile: true, render: (row) => <><strong>{variantMap.get(row.variant_id)?.name || short(row.variant_id)}</strong><small>{variantMap.get(row.variant_id)?.sku || "Variant"}</small></> },
+          { key: "location", label: "Location", render: (row) => locationMap.get(row.location_id)?.name || short(row.location_id) },
+          { key: "on-hand", label: "On hand", align: "right", render: (row) => qty(row.on_hand) },
+          { key: "available", label: "Available", align: "right", render: (row) => <span className={Number(row.available) <= 0 ? "number-danger" : Number(row.available) <= 5 ? "number-warning" : ""}>{qty(row.available)}</span> },
+          { key: "cost", label: "Avg. cost", align: "right", render: (row) => money(row.average_cost) },
+          { key: "value", label: "Value", align: "right", render: (row) => money(row.stock_value) },
+          { key: "updated", label: "Updated", render: (row) => new Date(row.updated_at).toLocaleString("en-GB") },
+        ]}
+      /><div className={`integrity-line ${mismatch?"integrity-bad":""}`}><span className={`status-dot ${mismatch?"warning":""}`}/>{mismatch?"Inventory integrity mismatch detected. Investigate before using balance projections.":`Ledger integrity ${integrity} · ${balances.length} visible balance rows`}<button onClick={()=>void load()}>Recheck</button></div></>}
 
       {tab === "Ledger" && <><div className="panel-head"><div><h2>Inventory ledger</h2><p>Immutable history of stock-affecting movements. Corrections are new transactions, not edits.</p></div><div className="filter-row"><select value={locationFilter} onChange={e=>setLocationFilter(e.target.value)}><option value="">All locations</option>{locations.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select><select value={ledgerType} onChange={e=>setLedgerType(e.target.value)}><option value="">All movement types</option><option>ADJUSTMENT</option><option>COUNT_RECONCILIATION</option><option>TRANSFER_OUT</option><option>TRANSFER_IN</option><option>PURCHASE</option><option>SALE</option><option>SALE_RETURN</option></select></div></div><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Time</th><th>Item</th><th>Location</th><th>Movement</th><th>Quantity</th><th>Unit cost</th><th>Balance after</th><th>Source</th></tr></thead><tbody>{ledger.map(row=><tr key={row.id}><td>{new Date(row.occurred_at).toLocaleString("en-GB")}</td><td><strong>{variantMap.get(row.variant_id)?.name || short(row.variant_id)}</strong><small>{variantMap.get(row.variant_id)?.sku || "Variant"}</small></td><td>{locationMap.get(row.location_id)?.name || short(row.location_id)}</td><td><span className="status-pill status-muted">{row.transaction_type}</span></td><td className={Number(row.quantity_delta)<0?"number-danger":"number-good"}>{Number(row.quantity_delta)>0?"+":""}{qty(row.quantity_delta)}</td><td>{money(row.unit_cost)}</td><td>{qty(row.balance_after)}</td><td>{row.reference_type?`${row.reference_type} ${row.reference_id?short(row.reference_id):""}`:"—"}</td></tr>)}{!ledger.length&&!busy&&<tr><td colSpan={8}><div className="empty-state"><strong>No ledger movements</strong><span>Posted stock movements will become the historical record here.</span></div></td></tr>}</tbody></table></div></>}
 

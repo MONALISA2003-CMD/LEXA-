@@ -1,4 +1,4 @@
-# LEXA — Production Hardening v2.8.7 Phase 0 Handoff
+# LEXA — v2.9.0 Phase 1 UX Foundation Handoff
 
 LEXA is a real multi-tenant business operating and intelligence system. The canonical business system of record is Neon PostgreSQL project `LEXA`, branch `lexa-live`, database `neondb`.
 
@@ -63,3 +63,12 @@ This package includes additional source-side hardening and release gates:
 
 
 For execution order and dedicated-account smoke acceptance, see `docs/PHASE0_RUNBOOK.md`. The current detailed acceptance status is `docs/PHASE0_IMPLEMENTATION_REPORT.md`.
+
+
+## Phase 1 UX foundation (15 October 2026)
+
+Version 2.9.0 carries the Phase 1 UX foundation implementation from the product/UX roadmap. It adds responsive shared UI states and table/card components, a four-action primary navigation plus More menu, readiness-linked service copy, a sign-in pass with workspace selection and password reveal, and resumable first-workspace setup that creates branch/warehouse/location defaults transactionally. API error language is centralized and the registration idempotency digest now binds all registration inputs.
+
+The handoff is source-only: the updated build is in the Phase 1 ZIP. On this runner, **104 Python tests and 3 frontend static contract tests passed, with one Python auth-refresh test skipped because the local environment lacks `redis`**. A local frontend dependency install/typecheck/build could not run because the npm registry was unavailable and `undici-types` was not cached; CI is configured to execute `npm ci`, typecheck, tests, and build with Node 24. The five-width visual screenshot checklist and credentialed hosted auth acceptance remain pending.
+
+The Phase 0 blockers remain release blockers: seven exact historical migration SQL sources are missing, hosted production readiness settings still require reconciliation, and GitHub write access returned 403. No production deployment or canonical Neon schema mutation was performed in this pass. See `docs/PHASE1_UX_IMPLEMENTATION_REPORT.md` and `docs/PHASE1_UX_RUNBOOK.md`.

@@ -10,7 +10,7 @@ export type StockCount = { id: string; location_id: string; status: string; scop
 export type Transfer = { id: string; source_location_id: string; destination_location_id: string; status: string; notes?: string | null; created_at: string; lines: { id: string; variant_id: string; requested_quantity: string; dispatched_quantity: string; received_quantity: string; unit_cost: string }[] };
 
 export type ApiHealth = { status: string };
-export type ApiReadiness = { status: string; dependencies?: { database?: string } };
+export type ApiReadiness = { status: string; dependencies?: { database?: string; cache?: string; [key: string]: string | undefined } };
 
 export type WorkspaceChoice = { tenant_id: string; tenant_name: string };
 export class WorkspaceSelectionError extends Error {
@@ -30,19 +30,24 @@ export class ApiError extends Error {
   }
 }
 
-function friendlyMessage(status: number, payload: unknown): string {
+function friendlyMessage(status: number, payload: unknown, path = ""): string {
   const detail = typeof payload === "object" && payload !== null && "detail" in payload ? (payload as { detail?: unknown }).detail : null;
   const code = typeof detail === "object" && detail !== null && "code" in detail ? String((detail as { code?: unknown }).code) : "";
   const raw = typeof detail === "string" ? detail : "";
   if (code === "WORKSPACE_SELECTION_REQUIRED") return "Choose a workspace to continue.";
-  if (status === 401) return "Those sign-in details don't match.";
+  if (status === 401 && path === "/api/v1/auth/login") return "The email or password doesn't match an account. Check both and try again.";
+  if (status === 401 && path === "/api/v1/auth/register") return "We could not verify that registration. Check the details and try again.";
+  if (status === 401) return "Your session may have expired. Sign in again to continue.";
+  if (status === 403) return "You don't have permission to do this. Ask your workspace administrator to review your access.";
+  if (status === 404) return "We couldn't find that record. It may have been removed or you may not have access.";
   if (status === 409 && raw === "User already exists") return "An account with this email already exists. Sign in to continue.";
-  if (status === 409 && raw.includes("Business")) return "That business information conflicts with an existing workspace.";
+  if (status === 409 && raw.toLowerCase().includes("business")) return "That business information conflicts with an existing workspace.";
+  if (status === 409 && code !== "WORKSPACE_SELECTION_REQUIRED") return "This change conflicts with the latest record. Refresh the page and review it before trying again.";
   if (status === 400 && raw === "Business name is required") return "Enter your business name to continue.";
-  if (status === 422) return "Please check the information and try again.";
-  if (status === 429) return "Too many attempts. Please wait a moment and try again.";
-  if (status >= 500) return "We couldn't connect to LEXA right now. Please try again in a moment.";
-  if (status >= 400) return "We couldn't complete that action. Please review the information and try again.";
+  if (status === 422) return "Please check the required fields and correct any invalid information.";
+  if (status === 429) return "Too many attempts. Please wait a moment before trying again.";
+  if (status === 408 || status === 502 || status === 503 || status === 504 || status >= 500) return "LEXA couldn't complete the request right now. Your change may not have been saved. Check the record before retrying.";
+  if (status >= 400) return "We couldn't complete that action. Review the information and try again.";
   return "Something went wrong. Please try again.";
 }
 
@@ -106,13 +111,13 @@ async function getJson<T>(path: string, init?: RequestInit, retried = false): Pr
       const workspaces = Array.isArray((detail as { workspaces?: unknown }).workspaces) ? (detail as { workspaces: unknown[] }).workspaces.filter((x): x is WorkspaceChoice => Boolean(x && typeof x === "object" && "tenant_id" in x && "tenant_name" in x)) : [];
       throw new WorkspaceSelectionError(workspaces);
     }
-    throw new ApiError(response.status, friendlyMessage(response.status, payload));
+    throw new ApiError(response.status, friendlyMessage(response.status, payload, path));
   }
   return payload as T;
 }
 function key() { return crypto.randomUUID(); }
 export function getHealth(signal?: AbortSignal) { return getJson<ApiHealth>("/health", { signal }); }
-export function getReadiness() { return getJson<ApiReadiness>("/ready"); }
+export function getReadiness(signal?: AbortSignal) { return getJson<ApiReadiness>("/ready", signal ? { signal } : undefined); }
 
 export type Category = { id:string; tenant_id:string; parent_id?:string|null; name:string; code:string; description?:string|null; status:string; sort_order:number };
 export type Brand = { id:string; tenant_id:string; name:string; code?:string|null; description?:string|null; status:string };
@@ -166,7 +171,7 @@ export function receiveTransfer(id:string, body:unknown) { return getJson<{id:st
 export function completeTransfer(id:string) { return getJson<{id:string;status:string}>(`/api/v1/inventory/transfers/${id}/complete`, { method:"POST", headers:{"Idempotency-Key":key()} }); }
 export type LoginRequest = { email: string; password: string; tenant_id?: string; };
 export type AuthResponse = { access_token: string; token_type: string; session_id: string; tenant_id: string; tenant_name: string };
-export type RegisterResponse = { user_id: string; tenant_id: string };
+export type RegisterResponse = { user_id: string; tenant_id: string; branch_id?: string; warehouse_id?: string; location_id?: string };
 
 /**
  * Refresh via the HttpOnly cookie. Share the promise across simultaneous page
@@ -191,7 +196,8 @@ function refreshSession(): Promise<AuthResponse> {
 }
 
 export async function login(body: LoginRequest) { const response = await getJson<AuthResponse>("/api/v1/auth/login", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }); setAccessToken(response.access_token); return response; }
-export function register(body: { email:string; password:string; tenant_name:string }) { return getJson<RegisterResponse>("/api/v1/auth/register", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
+export type RegisterRequest = { email: string; password: string; tenant_name: string; country_code: string; currency_code: string; branch_name: string; warehouse_name: string; location_name: string };
+export function register(body: RegisterRequest, idempotencyKey = key()) { return getJson<RegisterResponse>("/api/v1/auth/register", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":idempotencyKey}, body:JSON.stringify(body) }); }
 
 export type CurrentIdentity = {
   user: { id: string; email: string; is_active: boolean };
