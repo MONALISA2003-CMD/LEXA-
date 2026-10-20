@@ -1,0 +1,396 @@
+{
+  "manifest_version": 2,
+  "repository": "MONALISA2003-CMD/LEXA-",
+  "base_commit": "8124cca301062eac6ffe59f68d02fc689a3ffae1",
+  "base_ref": "refs/heads/main; inspected 2026-10-20",
+  "package_scope": "Combined Phase 3 Increment 01 prerequisites plus Increment 02 workspace context/onboarding and Increment 03 membership/invitation/branch assignments; Phase 0\u20133 gap-closure evidence",
+  "delivery_state": "reviewable source-only candidate; not merged, committed, deployed, or applied to production",
+  "installer": "scripts/apply_phase3_increments_02_03.py",
+  "installer_invariants": [
+    "exact baseline commit",
+    "clean working tree",
+    "exact Git blob SHA-1 for every replacement target",
+    "exact unique replacement anchors",
+    "no existing target overwrites",
+    "builds generated replay candidates in a staging directory before copying changes"
+  ],
+  "replacement_targets": [
+    {
+      "target": "apps/api/app/routes/organization.py",
+      "mode": "replace",
+      "package_source": "overrides/apps/api/app/routes/organization.py",
+      "source_sha256": "f20044dbb8a3bffdc340e77830013d606c472e9a0b17f1584b5727b191f8be6c",
+      "original_git_blob_sha1": "5150e386c1aed49daf46ed0f63264ee36eea04d9"
+    },
+    {
+      "target": "apps/web/app/administration/page.tsx",
+      "mode": "replace",
+      "package_source": "overrides/apps/web/app/administration.page.tsx",
+      "source_sha256": "b5716c0846d51e5a8c975fb4b437649e5cf1ba4f574887d346be8d7f09d76868",
+      "original_git_blob_sha1": "8ef73f5db57131b9e2f5783583157dc43c3462cc"
+    },
+    {
+      "target": "apps/web/app/invite/page.tsx",
+      "mode": "replace",
+      "package_source": "overrides/apps/web/app/invite/page.tsx",
+      "source_sha256": "c9fe749dc396c45a74eaa646016c4ca515ca91c7e8c695ec7a77f6aa4fd661d8",
+      "original_git_blob_sha1": "b71e004b83224045086ff6b95244ebd1a455a8a2"
+    },
+    {
+      "target": "apps/api/app/routes/auth.py",
+      "mode": "exact-anchor edits",
+      "original_git_blob_sha1": "dfe0f8bd204bc6b16908d61e311e75e53b420a98",
+      "changes": [
+        "use active-workspace listing",
+        "reject inactive target workspace"
+      ]
+    },
+    {
+      "target": "apps/api/app/main.py",
+      "mode": "exact-anchor edits",
+      "original_git_blob_sha1": "c6155bf8001e6e9341bb80ac84f3ae797c5210ee",
+      "changes": [
+        "import/register workspace-context router",
+        "import/register members and invitations routers"
+      ]
+    },
+    {
+      "target": "apps/web/components/app-shell.tsx",
+      "mode": "exact-anchor edits",
+      "original_git_blob_sha1": "b9763898c105048946be096b7e4352f7e28d232b",
+      "changes": [
+        "workspace/onboarding/team navigation",
+        "workspace switch link"
+      ]
+    },
+    {
+      "target": "apps/web/lib/api.ts",
+      "mode": "exact-anchor edits plus appended API helpers",
+      "original_git_blob_sha1": "d62b1f64fc78bc333c1017a6bcda2690b8f3cb23",
+      "append_source": "overrides/apps/web/lib/api.phase3-increments-02-03.append.ts.txt"
+    }
+  ],
+  "new_repository_paths": [
+    {
+      "target": "apps/api/app/workspace_domain.py",
+      "package_source": "overrides/apps/api/app/workspace_domain.py",
+      "sha256": "4427fa785e8eb619bfcf7e86ab230d1456462d1cf05739829faac39ec2f172d8",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    },
+    {
+      "target": "apps/api/app/workspace_models.py",
+      "package_source": "overrides/apps/api/app/workspace_models.py",
+      "sha256": "0a4354aeb9bf8c1ba69d996484392eaffd5b793b7d59fe58a2df937f5cc37852",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    },
+    {
+      "target": "apps/api/app/routes/workspace_context.py",
+      "package_source": "overrides/apps/api/app/routes/workspace_context.py",
+      "sha256": "eb84ab1a11f82c3b2534ac4d9606d63690b405d16f0b605ba0865ede7fea3a73",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    },
+    {
+      "target": "apps/api/app/routes/membership_admin.py",
+      "package_source": "overrides/apps/api/app/routes/membership_admin.py",
+      "sha256": "3c90ea631d44d9b85879ca469183083183167e7513d74acb23a864d6ea191ecb",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    },
+    {
+      "target": "apps/web/app/workspace/page.tsx",
+      "package_source": "overrides/apps/web/app/workspace/page.tsx",
+      "sha256": "91a213ec57f8e7f98146e4e664f3f63226d7f2e4e31ed50e158ea85b0464a909",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    },
+    {
+      "target": "apps/web/app/onboarding/page.tsx",
+      "package_source": "overrides/apps/web/app/onboarding/page.tsx",
+      "sha256": "a6d3565d054f7882a5ac5436c24512a449c3553b1d6be4c5d45dbb530d19ed27",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    },
+    {
+      "target": "apps/web/app/administration/members/page.tsx",
+      "package_source": "overrides/apps/web/app/administration/members/page.tsx",
+      "sha256": "0eadb000c70bbc457b172ae7c35e47054df45ace75f75fbc086a68034064c55d",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    },
+    {
+      "target": "migrations/030_phase3_workspace_memberships.sql",
+      "package_source": "overrides/migrations/030_phase3_workspace_memberships.sql",
+      "sha256": "dd0ca04a05d721ad772307f26bedc2d4a7718ce267b4e7cc885d08162f8bfcfa",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    },
+    {
+      "target": "migrations/reconstructed/005a_phase0_outbox_contract_reconciliation.replay-only.sql",
+      "package_source": "overrides/migrations/reconstructed/005a_phase0_outbox_contract_reconciliation.replay-only.sql",
+      "sha256": "bb0b471e47ef5ed7734bfb2c4327f20a75bf8c0f0effbbd2d4eba11fd8b084ef",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    },
+    {
+      "target": "migrations/reconstructed/025a_phase2_membership_branch_contract_reconciliation.replay-only.sql",
+      "package_source": "overrides/migrations/reconstructed/025a_phase2_membership_branch_contract_reconciliation.replay-only.sql",
+      "sha256": "ff7ccc94249c6b7aa95ecc75c54a201e9a8f3875f280d3c03ca329cabbac1b74",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    },
+    {
+      "target": "migrations/reconstructed/clean_replay_order.json",
+      "package_source": "overrides/migrations/reconstructed/clean_replay_order.json",
+      "sha256": "d15dd5bd0f845c33489108cbec2ebbb07b92a10547ff44648aa7a305d0592c3e",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    },
+    {
+      "target": "scripts/build_phase0_3_replay_candidates.py",
+      "package_source": "scripts/build_phase0_3_replay_candidates.py",
+      "sha256": "f68e88723edfb39a64774f700435a29dcba1bdf7c5cc19a9a382f2aa42ec4192",
+      "install_mode": "copy-new-file; installer refuses if target exists"
+    }
+  ],
+  "generated_replay_candidates": [
+    {
+      "target": "migrations/reconstructed/004_catalog_and_rbac_hardening.replay-equivalent.sql",
+      "generated_by": "scripts/build_phase0_3_replay_candidates.py",
+      "original_path": "migrations/004_catalog_and_rbac_hardening.sql",
+      "required_original_git_blob_sha1": "a5b65091c2f31697ecd2caf5fdd235ceba468a66",
+      "install_mode": "generate-on-install; never overwrites historical original"
+    },
+    {
+      "target": "migrations/reconstructed/021_phase5_analytics_foundation.repair-candidate.sql",
+      "generated_by": "scripts/build_phase0_3_replay_candidates.py",
+      "original_path": "migrations/021_phase5_analytics_foundation.sql",
+      "required_original_git_blob_sha1": "c32a60352f10a1463937ff4aa0b204adf38f470b",
+      "install_mode": "generate-on-install; original malformed bytes remain untouched"
+    }
+  ],
+  "historical_source_gaps": [
+    "migrations/010_phase2_catalog_intelligence.sql",
+    "migrations/011_phase2_catalog_runtime_constraints.sql",
+    "migrations/023_phase4_purchasing_core.sql",
+    "migrations/024_phase4_purchasing_security.sql",
+    "migrations/025_phase4_purchasing_permissions.sql",
+    "migrations/026_phase4_membership_branch_integrity.sql"
+  ],
+  "malformed_original_source": {
+    "path": "migrations/021_phase5_analytics_foundation.sql",
+    "git_blob_sha1": "c32a60352f10a1463937ff4aa0b204adf38f470b",
+    "handling": "preserved untouched; separate repair candidate generated only after Git blob hash guard"
+  },
+  "isolated_replay_evidence": {
+    "project_id": "wispy-mud-75323042",
+    "branch_id": "br-purple-art-b1horduo",
+    "branch_name": "lexa-phase0-3-replay-20261020",
+    "database": "lexa_phase0_3_cleanbridge",
+    "status": "isolated candidate replay with labelled equivalents; final 025a/030 DDL reapplied idempotently; not a full fresh replay of final bundle",
+    "schema_counts": {
+      "tables": 119,
+      "views": 0,
+      "columns": 1300,
+      "indexes": 446,
+      "constraints": 1799,
+      "rls_policies": 116,
+      "public_functions": 460,
+      "user_triggers": 36
+    },
+    "rls_test": "under lexa_app, tenant-scoped reads filtered to one tenant and cross-tenant invite/assignment inserts were rejected; synthetic fixtures removed"
+  },
+  "validation_summary": {
+    "python_tests": "26 passed",
+    "python_compile": "passed",
+    "node_contract_tests": "4 passed",
+    "typescript_contract_fixture": "passed",
+    "node24_base_checkout": "npm ci, npm run typecheck, 23/23 npm tests and npm run build passed on baseline only; not overlay"
+  },
+  "known_limitations": [
+    "six exact historical SQL sources remain unrecovered; strict source checker remains failed",
+    "full fresh replay from empty DB with the exact final package bundle is still required",
+    "full dependency-complete backend suite and frontend build/typecheck/tests have not run after applying the overlay to the app",
+    "authenticated browser E2E not run",
+    "branch assignment enforcement is not yet wired through every branch-scoped business endpoint",
+    "canonical schema parity is not signed off",
+    "live lexa_runtime role remains overprivileged in last recorded production inspection; no role or credential change done",
+    "no hosted branch/commit/PR/CI/deployment was created; prior branch write attempt returned 403",
+    "no production DB/service settings or live data were mutated"
+  ],
+  "package_file_inventory_note": "SHA-256 and byte sizes are listed for all stable package files excluding this manifest and SHA256SUMS itself. Transient caches and compiled Python bytecode are excluded from ZIP delivery.",
+  "package_files": [
+    {
+      "path": "README.md",
+      "sha256": "b3d14628181baa6c4fd61614b7d22df383fb2fd6c91411cd77b5a8545540f638",
+      "size_bytes": 6056
+    },
+    {
+      "path": "VALIDATION_RESULTS.json",
+      "sha256": "9c83d6b028ed339cd2a6ec76ac5854bd38a93ca574b8d82d8abb2d9b18dd8f6f",
+      "size_bytes": 6134
+    },
+    {
+      "path": "docs/ACCEPTANCE_MATRIX.md",
+      "sha256": "b95279b3be5b3ccc88aaeb07391e2c43d6d8f3c6cbfdc37bc0c4a3f51a018412",
+      "size_bytes": 3147
+    },
+    {
+      "path": "docs/IMPLEMENTATION_REPORT.md",
+      "sha256": "a962ba9642fc120a875157fc9607dde4a66ed5e74b4f3e26298816c472d6df40",
+      "size_bytes": 6579
+    },
+    {
+      "path": "docs/PHASE0_TO_PHASE3_CLOSURE_MATRIX.md",
+      "sha256": "ddc178e6e7a426cc56ec18becbae117deae1d1fdfe8fd23c89a3a2f74e4c3d9e",
+      "size_bytes": 8585
+    },
+    {
+      "path": "fixtures/typecheck/apps/web/app/administration/members/page.tsx",
+      "sha256": "0eadb000c70bbc457b172ae7c35e47054df45ace75f75fbc086a68034064c55d",
+      "size_bytes": 11752
+    },
+    {
+      "path": "fixtures/typecheck/apps/web/app/invite/page.tsx",
+      "sha256": "317f1b8fcee22b07fb813b78b3aebf2b0767d00c9e086bb55b369fa1d787a734",
+      "size_bytes": 3624
+    },
+    {
+      "path": "fixtures/typecheck/apps/web/app/onboarding/page.tsx",
+      "sha256": "a6d3565d054f7882a5ac5436c24512a449c3553b1d6be4c5d45dbb530d19ed27",
+      "size_bytes": 2927
+    },
+    {
+      "path": "fixtures/typecheck/apps/web/app/workspace/page.tsx",
+      "sha256": "91a213ec57f8e7f98146e4e664f3f63226d7f2e4e31ed50e158ea85b0464a909",
+      "size_bytes": 2942
+    },
+    {
+      "path": "fixtures/typecheck/apps/web/components/app-shell.tsx",
+      "sha256": "340638e75fbab439e64408251a5496c2d256c131b425bca5c6e21e40398e8785",
+      "size_bytes": 179
+    },
+    {
+      "path": "fixtures/typecheck/apps/web/lib/api-client.ts",
+      "sha256": "b6faadd8fd4d9ea6af8b2bb6439ff1d5ba8d592963e80fc280a55515e8c7ae30",
+      "size_bytes": 5498
+    },
+    {
+      "path": "fixtures/typecheck/apps/web/lib/api.ts",
+      "sha256": "d35ae2a998164d7a833ad02b30f9115acad4a54bca83d850a8095018a60b3a1d",
+      "size_bytes": 3140
+    },
+    {
+      "path": "fixtures/typecheck/tsconfig.json",
+      "sha256": "d43daddb5ec31a2271d6343a7aa720d42e60d2b76e13b83d56a9087b6a9d3732",
+      "size_bytes": 260
+    },
+    {
+      "path": "fixtures/typecheck/types.d.ts",
+      "sha256": "787c991bf4c4bfc5bebf4ba6a81decac70b65d07d5213662a4260d0aae9f3161",
+      "size_bytes": 1281
+    },
+    {
+      "path": "overrides/apps/api/app/routes/membership_admin.py",
+      "sha256": "3c90ea631d44d9b85879ca469183083183167e7513d74acb23a864d6ea191ecb",
+      "size_bytes": 29552
+    },
+    {
+      "path": "overrides/apps/api/app/routes/organization.py",
+      "sha256": "f20044dbb8a3bffdc340e77830013d606c472e9a0b17f1584b5727b191f8be6c",
+      "size_bytes": 22971
+    },
+    {
+      "path": "overrides/apps/api/app/routes/workspace_context.py",
+      "sha256": "eb84ab1a11f82c3b2534ac4d9606d63690b405d16f0b605ba0865ede7fea3a73",
+      "size_bytes": 9224
+    },
+    {
+      "path": "overrides/apps/api/app/workspace_domain.py",
+      "sha256": "4427fa785e8eb619bfcf7e86ab230d1456462d1cf05739829faac39ec2f172d8",
+      "size_bytes": 2272
+    },
+    {
+      "path": "overrides/apps/api/app/workspace_models.py",
+      "sha256": "0a4354aeb9bf8c1ba69d996484392eaffd5b793b7d59fe58a2df937f5cc37852",
+      "size_bytes": 2947
+    },
+    {
+      "path": "overrides/apps/web/app/administration/members/page.tsx",
+      "sha256": "0eadb000c70bbc457b172ae7c35e47054df45ace75f75fbc086a68034064c55d",
+      "size_bytes": 11752
+    },
+    {
+      "path": "overrides/apps/web/app/administration.page.tsx",
+      "sha256": "b5716c0846d51e5a8c975fb4b437649e5cf1ba4f574887d346be8d7f09d76868",
+      "size_bytes": 17707
+    },
+    {
+      "path": "overrides/apps/web/app/invite/page.tsx",
+      "sha256": "c9fe749dc396c45a74eaa646016c4ca515ca91c7e8c695ec7a77f6aa4fd661d8",
+      "size_bytes": 3479
+    },
+    {
+      "path": "overrides/apps/web/app/onboarding/page.tsx",
+      "sha256": "a6d3565d054f7882a5ac5436c24512a449c3553b1d6be4c5d45dbb530d19ed27",
+      "size_bytes": 2927
+    },
+    {
+      "path": "overrides/apps/web/app/workspace/page.tsx",
+      "sha256": "91a213ec57f8e7f98146e4e664f3f63226d7f2e4e31ed50e158ea85b0464a909",
+      "size_bytes": 2942
+    },
+    {
+      "path": "overrides/apps/web/lib/api.phase3-increments-02-03.append.ts.txt",
+      "sha256": "ef97344eb840786909146e6d55bfd5a96286a748c74590d00abae332016aa0b6",
+      "size_bytes": 4512
+    },
+    {
+      "path": "overrides/migrations/030_phase3_workspace_memberships.sql",
+      "sha256": "dd0ca04a05d721ad772307f26bedc2d4a7718ce267b4e7cc885d08162f8bfcfa",
+      "size_bytes": 9075
+    },
+    {
+      "path": "overrides/migrations/reconstructed/005a_phase0_outbox_contract_reconciliation.replay-only.sql",
+      "sha256": "bb0b471e47ef5ed7734bfb2c4327f20a75bf8c0f0effbbd2d4eba11fd8b084ef",
+      "size_bytes": 4609
+    },
+    {
+      "path": "overrides/migrations/reconstructed/025a_phase2_membership_branch_contract_reconciliation.replay-only.sql",
+      "sha256": "ff7ccc94249c6b7aa95ecc75c54a201e9a8f3875f280d3c03ca329cabbac1b74",
+      "size_bytes": 2826
+    },
+    {
+      "path": "overrides/migrations/reconstructed/clean_replay_order.json",
+      "sha256": "d15dd5bd0f845c33489108cbec2ebbb07b92a10547ff44648aa7a305d0592c3e",
+      "size_bytes": 6212
+    },
+    {
+      "path": "scripts/apply_phase3_increments_02_03.py",
+      "sha256": "5ae81ad128fe2bf3454945477fa4e265370b2d4825a3bd4bcc4b044907dbe85a",
+      "size_bytes": 14648
+    },
+    {
+      "path": "scripts/build_phase0_3_replay_candidates.py",
+      "sha256": "f68e88723edfb39a64774f700435a29dcba1bdf7c5cc19a9a382f2aa42ec4192",
+      "size_bytes": 5709
+    },
+    {
+      "path": "scripts/validate-package.sh",
+      "sha256": "b28eec24189b20152a56f9df1c678977eb66aaf3a3ef9493e6c3cb8b076b96a6",
+      "size_bytes": 424
+    },
+    {
+      "path": "tests/phase3-increments-02-03.test.mjs",
+      "sha256": "c0760be07e8946b8158f1a9cf0c063c6bd71088678e1e765c41178ddbd32abab",
+      "size_bytes": 2898
+    },
+    {
+      "path": "tests/test_build_replay_candidates.py",
+      "sha256": "7a32df44f5d02cf2140612e4904ba22d608095355601fc4a10a955c5ef1bed57",
+      "size_bytes": 5299
+    },
+    {
+      "path": "tests/test_phase3_increments_02_03_contract.py",
+      "sha256": "c9e50be0121c2ca34ad96bcb2c6a3f4f439efe7044dc1d8e05b99000110d8260",
+      "size_bytes": 7015
+    },
+    {
+      "path": "tests/test_workspace_domain.py",
+      "sha256": "c5b82749390bd2ab6916e4ec9b78bc33cde9d11d5d2676d40dca4ff83f042392",
+      "size_bytes": 2705
+    }
+  ],
+  "package_file_count": 36
+}

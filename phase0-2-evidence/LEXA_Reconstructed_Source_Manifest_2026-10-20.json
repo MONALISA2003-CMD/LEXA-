@@ -1,0 +1,140 @@
+{
+  "schema_version": 2,
+  "project": "LEXA",
+  "as_of": "2026-10-20",
+  "historical_source_gate": "UNRESOLVED: exact SQL bytes for six source gaps were not recovered from 58 distinct historical ZIP archives spanning 116 ZIP-related commits; zero hits, zero scan errors.",
+  "semantic_replay_gate": "BLOCKED: an isolated first-pass replay applied the available chain plus explicitly labelled equivalents and produced the same 119 table and 116 policy counts as the observed canonical clone, but schema parity failed across columns, constraints, indexes, functions, and triggers. The first-pass database used earlier drafts of the reconstructed 010/011/024/026 files and must be replayed cleanly against the current refreshed files before any status can change.",
+  "release_gate": "NO-GO for Phase 3 production cutover until exact-source decision is documented, refreshed semantic replay deltas reconciled, CI is installed and passes on an immutable SHA, branch protection is enforced, authenticated E2E with isolated tenant fixtures passes, and Render staging/health-check settings are confirmed.",
+  "rule": "Equivalent SQL, compatibility deltas, and syntax-normalized replay input must never be moved to original migration paths or counted as exact-source recovery.",
+  "source_gap_equivalents": [
+    {
+      "gap_version": "010_phase2_catalog_intelligence",
+      "path": "migrations/reconstructed/010_phase2_catalog_intelligence.equivalent.sql",
+      "sha256": "a1d414eb36186e28fbc24e3fd2274b9eae688b0e0f5556b83ce53430649c8d8e",
+      "bytes": 10522,
+      "status": "reconstructed_equivalent_not_historical_source",
+      "derived_from": "observed LEXA canonical Neon schema, available checked-in migrations, available 027 DDL, and application contracts",
+      "warning": "Not original applied SQL. Not proof of historical data transformations. Must not occupy the original migrations/<version>.sql path."
+    },
+    {
+      "gap_version": "011_phase2_catalog_runtime_constraints",
+      "path": "migrations/reconstructed/011_phase2_catalog_runtime_constraints.equivalent.sql",
+      "sha256": "650aad6e622bc230b6ea85575bc2eed52e5387085f3d718e97ec162bfdc4e1b8",
+      "bytes": 8129,
+      "status": "reconstructed_equivalent_not_historical_source",
+      "derived_from": "observed LEXA canonical Neon schema, available checked-in migrations, available 027 DDL, and application contracts",
+      "warning": "Not original applied SQL. Not proof of historical data transformations. Must not occupy the original migrations/<version>.sql path."
+    },
+    {
+      "gap_version": "023_phase4_purchasing_core",
+      "path": "migrations/reconstructed/023_phase4_purchasing_core.equivalent.sql",
+      "sha256": "f1631d11e65e7b3dc6d9d755b57cb7449139762cd6004b7a1146fc0cfdbe16e2",
+      "bytes": 13582,
+      "status": "reconstructed_equivalent_not_historical_source",
+      "derived_from": "observed LEXA canonical Neon schema, available checked-in migrations, available 027 DDL, and application contracts",
+      "warning": "Not original applied SQL. Not proof of historical data transformations. Must not occupy the original migrations/<version>.sql path."
+    },
+    {
+      "gap_version": "024_phase4_purchasing_security",
+      "path": "migrations/reconstructed/024_phase4_purchasing_security.equivalent.sql",
+      "sha256": "696365a93831c30b98b89884ad59c0950949bfd21514cdf3ae0a98a74ccc1419",
+      "bytes": 2353,
+      "status": "reconstructed_equivalent_not_historical_source",
+      "derived_from": "observed LEXA canonical Neon schema, available checked-in migrations, available 027 DDL, and application contracts",
+      "warning": "Not original applied SQL. Not proof of historical data transformations. Must not occupy the original migrations/<version>.sql path."
+    },
+    {
+      "gap_version": "025_phase4_purchasing_permissions",
+      "path": "migrations/reconstructed/025_phase4_purchasing_permissions.equivalent.sql",
+      "sha256": "71777cb9740f55bd1f52bfa3c7a11bc677b5958216aad319a19a32f7dfbe09ad",
+      "bytes": 1193,
+      "status": "reconstructed_equivalent_not_historical_source",
+      "derived_from": "observed LEXA canonical Neon schema, available checked-in migrations, available 027 DDL, and application contracts",
+      "warning": "Not original applied SQL. Not proof of historical data transformations. Must not occupy the original migrations/<version>.sql path."
+    },
+    {
+      "gap_version": "026_phase4_membership_branch_integrity",
+      "path": "migrations/reconstructed/026_phase4_membership_branch_integrity.equivalent.sql",
+      "sha256": "992be2a5c405ccfea2ead9aa2fcce0d45240aee27618de64e0952aaa76691cec",
+      "bytes": 2082,
+      "status": "reconstructed_equivalent_not_historical_source",
+      "derived_from": "observed LEXA canonical Neon schema, available checked-in migrations, available 027 DDL, and application contracts",
+      "warning": "Not original applied SQL. Not proof of historical data transformations. Must not occupy the original migrations/<version>.sql path."
+    }
+  ],
+  "additional_isolated_replay_files": [
+    {
+      "path": "migrations/reconstructed/016_payments_tenant_identity_compatibility.equivalent.sql",
+      "sha256": "690d7279944f5a395c0b37958cd8a94994524177633e2c3e95e3de7e2dc95d19",
+      "bytes": 452,
+      "status": "isolated_replay_compatibility_not_historical_source"
+    },
+    {
+      "path": "migrations/reconstructed/schema_observation_compatibility.equivalent.sql",
+      "sha256": "36e31c3877f19efcbf8db556c6566850b0fed1aa87f3d7845c4f11cebb82aa72",
+      "bytes": 7753,
+      "status": "isolated_replay_compatibility_not_historical_source"
+    }
+  ],
+  "recovery_scan": {
+    "repository": "MONALISA2003-CMD/LEXA-",
+    "head": "4dac83541badc21800f84e652f0f192c211a612a",
+    "zip_related_commits_examined": 116,
+    "archive_versions_examined": 58,
+    "hits": [],
+    "errors": [],
+    "status": "NO_EXACT_MATCH_FOUND"
+  },
+  "additional_source_integrity_finding": {
+    "path": "migrations/021_phase5_analytics_foundation.sql",
+    "finding": "A GitHub-read copy contains 32 literal backslash-n sequences after the intended SQL function block and additional non-SQL text. Raw execution failed at a backslash. Isolated replay used a documented normalization only; original file untouched.",
+    "impact": "Additional source-integrity blocker, separate from the six missing historical migration sources.",
+    "sha256_observed_file_bytes": "d26742cfadbb0ae1e1db4563c955dd3271cca4aaceec4a79190feefe27dca298"
+  },
+  "schema_replay": {
+    "project_id": "wispy-mud-75323042",
+    "isolated_branch_id": "br-crimson-shadow-b1e7n1ce",
+    "database": "lexa_phase2_replay_full",
+    "not_production": true,
+    "canonical_clone": {
+      "tables": 119,
+      "views": 0,
+      "functions": 458,
+      "triggers": 36,
+      "policies": 116,
+      "constraints": 1804,
+      "indexes": 433,
+      "columns": 1305
+    },
+    "reconstructed_replay_first_pass": {
+      "tables": 119,
+      "views": 0,
+      "functions": 455,
+      "triggers": 32,
+      "policies": 116,
+      "constraints": 1792,
+      "indexes": 423,
+      "columns": 1291
+    },
+    "status": "SCHEMA_PARITY_FAILED",
+    "notes": [
+      "A replay-only compatibility index uq_payments_tenant_id was required because checked-in 012 does not create the composite unique key required by 016.",
+      "The raw checked-in 021 file failed due literal escaped line breaks/appended non-SQL text; replay normalized the input only, without editing source bytes.",
+      "The observed-schema compatibility SQL is included in the package but was not applied in the measured first-pass diff.",
+      "The first-pass replay used earlier equivalent drafts; a fresh replay and diff against current hashes is required."
+    ]
+  },
+  "remote_access": {
+    "github_branch_create": "403 Resource not accessible by integration; no commit/PR/workflow installation performed.",
+    "main_branch_protection": "unprotected at inspection; integration was unable to create branch/protection change.",
+    "render_staging": "No separate LEXA staging service found; existing LEXA service is live and auto-deploy-enabled; no service setting changed.",
+    "production_changes": "No production SQL writes, credential rotation, role cutover, deploy trigger, or Render/Vercel configuration change performed."
+  },
+  "revalidation_after_equivalent_edits": "Current reconstructed SQL files and compatibility SQL were updated after the measured first-pass replay; checksums below are current, but the replay comparison has not yet been rerun against these updated hashes.",
+  "browser_acceptance_source": {
+    "path": "apps/web/e2e/acceptance.spec.ts",
+    "config": "apps/web/playwright.config.ts",
+    "result": "4 passed, 0 failed on the inspected LEXA SHA using Node 24.21.0 / Playwright 1.64.1 / Chromium 156.0.8078.4 in a disposable Vercel sandbox",
+    "integration_status": "Source/config delivered only. @playwright/test and updated package-lock are not committed; package integration into CI awaits a reviewed lockfile update in an authorized Node 24 environment."
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "checked_date": "2026-10-20",
+  "repository": "MONALISA2003-CMD/LEXA-",
+  "baseline_main_commit": "8124cca301062eac6ffe59f68d02fc689a3ffae1",
+  "delivery_state": "guarded source-only candidate overlay; not installed to hosted repository, committed, merged, migrated in production, or deployed",
+  "local_package_validation_runtime": {
+    "python": "CPython 3.13.x",
+    "node": "local package Node test runner",
+    "typescript": "isolated fixture typecheck"
+  },
+  "disposable_base_checkout_node24_validation": {
+    "sandbox": "lexa-phase0-3-final-validation-20261020",
+    "source_sha": "8124cca301062eac6ffe59f68d02fc689a3ffae1",
+    "node": "v24.14.1",
+    "scope": "pinned base checkout without this overlay"
+  },
+  "passed": [
+    {
+      "command": "python -m pytest -q tests",
+      "result": "26 passed; pure-domain, source-contract, replay-candidate generator, preflight and index-idempotency checks"
+    },
+    {
+      "command": "python -m compileall -q overrides/apps/api/app scripts",
+      "result": "passed; candidate API modules, installer and replay-candidate builder compile"
+    },
+    {
+      "command": "node --test tests/phase3-increments-02-03.test.mjs",
+      "result": "4 passed, 0 failed"
+    },
+    {
+      "command": "(cd fixtures/typecheck && npx --no-install tsc --noEmit -p tsconfig.json)",
+      "result": "passed for isolated TypeScript UI/API-helper contract fixtures; does not substitute for application typecheck"
+    },
+    {
+      "command": "Node 24 base checkout: npm ci; npm run typecheck; npm test; npm run build",
+      "result": "npm ci passed; application typecheck passed; 23/23 existing frontend tests passed; Next.js production build passed on pinned baseline, not overlay"
+    },
+    {
+      "check": "Isolated Neon Phase 0\u20133 replay candidate branch",
+      "project_id": "wispy-mud-75323042",
+      "branch_id": "br-purple-art-b1horduo",
+      "database": "lexa_phase0_3_cleanbridge",
+      "result": "reached 030 with labelled equivalents/reconciliation steps; final 025a/030 PK/index DDL re-applied idempotently"
+    },
+    {
+      "check": "Final isolated schema snapshot",
+      "result": {
+        "tables": 119,
+        "views": 0,
+        "columns": 1300,
+        "indexes": 446,
+        "constraints": 1799,
+        "rls_policies": 116,
+        "public_functions": 460,
+        "user_triggers": 36
+      }
+    },
+    {
+      "check": "Phase 3 target-table RLS flags",
+      "result": "tenant_invitations and membership_branch_assignments have RLS enabled and FORCE RLS; each has one app.tenant_id policy"
+    },
+    {
+      "check": "RLS behavior under lexa_app",
+      "result": "two-tenant transaction: tenant A saw exactly its own invitation and assignment; attempted tenant-B invitation and branch-assignment INSERTs were denied; test fixtures were deleted in the same transaction; post-check found zero residual fixtures"
+    },
+    {
+      "check": "Membership branch key and duplicate indexes",
+      "result": "membership_branch_assignments has PRIMARY KEY (id); exactly one (tenant_id, branch_id, status) index remains in the isolated replay database"
+    },
+    {
+      "check": "Integrity smoke checks",
+      "result": "zero orphan tenant memberships, branch assignments, and invitations after fixture cleanup"
+    }
+  ],
+  "not_run_or_not_proven": [
+    "A brand-new empty database has not been replayed again from start to finish after the final metadata-only PK/index/preflight refinements; the existing isolated replay was corrected and the final 025a/030 DDL was re-run idempotently.",
+    "The current source overlay has not been installed into a full application checkout for full Node 24 typecheck/tests/build; only candidate fixtures were checked and the pinned base checkout passed all web checks.",
+    "The full dependency-complete backend suite has not run against the overlay. Prior Phase 0\u20132 baseline results were 116 passed and 1 skipped because Redis was unavailable; those are not Increment 02\u201303 validation.",
+    "No authenticated browser E2E for workspace switching, invite acceptance, token expiry/replay, session revocation or last-owner concurrency.",
+    "No effective branch-assignment authorization across every branch-scoped business endpoint; this candidate persists and surfaces assignments but does not prove enforcement in every route.",
+    "No canonical Neon schema parity signoff; earlier recorded canonical-vs-replay deltas still need read-only diff review.",
+    "No remote branch, source commit, pull request, CI run, migration against production, runtime-role cutover, service-setting change or deployment. Previous GitHub branch-write attempt returned 403.",
+    "The exact historical SQL bytes for source gaps 010, 011, 023 purchasing core, 024 purchasing security, 025 purchasing permissions and 026 membership-branch integrity remain unrecovered.",
+    "The original 021 migration file remains malformed; a separate pinned-hash repair candidate is generated without overwriting the original path and requires review."
+  ],
+  "release_gates_still_blocking": [
+    "Recover/review exact historical SQL for migrations 010, 011 and 023\u2013026; keep strict historical-source checker failing until authoritative bytes exist.",
+    "Review reconstructed equivalents, generated 004 replay-equivalent and 021 repair candidate, and the 005a/025a replay-only compatibility steps.",
+    "Run a clean full-history replay from a new empty database using the final replay order and resolve the remaining canonical schema diffs.",
+    "Run full backend tests with required dependencies including Redis and all app frontend checks on Node 24 after overlay installation.",
+    "Run authenticated browser/database E2E for switching, revocation, expired/replayed invitations, last-owner races, tenant crossing and branch crossing.",
+    "Integrate branch assignment enforcement on every branch-scoped endpoint and verify denial of unassigned branches.",
+    "Approve the runtime-role/connection rollout, remote PR/CI and rollback/release steps separately; no production mutation is authorized by this package."
+  ]
+}
