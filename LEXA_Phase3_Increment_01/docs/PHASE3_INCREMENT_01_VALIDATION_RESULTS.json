@@ -1,0 +1,73 @@
+{
+  "report_date": "2026-10-20",
+  "repository": "MONALISA2003-CMD/LEXA-",
+  "candidate_base_sha": "f48e201fc8c4ed0a9ff1551c0b99451a7eb500dd",
+  "remote_changes_applied": false,
+  "production_database_writes": false,
+  "schema_migrations_added": 0,
+  "results": [
+    {
+      "name": "Node administration and client contract tests",
+      "status": "PASS",
+      "passed": 4,
+      "failed": 0,
+      "scope": "Source contract test suite; does not start a browser or live web server"
+    },
+    {
+      "name": "Python source-contract tests",
+      "status": "PASS",
+      "passed": 5,
+      "failed": 0,
+      "scope": "Static assertions against candidate API source"
+    },
+    {
+      "name": "Python handler mutation unit tests",
+      "status": "PASS",
+      "passed": 11,
+      "failed": 0,
+      "scope": "Candidate route code with fake SQLAlchemy session and lightweight fixture model/catalog modules; not PostgreSQL integration"
+    },
+    {
+      "name": "Strict TypeScript fixture typecheck",
+      "status": "PASS",
+      "scope": "Narrow declaration fixture; not the full Next.js application dependency graph"
+    },
+    {
+      "name": "Python candidate route compile",
+      "status": "PASS"
+    },
+    {
+      "name": "API helper transform fixture",
+      "status": "PASS",
+      "scope": "Exact-anchor patch output matches expected output; rerun against already-patched file safely refuses"
+    },
+    {
+      "name": "Handoff shell syntax",
+      "status": "PASS",
+      "scope": "bash -n checks"
+    },
+    {
+      "name": "Node 24 clean install, complete web typecheck/tests/build for this overlay",
+      "status": "NOT RUN",
+      "reason": "Execution workspace runs Node v22.16.0 while repository requires Node 24.x; validate-phase3-increment01.sh enforces Node 24"
+    },
+    {
+      "name": "Full live API integration against isolated PostgreSQL/RLS",
+      "status": "NOT RUN",
+      "reason": "No PostgreSQL integration database was used for this source-only overlay"
+    },
+    {
+      "name": "Credentialed hosted browser E2E and two-tenant/two-branch authorization acceptance",
+      "status": "NOT RUN",
+      "reason": "Requires dedicated non-production credentials and isolated hosted environment"
+    }
+  ],
+  "summary": {
+    "targeted_tests_passed": 20,
+    "targeted_tests_failed": 0,
+    "node_runtime": "v22.16.0",
+    "python_runtime": "3.13.5",
+    "bundle_self_validation": "PASS",
+    "production_release_disposition": "NO-GO until existing Phase 0-2 gates and separate Phase 3 acceptance are evidenced"
+  }
+}

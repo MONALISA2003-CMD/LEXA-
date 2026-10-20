@@ -1,0 +1,2 @@
+class CatalogValidation(ValueError):
+    pass

@@ -1,0 +1,190 @@
+{
+  "artifact": "LEXA Phase 3 Increment 01 \u2014 Workspace Configuration",
+  "created_date": "2026-10-20",
+  "target_repository": "MONALISA2003-CMD/LEXA-",
+  "target_branch": "main",
+  "pinned_base_commit_sha": "f48e201fc8c4ed0a9ff1551c0b99451a7eb500dd",
+  "source_blob_sha1_guards": {
+    "apps/api/app/routes/organization.py": "5150e386c1aed49daf46ed0f63264ee36eea04d9",
+    "apps/web/lib/api.ts": "d62b1f64fc78bc333c1017a6bcda2690b8f3cb23",
+    "apps/web/app/administration/page.tsx": "8ef73f5db57131b9e2f5783583157dc43c3462cc"
+  },
+  "remote_state": {
+    "branch_created": false,
+    "commit_created": false,
+    "pull_request_created": false,
+    "ci_run_triggered": false,
+    "deployment_triggered": false,
+    "reason": "GitHub branch creation returned HTTP 403: Resource not accessible by integration"
+  },
+  "safety": {
+    "schema_migration_files_added": 0,
+    "database_writes_performed": false,
+    "production_credentials_or_roles_changed": false,
+    "hosted_environment_changes_performed": false
+  },
+  "tested_counts": {
+    "node_contract_tests_passed": 4,
+    "python_source_contract_tests_passed": 5,
+    "python_handler_unit_tests_passed": 11,
+    "targeted_total_passed": 20
+  },
+  "validation_limits": [
+    "Node 24 clean install/full frontend build for this overlay not run because workspace has Node v22.16.0",
+    "Python handler unit tests use a fake SQLAlchemy session and lightweight fixture modules; not PostgreSQL integration",
+    "TypeScript fixture typecheck uses narrow declaration stubs; not the full Next.js application dependency graph",
+    "Credentialed hosted E2E and two-tenant/two-branch RLS acceptance remain open"
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "size_bytes": 3717,
+      "sha256": "ed506bf54a380d0ebabfd073056ac0e2967443c03175c0e0d53ba9c1540b6151"
+    },
+    {
+      "path": "docs/PHASE3_INCREMENT_01_ACCEPTANCE_MATRIX.md",
+      "size_bytes": 3488,
+      "sha256": "3ade10e603643c0c8f5c76f3d1457ff97ab922fd13f70d33e582147b0639783f"
+    },
+    {
+      "path": "docs/PHASE3_INCREMENT_01_IMPLEMENTATION_REPORT.md",
+      "size_bytes": 5213,
+      "sha256": "6bfc39995591ef363ada55c72101122fcb41faad25d7df5861327dd06ccefd99"
+    },
+    {
+      "path": "docs/PHASE3_INCREMENT_01_VALIDATION_RESULTS.json",
+      "size_bytes": 2553,
+      "sha256": "7fcccb3d3b382f5ba1587c3e67f7b167f9dfd5160bce422fb54d4ef88e814847"
+    },
+    {
+      "path": "docs/api-helpers-phase3.ts.txt",
+      "size_bytes": 1574,
+      "sha256": "40495ae0ac437e4bde50eaad5f1d9c978b9c7ec1b4ac6e2777dbc8d3ea4a88ae"
+    },
+    {
+      "path": "fixtures/api-transform/api.before.ts",
+      "size_bytes": 561,
+      "sha256": "417e4bf0310256f9c3d8cb778a02055988d7ee5268dcf89213065297b814d148"
+    },
+    {
+      "path": "fixtures/api-transform/api.expected.ts",
+      "size_bytes": 1963,
+      "sha256": "6631caac3899d239432c2092a0508c789ea05355835d2892ea30d09059838f03"
+    },
+    {
+      "path": "fixtures/repo-root/apps/api/app/routes/organization.py",
+      "size_bytes": 22971,
+      "sha256": "f20044dbb8a3bffdc340e77830013d606c472e9a0b17f1584b5727b191f8be6c"
+    },
+    {
+      "path": "fixtures/runtime/apps/api/app/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fixtures/runtime/apps/api/app/catalog.py",
+      "size_bytes": 202,
+      "sha256": "57ed855255f43733f913f69e3772d4791b42e0023c0cacc93ba88a90791ce777"
+    },
+    {
+      "path": "fixtures/runtime/apps/api/app/catalog_rules.py",
+      "size_bytes": 46,
+      "sha256": "fecdc10389697a526a91ad59e3f83f37626971e1bf6f9d3320f129140300e3cf"
+    },
+    {
+      "path": "fixtures/runtime/apps/api/app/dependencies.py",
+      "size_bytes": 106,
+      "sha256": "4ac399f23fb3cca9a25af51797e998295c041892664368cdad4454ff0f2a6745"
+    },
+    {
+      "path": "fixtures/runtime/apps/api/app/models.py",
+      "size_bytes": 2077,
+      "sha256": "b3c314180f06cc2b5f18c756f3b1a40242ba1ff982948dc2d666e67378fa286c"
+    },
+    {
+      "path": "fixtures/runtime/apps/api/app/routes/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fixtures/runtime/apps/api/app/routes/organization.py",
+      "size_bytes": 22971,
+      "sha256": "f20044dbb8a3bffdc340e77830013d606c472e9a0b17f1584b5727b191f8be6c"
+    },
+    {
+      "path": "fixtures/runtime/apps/api/tests/test_phase3_organization_mutations.py",
+      "size_bytes": 9794,
+      "sha256": "c2f6f3f1c6a6c476c970a6579a4afad61d65687d09ac8b3d9005c7aad4c5db35"
+    },
+    {
+      "path": "fixtures/typecheck/apps/web/app/administration/page.tsx",
+      "size_bytes": 17707,
+      "sha256": "b5716c0846d51e5a8c975fb4b437649e5cf1ba4f574887d346be8d7f09d76868"
+    },
+    {
+      "path": "fixtures/typecheck/apps/web/components/app-shell.tsx",
+      "size_bytes": 157,
+      "sha256": "a0227ca862d3d805fd9aeb4516bdd098f9cd4d1b26fdcb032fd645bdb0937010"
+    },
+    {
+      "path": "fixtures/typecheck/apps/web/lib/api.ts",
+      "size_bytes": 1734,
+      "sha256": "082c1fc74d4c59ea9af2f5e4d6f9c69ee10cc6ea3a5970c7c914678ba74368ee"
+    },
+    {
+      "path": "fixtures/typecheck/tsconfig.json",
+      "size_bytes": 294,
+      "sha256": "a9c5293eea6266d36d461f69c5e6e824305e9b0255f71a1384ae6d077e4c16ac"
+    },
+    {
+      "path": "fixtures/typecheck/types.d.ts",
+      "size_bytes": 921,
+      "sha256": "5df64e1a0bb9db1867eddade5f4443152c7a6fe1d0041c0f7289c05850aee287"
+    },
+    {
+      "path": "overrides/apps/api/app/routes/organization.py",
+      "size_bytes": 22971,
+      "sha256": "f20044dbb8a3bffdc340e77830013d606c472e9a0b17f1584b5727b191f8be6c"
+    },
+    {
+      "path": "overrides/apps/web/app/administration/page.tsx",
+      "size_bytes": 17707,
+      "sha256": "b5716c0846d51e5a8c975fb4b437649e5cf1ba4f574887d346be8d7f09d76868"
+    },
+    {
+      "path": "scripts/apply-phase3-increment01.sh",
+      "size_bytes": 2137,
+      "sha256": "082a6b3eb2694ba88672c907f454ca1ba6cbf218d34c7688702ab8552e5bd94a"
+    },
+    {
+      "path": "scripts/extend-api-helpers.py",
+      "size_bytes": 3221,
+      "sha256": "08f94437e649e69787279632c0ac3ad9addea30e52d185474315bdadc74148ee"
+    },
+    {
+      "path": "scripts/validate-bundle.sh",
+      "size_bytes": 1601,
+      "sha256": "f8eeebba76e33c4d61b0ea533b1683f7a5d20dd93125c477fd43b1fd6ba5f879"
+    },
+    {
+      "path": "scripts/validate-phase3-increment01.sh",
+      "size_bytes": 900,
+      "sha256": "b00068d2198b6488ffa2cccbf1d0e8443c4365186bb1c85bb8155445efacbf16"
+    },
+    {
+      "path": "tests/phase3-workspace-admin-contract.test.mjs",
+      "size_bytes": 3703,
+      "sha256": "6704b088e7088e89d94dc8eaa24e0dfdc8c780596552d40f1a17ad9c2b19dde8"
+    },
+    {
+      "path": "tests/test_phase3_organization_contract.py",
+      "size_bytes": 3355,
+      "sha256": "f97afe1ea17f363240079d69df81a2b6c088e5b454992a7397b772289796ae7c"
+    },
+    {
+      "path": "tests/test_phase3_organization_mutations.py",
+      "size_bytes": 9794,
+      "sha256": "c2f6f3f1c6a6c476c970a6579a4afad61d65687d09ac8b3d9005c7aad4c5db35"
+    }
+  ]
+}
