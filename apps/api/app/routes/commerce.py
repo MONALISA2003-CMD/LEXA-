@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
@@ -28,9 +29,11 @@ def q(value: Decimal | int | str) -> Decimal:
 
 
 def out(row: Any) -> dict[str, Any]:
+    """Serialize both SQLAlchemy Row and RowMapping result objects safely."""
     if row is None:
         return {}
-    return {k: (str(v) if isinstance(v, Decimal) else v) for k, v in row._mapping.items()}
+    values = row if isinstance(row, Mapping) else row._mapping
+    return {k: (str(v) if isinstance(v, Decimal) else v) for k, v in values.items()}
 
 
 def default_currency(db: Session, tenant_id: UUID) -> str:
