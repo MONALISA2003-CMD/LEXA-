@@ -1,0 +1,59 @@
+name: LEXA CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  backend-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install API dependencies
+        working-directory: apps/api
+        run: python -m pip install --upgrade pip && pip install -e '.[dev]'
+      - name: Run canonical Python test suites (exclude archived ZIP snapshots)
+        run: python -m pytest -q tests apps/api/tests
+      - name: Compile backend
+        run: python -m compileall -q apps/api/app apps/api/tests
+      - name: Check migration source reconciliation manifest
+        run: python scripts/check_migration_sources.py
+
+  frontend-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - name: Install frontend dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck frontend
+        working-directory: apps/web
+        run: npm run typecheck
+      - name: Run frontend contract tests
+        run: node --test apps/web/tests/*.test.mjs
+      - name: Build frontend
+        working-directory: apps/web
+        run: npm run build
+
+  migration-replay-release-gate:
+    # Historical migration sources are currently missing. Run this job manually
+    # when preparing a schema/replay release; it must fail until exact sources
+    # are recovered, rather than leaving everyday source CI permanently red.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Require complete exact migration source history
+        run: python scripts/check_migration_sources.py --strict

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "purpose": "Track the exact applied live migration SQL sources that remain unavailable from the supplied package and inspectable GitHub history. Never reconstruct missing historical migrations from schema inference.",
+  "status": "BLOCKS_REPRODUCIBLE_FROM_ZERO_MIGRATION_REPLAY",
+  "gaps": [
+    {
+      "version": "010_phase2_catalog_intelligence",
+      "expected_path": "migrations/010_phase2_catalog_intelligence.sql",
+      "reason": "Recorded in the live ledger and README, but exact SQL was absent from the ZIP and the inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact; do not recreate from schema inference."
+    },
+    {
+      "version": "011_phase2_catalog_runtime_constraints",
+      "expected_path": "migrations/011_phase2_catalog_runtime_constraints.sql",
+      "reason": "Recorded in the live ledger and README, but exact SQL was absent from the ZIP and the inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact; do not recreate from schema inference."
+    },
+    {
+      "version": "023_phase4_purchasing_core",
+      "expected_path": "migrations/023_phase4_purchasing_core.sql",
+      "reason": "Present in the live ledger but absent from the source package; it shares numeric prefix 023 with a distinct identity migration.",
+      "next_step": "Recover the exact applied SQL, retain its full historical version string, and ensure tooling treats full version strings as identities."
+    },
+    {
+      "version": "024_phase4_purchasing_security",
+      "expected_path": "migrations/024_phase4_purchasing_security.sql",
+      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+    },
+    {
+      "version": "025_phase4_purchasing_permissions",
+      "expected_path": "migrations/025_phase4_purchasing_permissions.sql",
+      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+    },
+    {
+      "version": "026_phase4_membership_branch_integrity",
+      "expected_path": "migrations/026_phase4_membership_branch_integrity.sql",
+      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+    },
+    {
+      "version": "027_release_convergence",
+      "expected_path": "migrations/027_release_convergence.sql",
+      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+    }
+  ],
+  "numeric_prefix_collisions": {
+    "023": [
+      "023_phase2_identity_tenancy_authorization_foundation",
+      "023_phase4_purchasing_core"
+    ]
+  }
+}
