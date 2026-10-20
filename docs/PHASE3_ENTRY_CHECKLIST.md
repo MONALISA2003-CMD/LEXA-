@@ -1,6 +1,6 @@
 # LEXA Phase 3 Entry Checklist
 
-This is the go/no-go checklist for Phase 3 (business setup and workspace configuration). It supplements, but does not replace, `docs/PHASE0_2_FINAL_READINESS_AUDIT_2026-10-20.md`.
+This is the go/no-go checklist for Phase 3 (business setup and workspace configuration). The authoritative current status is `docs/PHASE0_2_CLOSURE_AUDIT_2026-10-20.md`; older readiness audits are historical snapshots.
 
 ## Phase 3 goal
 
@@ -10,7 +10,7 @@ Implement reliable business/workspace setup and ongoing administration using exi
 
 - [ ] Root GitHub Actions CI exists, runs on the active source paths, and has a green run on the exact release commit.
 - [ ] `main` requires the CI checks; the Vercel deployment check is not the only required status.
-- [ ] Exact missing migration sources 010, 011, 023 purchasing, 024, 025, 026, and 027 are recovered and reviewed, or a formal migration provenance plan is approved that preserves the strict replay block and explicitly scopes what schema operations can safely proceed.
+- [ ] The six remaining missing exact migration sources—010, 011, `023_phase4_purchasing_core`, 024, 025, and 026—are recovered and reviewed, or a formal migration-provenance plan is approved that keeps strict replay blocked and explicitly scopes any allowed non-schema work. `027_release_convergence.sql` has been recovered from tracked historical Git source with blob/checksum verification; the database ledger itself has no executed-SQL checksum, so this is artifact-provenance evidence, not a DB-side checksum.
 - [ ] The elevated `lexa_runtime` production login has an approved, tested least-privilege cutover plan. Do not change credentials or roles without approval.
 - [ ] RLS and grants for `permissions`, `registration_requests`, `schema_migrations`, `tenants`, and `users` have documented intended access and tests on an isolated branch.
 - [ ] Credentialed hosted auth and workspace selection acceptance passes using a dedicated non-production account.

@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { login, setAccessToken, WorkspaceSelectionError, type WorkspaceChoice } from "../../lib/api";
 import { FormField, StatusBanner } from "../../components/ui";
+import { safeReturnPath as resolveSafeReturnPath } from "../../lib/navigation.mjs";
 
 function safeReturnPath() {
   const next = new URLSearchParams(window.location.search).get("next");
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  return resolveSafeReturnPath(next, window.location.origin);
 }
 
 export default function LoginPage() {

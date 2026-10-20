@@ -32,7 +32,6 @@ def test_every_known_live_migration_source_gap_is_explicit_and_actionable():
         "024_phase4_purchasing_security",
         "025_phase4_purchasing_permissions",
         "026_phase4_membership_branch_integrity",
-        "027_release_convergence",
     }
     assert gap_versions <= ledger_versions
     for gap in gaps["gaps"]:
@@ -41,6 +40,13 @@ def test_every_known_live_migration_source_gap_is_explicit_and_actionable():
         assert gap["next_step"].strip()
         assert not (ROOT / gap["expected_path"]).exists()
     assert (MIGRATIONS / "019_phase4a_customer_credit_allocation.sql").is_file()
+    restored_027 = MIGRATIONS / "027_release_convergence.sql"
+    assert restored_027.is_file()
+    assert "INSERT INTO schema_migrations(version) VALUES('027_release_convergence')" in restored_027.read_text()
+    raw = restored_027.read_bytes()
+    import hashlib
+    git_blob_sha1 = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+    assert git_blob_sha1 == "e6d9242d7dedb2cbf7b1a71a46fe635b3ab051d8"
 
 
 def test_migration_source_checker_reports_known_gaps_but_strict_mode_blocks_replay():
@@ -55,7 +61,7 @@ def test_migration_source_checker_reports_known_gaps_but_strict_mode_blocks_repl
         cwd=ROOT, text=True, capture_output=True, check=False,
     )
     assert strict.returncode == 1
-    assert "SOURCE GAPS (7)" in strict.stdout
+    assert "SOURCE GAPS (6)" in strict.stdout
 
 
 def test_deployment_docs_distinguish_liveness_from_readiness():

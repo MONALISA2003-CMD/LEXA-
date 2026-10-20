@@ -4,6 +4,8 @@
 **Scope:** LEXA only — GitHub repository `MONALISA2003-CMD/LEXA-`, Vercel project `lexa`, Render service `LEXA`, Neon project `LEXA` / default branch `lexa-live`.  
 **Mode:** Read-only inspection of hosted systems. Local source changes and a new source-package candidate are separate from hosted state. No production deployment, GitHub write, Render settings change, Neon SQL mutation, role/password change, or branch change was performed as part of this audit.
 
+> **Historical snapshot notice — superseded by Increment 06:** This report records the earlier investigation before exact source recovery for `027_release_convergence.sql`. The latest migration gap list is six entries, and the current code/tests/platform decision are recorded in [`docs/PHASE0_2_CLOSURE_AUDIT_2026-10-20.md`](docs/PHASE0_2_CLOSURE_AUDIT_2026-10-20.md).
+
 ## Executive decision
 
 **NO-GO for Phase 3. Phase 2 is not yet release-certified.** Multiple independently confirmed blockers remain: the archive workflow nests the repository under an extra directory so updates do not replace the live root; the newest Vercel build still fails TypeScript; Render is currently serving a backend implementation that returns repeatable HTTP 500 responses; the live database login role has excessive privileges; and historical migration source recovery is incomplete.
@@ -59,9 +61,9 @@ Read-only inspection of Neon `LEXA`, default branch `lexa-live` (`br-soft-star-b
 
 Migration `029_phase1_runtime_role_least_privilege` is not recorded in the live migration ledger and the intended `lexa_runtime_safe` role is absent. The checked-in migration source/runbook describe this isolation, but the canonical live branch has not adopted it. This is a security release blocker until a reviewed, approved rollout has been applied and verified against the actual Render connection configuration. Do not fix this by casually changing a role or connection string: the migration and runtime credential transition require a controlled change window, rollback plan, and explicit approval.
 
-### P1 — Seven applied historical migrations lack exact SQL source
+### P1 — Six applied historical migrations still lack exact SQL source
 
-The live ledger includes migration versions whose original SQL is absent from the current source package. Tracked gaps include `010`, `011`, `023_phase4_purchasing_core`, `024`, `025`, `026`, and `027_release_convergence`. The source tree tracks these in `migrations/source_gaps.json`; the duplicate numeric `023` prefix also means migration tooling must use full version strings rather than numeric prefixes alone.
+The live ledger includes migration versions whose original SQL is absent from the current source package. Remaining tracked gaps are `010`, `011`, `023_phase4_purchasing_core`, `024`, `025`, and `026`. Exact `027_release_convergence.sql` was recovered from tracked source path `lexa_v280_src/migrations/027_release_convergence.sql` and its Git blob SHA-1 verified; see `migrations/SOURCE_RECOVERY.md`. The tracked artifact provenance is verified, although the database ledger does not store an applied-source checksum. The source tree tracks these in `migrations/source_gaps.json`; the duplicate numeric `023` prefix also means migration tooling must use full version strings rather than numeric prefixes alone.
 
 This prevents a strict, source-grounded from-zero migration replay. Do not recreate missing historical SQL by guessing from current tables. Recover exact SQL from an authoritative historical Git commit/release artifact, checksum/review it, then run the complete chain on a disposable database/branch. A live schema that currently responds does not prove the repository can reconstruct it.
 
@@ -103,7 +105,7 @@ Phase 2 cannot be considered complete based only on a shared token layer and a f
 4. **Actual frontend build:** Node 24.x clean install, typecheck, frontend tests and production build on root source, not the nested folder; then inspect browser console and requests on a successful deployment.
 5. **Backend handler tests:** fix the serializer and add tests for its use across dashboard, customer, payment-channel, sale/payment, reconciliation and other `.mappings()` call sites. Exercise normal Row and RowMapping shapes; verify numeric/Decimal/date/UUID serialization and nullable/empty results.
 6. **End-to-end business workflows:** sign-in, workspace selection, token refresh and expiry; product create/edit/lookup; inventory balances/ledger/counts/transfers; sale/payment/return; customer/credit; purchasing; accounting/reconciliation; reporting; permissions/tenant boundary checks. Use disposable/test workspaces and non-destructive test data.
-7. **Database source and role:** recover seven exact migration sources, strict clean replay, document duplicate migration prefix handling, and complete the least-privilege application role transition with explicit approval and rollback plan.
+7. **Database source and role:** recover the six remaining exact migration sources and retain the verified 027 provenance record, strict clean replay, document duplicate migration prefix handling, and complete the least-privilege application role transition with explicit approval and rollback plan.
 8. **Same-commit release evidence:** root ZIP layout, source hash, Git commit, Vercel build, Render deploy, Neon migration version, and smoke-test report must all refer to the intended candidate. A successful service on an older commit is not proof that the new source works.
 9. **Monitoring and rollback:** verify `/ready` is configured in Render, add alerts for 5xx bursts, maintain a short post-deploy smoke test and a documented rollback procedure.
 
@@ -131,7 +133,7 @@ Do not start Phase 3 until:
 - Backend regression suite: **112 passed, 1 skipped** (`python -m pytest -q tests apps/api/tests`). The one skip is `apps/api/tests/test_auth_refresh.py`, which requires the Redis package not available in this local environment.
 - Focused serializer and Phase 1 runtime-security tests: **8 passed**. The serializer tests cover both SQLAlchemy `RowMapping` and `Row` results and Decimal formatting.
 - Python `compileall`/`py_compile` and shell `bash -n` validation: passed.
-- Migration-source reconciliation: ran and reported **seven unresolved exact-source gaps**. Strict from-zero replay remains blocked.
+- Migration-source reconciliation: ran and reported **six unresolved exact-source gaps**. Strict from-zero replay remains blocked.
 - Frontend `npm run typecheck`: attempted but **not passed locally**. Installed `node_modules` does not contain the actual `react`/`next` packages and type declarations; TypeScript reports `TS2307` for those modules followed by JSX-type cascade errors. The available runtime is Node `v22.16.0`, while this project declares `24.x`. A clean install at Node 24 and actual build remain mandatory; static contracts are not a substitute.
 - ZIP verification: **220 source files plus the internal manifest**, CRC passed, byte-for-byte and per-file SHA-256 checks passed, required active-root paths present, no `LEXA-Phase1-2.9.1/` enclosing prefix, and no actual secret environment files included. The external manifest's archive SHA-256 matches the ZIP.
 

@@ -2,9 +2,10 @@
 import { useEffect, useState } from "react";
 import { getAccountingAccounts, getAccountingPeriods, getBalanceSheet, getIncomeStatement, getJournalEntries, getTrialBalance, type AccountingAccount, type AccountingPeriod, type JournalEntry } from "../../lib/api";
 import { AppShell } from "../../components/app-shell";
+import { localDateISO, localMonthStartISO } from "../../lib/date.mjs";
 
-function today(){ return new Date().toISOString().slice(0,10); }
-function monthStart(){ const d=new Date(); d.setDate(1); return d.toISOString().slice(0,10); }
+function today(){ return localDateISO(); }
+function monthStart(){ return localMonthStartISO(); }
 function money(v:string|number){return new Intl.NumberFormat("en-UG",{style:"currency",currency:"UGX",maximumFractionDigits:0}).format(Number(v));}
 
 export default function AccountingPage(){

@@ -46,5 +46,5 @@ Retry behavior should include both (a) the same request and idempotency key, whi
 
 - Do not deploy by triggering Render `main` while the candidate is only in the ZIP; that would deploy the existing main commit, not this code.
 - After the ZIP is reviewed and brought into the intended branch, use GitHub CI to run the backend tests, frontend `npm ci`/typecheck/tests/build, and migration-source check.
-- Production acceptance remains blocked by the seven missing exact migration files noted in `migrations/SOURCE_RECOVERY.md`, live Render readiness configuration reconciliation, and credentialed hosted auth E2E.
+- Production acceptance remains blocked by the six remaining missing exact migration files noted in `migrations/SOURCE_RECOVERY.md`, live Render readiness configuration reconciliation, and credentialed hosted auth E2E.
 - Do not mutate the canonical Neon `lexa-live` schema as part of the UX pass.

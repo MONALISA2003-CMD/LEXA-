@@ -2,6 +2,17 @@
 
 LEXA is a real multi-tenant business operating and intelligence system. The canonical business system of record is Neon PostgreSQL project `LEXA`, branch `lexa-live`, database `neondb`.
 
+## Phase 0–2 closure candidate (Increment 06 — 20 October 2026)
+
+**Current decision: Phase 3 schema-changing work remains NO-GO.** The exact `027_release_convergence.sql` source has been recovered and verified against its Git blob; six exact historical migrations still need authoritative recovery. This candidate adds date/proxy/navigation hardening, responsive sign-in refinements, UI/UX research, stronger tests, root CI workflow source and a security/role-cutover runbook. Production roles/settings/data have not been changed.
+
+- **Current closure audit:** [`docs/PHASE0_2_CLOSURE_AUDIT_2026-10-20.md`](docs/PHASE0_2_CLOSURE_AUDIT_2026-10-20.md)
+- **UI/UX research:** [`docs/research/LEXA_PHASE0_2_UI_UX_RESEARCH_2026-10-20.md`](docs/research/LEXA_PHASE0_2_UI_UX_RESEARCH_2026-10-20.md)
+- **Security/cutover runbook:** [`docs/PHASE0_2_SECURITY_CUTOVER_RUNBOOK.md`](docs/PHASE0_2_SECURITY_CUTOVER_RUNBOOK.md)
+- **Migration source lineage:** [`migrations/SOURCE_RECOVERY.md`](migrations/SOURCE_RECOVERY.md)
+
+The hosted platform’s prior green commit is not the same as a clean CI build of this local candidate. GitHub root workflow installation/branch protection, production role/RLS rollout, Render's health-check setting, full Node 24 build and authenticated E2E remain open. Do not treat packaging as deployment or deploy source changes without the approved release procedure.
+
 ## Current product direction and first increment
 
 - **Authoritative product direction:** [`docs/LEXA_STATEMENT_OF_TRUTH_2026-10-19.md`](docs/LEXA_STATEMENT_OF_TRUTH_2026-10-19.md)
@@ -51,7 +62,9 @@ See `docs/MANUAL_DEPLOY_v2.5.0.md` for the exact manual handoff procedure.
 - See `LEXA_E2E_FORENSIC_AUDIT_2026-10-13.md` for the full evidence trail and exact acceptance checklist.
 
 
-## Phase 0 reliability handoff (15 October 2026)
+## Historical Phase 0 reliability handoff snapshot (15 October 2026)
+
+**This section is a dated historical snapshot. The current Increment 06 source gaps, tests and go/no-go decision are recorded at the top of this README and in `docs/PHASE0_2_CLOSURE_AUDIT_2026-10-20.md`.**
 
 This package includes additional source-side hardening and release gates:
 
@@ -78,7 +91,7 @@ Version 2.9.0 carries the Phase 1 UX foundation implementation from the product/
 
 The handoff is source-only: the updated build is in the Phase 1 ZIP. On this runner, **104 Python tests and 3 frontend static contract tests passed, with one Python auth-refresh test skipped because the local environment lacks `redis`**. A local frontend dependency install/typecheck/build could not run because the npm registry was unavailable and `undici-types` was not cached; CI is configured to execute `npm ci`, typecheck, tests, and build with Node 24. The five-width visual screenshot checklist and credentialed hosted auth acceptance remain pending.
 
-The Phase 0 blockers remain release blockers: seven exact historical migration SQL sources are missing, hosted production readiness settings still require reconciliation, and GitHub write access returned 403. No production deployment or canonical Neon schema mutation was performed in this pass. See `docs/PHASE1_UX_IMPLEMENTATION_REPORT.md` and `docs/PHASE1_UX_RUNBOOK.md`.
+The Phase 0 blockers remain release blockers: six exact historical migration SQL sources are still missing, hosted production readiness settings still require reconciliation, and GitHub write access returned 403. No production deployment or canonical Neon schema mutation was performed in this pass. See `docs/PHASE1_UX_IMPLEMENTATION_REPORT.md` and `docs/PHASE1_UX_RUNBOOK.md`.
 
 ## Phase 1 security and stability candidate (19 October 2026)
 
@@ -86,4 +99,4 @@ This source-only candidate adds a separately provisioned least-privilege databas
 
 **No production change is implied by this package.** The new role must be provisioned and verified on an isolated Neon branch, given a password through secret management, and only then configured in Render during an explicitly approved release. The old elevated `lexa_runtime` role remains unchanged until a safe cutover and separate decommission plan.
 
-See `docs/PHASE1_SECURITY_STABILITY_RUNBOOK.md` and `docs/PHASE1_SECURITY_STABILITY_REPORT_2026-10-19.md`. Run `bash scripts/verify-phase1.sh` from the repository root. Strict full migration replay remains blocked by seven missing historical SQL sources; frontend typecheck/build and credentialed hosted authentication acceptance remain release gates.
+See `docs/PHASE1_SECURITY_STABILITY_RUNBOOK.md` and `docs/PHASE1_SECURITY_STABILITY_REPORT_2026-10-19.md`. Run `bash scripts/verify-phase1.sh` from the repository root. Strict full migration replay remains blocked by six remaining missing historical SQL sources; frontend typecheck/build and credentialed hosted authentication acceptance remain release gates.

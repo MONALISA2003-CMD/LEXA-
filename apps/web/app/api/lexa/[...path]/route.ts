@@ -25,6 +25,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const out = new NextResponse(body, { status: response.status, statusText: response.statusText });
     const responseType = response.headers.get("content-type");
     if (responseType) out.headers.set("content-type", responseType);
+    out.headers.set("cache-control", "no-store, max-age=0");
+    out.headers.set("pragma", "no-cache");
+    out.headers.set("x-content-type-options", "nosniff");
     const responseRequestId = response.headers.get("x-request-id");
     if (responseRequestId) out.headers.set("x-request-id", responseRequestId);
     const responseHeaders = response.headers as Headers & { getSetCookie?: () => string[] };
@@ -36,11 +39,17 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       const headers = new Headers();
       if (retryAfter) headers.set("Retry-After", retryAfter);
       if (responseRequestId) headers.set("X-Request-ID", responseRequestId);
+      headers.set("Cache-Control", "no-store, max-age=0");
+      headers.set("Pragma", "no-cache");
+      headers.set("X-Content-Type-Options", "nosniff");
       return NextResponse.json({ detail: { code: "UPSTREAM_UNAVAILABLE", message: "LEXA is temporarily unavailable. Please try again shortly.", request_id: responseRequestId || null } }, { status: response.status, headers });
     }
     return out;
   } catch {
-    return NextResponse.json({ detail: "LEXA is temporarily unavailable. Please try again shortly." }, { status: 502 });
+    return NextResponse.json(
+      { detail: "LEXA is temporarily unavailable. Please try again shortly." },
+      { status: 502, headers: { "Cache-Control": "no-store, max-age=0", "Pragma": "no-cache", "X-Content-Type-Options": "nosniff" } },
+    );
   }
 }
 

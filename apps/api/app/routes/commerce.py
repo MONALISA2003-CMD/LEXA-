@@ -177,12 +177,21 @@ def _emit(db: Session, tenant_id: UUID, actor: UUID, action: str, event: str, ag
 @router.get("/dashboard")
 def dashboard(business_date: date | None = None, ctx=Depends(require_permission("sales.read"))):
     db, _, tenant_id, _ = ctx
-    today = business_date or date.today()
+    # The tenant's business calendar is authoritative, not the API host's UTC date.
+    today = business_date or db.execute(
+        text("SELECT public.lexa_business_date(now(), :tenant_id)"),
+        {"tenant_id": str(tenant_id)},
+    ).scalar_one()
+    # Keep the timestamp predicate on a stable business-date function so date
+    # semantics match reports; a future range-based implementation can add a
+    # supporting expression/index after measuring real production data volume.
     sales = db.execute(text("""
       SELECT COALESCE(SUM(s.total),0) sales, COALESCE(SUM(s.amount_paid),0) collected,
              COALESCE(SUM(s.amount_due),0) credit
       FROM public.sales AS s
-      WHERE s.tenant_id=:tenant_id AND s.created_at::date=:business_date AND s.status='COMPLETED'
+      WHERE s.tenant_id=:tenant_id
+        AND public.lexa_business_date(s.created_at, :tenant_id)=:business_date
+        AND s.status='COMPLETED'
     """), {"tenant_id": str(tenant_id), "business_date": today}).mappings().one()
     channels = db.execute(text("""
       SELECT pc.id,pc.name,pc.channel_type,pc.currency_code,pc.active,

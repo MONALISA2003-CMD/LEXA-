@@ -14,8 +14,11 @@ def test_commerce_page_covers_core_workflows():
 
 def test_commerce_page_uses_local_business_date_and_no_credentials_ui():
     source = PAGE.read_text()
-    assert 'getMonth() + 1' in source
-    assert 'getDate()' in source
+    date_helper = (ROOT / "apps/web/lib/date.mjs").read_text()
+    assert 'getMonth() + 1' in date_helper
+    assert 'getDate()' in date_helper
+    assert 'localDateISO' in source
+    assert 'toISOString().slice(0, 10)' not in source
     assert "API key" in source
     assert "password" in source
     assert "OTP" in source

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { usePathname } from "next/navigation";
 import { AppShell } from "../../components/app-shell";
+import { localDateISO } from "../../lib/date.mjs";
 import {
   closeReconciliation,
   createCommerceCustomer,
@@ -40,12 +41,7 @@ function money(v: string | number) {
   return new Intl.NumberFormat("en-UG", { style: "currency", currency: "UGX", maximumFractionDigits: 0 }).format(Number(v));
 }
 
-function today() {
-  const d = new Date();
-  const month = `${d.getMonth() + 1}`.padStart(2, "0");
-  const day = `${d.getDate()}`.padStart(2, "0");
-  return `${d.getFullYear()}-${month}-${day}`;
-}
+function today() { return localDateISO(); }
 
 function short(v: string) {
   return `${v.slice(0, 8)}…`;
@@ -102,9 +98,8 @@ export default function CommercePage() {
     setBusy(true);
     setMessage(null);
     try {
-      const date = today();
       const [d, c, ch, p, l, s, r, re, rr] = await Promise.all([
-        getCommerceDashboard(date),
+        getCommerceDashboard(),
         getCommerceCustomers(),
         getPaymentChannels(),
         getCommerceProducts(),

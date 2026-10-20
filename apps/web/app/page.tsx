@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "../components/app-shell";
 import { Skeleton } from "../components/ui";
+import { localDateISO, localMonthStartISO } from "../lib/date.mjs";
 import {
   getAnalyticsOverview, getCommerceDashboard, getInventoryBalances, getAdjustments, getStockCounts, getTransfers,
   getReadiness, type AnalyticsOverview, type CommerceDashboard, type InventoryAdjustment, type InventoryBalance,
@@ -11,8 +12,8 @@ import {
 } from "../lib/api";
 
 type LoadState = "loading" | "success" | "error";
-const today = () => new Date().toISOString().slice(0, 10);
-const monthStart = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); };
+const today = () => localDateISO();
+const monthStart = () => localMonthStartISO();
 const money = (value: string | number) => new Intl.NumberFormat("en-UG", { style: "currency", currency: "UGX", maximumFractionDigits: 0 }).format(Number(value));
 const short = (id: string) => `${id.slice(0, 8)}…`;
 
@@ -52,7 +53,7 @@ export default function HomePage() {
     setDashboardState("loading"); setAnalyticsState("loading"); setBalancesState("loading");
     setAdjustmentsState("loading"); setCountsState("loading"); setTransfersState("loading"); setReadinessState("loading");
     const tasks = [
-      getCommerceDashboard(today()).then(value => { setDashboard(value); setDashboardState("success"); }).catch(() => { setDashboard(null); setDashboardState("error"); }),
+      getCommerceDashboard().then(value => { setDashboard(value); setDashboardState("success"); }).catch(() => { setDashboard(null); setDashboardState("error"); }),
       getAnalyticsOverview(monthStart(), today()).then(value => { setAnalytics(value); setAnalyticsState("success"); }).catch(() => { setAnalytics(null); setAnalyticsState("error"); }),
       getInventoryBalances().then(value => { setBalances(value); setBalancesState("success"); }).catch(() => { setBalances([]); setBalancesState("error"); }),
       getAdjustments().then(value => { setAdjustments(value); setAdjustmentsState("success"); }).catch(() => { setAdjustments([]); setAdjustmentsState("error"); }),
@@ -85,7 +86,7 @@ export default function HomePage() {
     <div className="command-toolbar"><div><strong>What is happening in the business right now?</strong><span>Authoritative operational state with a light intelligence layer on top.</span></div><div className="toolbar-actions"><button className="button button-soft" onClick={() => void load()} disabled={busy}>Refresh</button><Link href="/sales" className="button button-dark">+ Create sale</Link></div></div>
     {message && <div className="notice notice-error">{message}</div>}
 
-    <section className="home-status-row"><span className={`status ${readinessState === "success" && ["ready", "ok"].includes(readiness) ? "good" : "warn"}`}>● {readinessState === "loading" ? "Checking workspace" : readinessState === "error" ? "Readiness unavailable" : ["ready", "ok"].includes(readiness) ? "Workspace ready" : "Dependency attention"}</span><span>Today · {today()}</span></section>
+    <section className="home-status-row"><span className={`status ${readinessState === "success" && ["ready", "ok"].includes(readiness) ? "good" : "warn"}`}>● {readinessState === "loading" ? "Checking workspace" : readinessState === "error" ? "Readiness unavailable" : ["ready", "ok"].includes(readiness) ? "Workspace ready" : "Dependency attention"}</span><span>Business date · {dashboardState === "success" && dashboard ? dashboard.business_date : today()}</span></section>
 
     <div className="command-kpis">
       <div className="command-kpi"><span>Today's sales</span><strong>{dashboardState === "loading" ? "—" : dashboardState === "error" || !dashboard ? "Unavailable" : money(dashboard.sales.sales)}</strong><small>{dashboardState === "loading" ? "Loading authoritative state" : dashboardState === "error" || !dashboard ? "Sales data could not be loaded" : dashboard.sales.credit ? `Credit ${money(dashboard.sales.credit)}` : "Completed sales"}</small></div>

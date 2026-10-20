@@ -4,6 +4,8 @@
 **Scope:** LEXA only — existing Vercel web app, Render API, Neon PostgreSQL, source repository, Phase 0 reliability/authentication, Phase 1 security/UX foundation, and Phase 2 frontend system/reliability.  
 **Mode:** Read-only inspection of hosted resources; local source/test work only. No production deploy, Render settings change, Git push/merge, Neon SQL write, credential change, or role cutover was performed.
 
+> **Superseded snapshot notice — 20 October 2026:** This is the earlier Increment 04/05 status snapshot. The exact `027_release_convergence.sql` artifact was recovered afterward; there are now six remaining exact-source gaps, and the current code/test results are in [`PHASE0_2_CLOSURE_AUDIT_2026-10-20.md`](PHASE0_2_CLOSURE_AUDIT_2026-10-20.md). Use that report for current acceptance decisions.
+
 ## Executive decision
 
 **Phase 0–2 are not yet fully release-accepted. Do not begin Phase 3 schema-changing work yet.** The latest deployed application is healthy at the platform/probe level and the current commit includes the prior frontend null-guard and SQLAlchemy `RowMapping` fixes. But green hosting status is not the same as authenticated end-to-end acceptance or security sign-off.
@@ -12,7 +14,7 @@ The most important remaining blockers are:
 
 1. The production Neon login `lexa_runtime` still has elevated Neon role membership; the safe login `lexa_runtime_safe` does not exist on `lexa-live`, and migration 029 is not applied there.
 2. Five public tables have RLS disabled and no policies (`permissions`, `registration_requests`, `schema_migrations`, `tenants`, `users`). Their intentional global/bootstrap access patterns must be documented and secured/tested deliberately; do not enable RLS blindly.
-3. Seven exact historical migration SQL sources are still missing. Strict replay remains blocked. Repository path history and the available ZIP artifacts did not recover them.
+3. Six exact historical migration SQL sources remain missing. Strict replay remains blocked. The exact `027_release_convergence.sql` artifact has been recovered from the tracked `lexa_v280_src/migrations/` tree and verified against GitHub blob SHA-1; this proves artifact provenance, not a database-side checksum of applied bytes.
 4. GitHub Actions CI is not running on the latest commit. The current green commit status is Vercel only. The workflow file is nested under `LEXA-Phase1-2.9.1/.github/workflows/` while the active root `.github/workflows/` is protected by the ZIP extractor. `main` is not protected and has no required status checks.
 5. Hosted credentialed authentication and tenant-scoped business acceptance have not been run with a dedicated test account.
 6. The current local runner lacks full frontend dependencies and runs Node 22 rather than required Node 24; local TypeScript typecheck fails with missing `react`/`next` modules. The latest Vercel deployment is READY, but this local candidate still needs a reproducible CI run and visual responsive acceptance.
@@ -118,7 +120,7 @@ The ten Universal Business Engine tables checked during this audit have RLS enab
 
 ### Missing migration source history
 
-The source manifest still identifies these seven missing exact SQL files:
+The source manifest now identifies these six remaining missing exact SQL files:
 
 - `010_phase2_catalog_intelligence.sql`
 - `011_phase2_catalog_runtime_constraints.sql`
@@ -126,7 +128,6 @@ The source manifest still identifies these seven missing exact SQL files:
 - `024_phase4_purchasing_security.sql`
 - `025_phase4_purchasing_permissions.sql`
 - `026_phase4_membership_branch_integrity.sql`
-- `027_release_convergence.sql`
 
 Queries against the inspected GitHub path history returned no commits for those paths, and available source ZIPs did not contain the files. This does not prove no other owner-held backup exists; request authoritative release artifacts or backup source. Preserve the full migration version names because numeric prefix `023` collides. Keep `python scripts/check_migration_sources.py --strict` blocked until exact bytes are recovered and reviewed.
 
@@ -159,7 +160,7 @@ Queries against the inspected GitHub path history returned no commits for those 
 
 ### Gate B — database security and migration provenance
 
-- [ ] Recover the seven exact missing SQL sources from authoritative artifacts; verify source bytes and full migration identities.
+- [ ] Recover the six remaining exact missing SQL sources from authoritative artifacts; verify source bytes and full migration identities.
 - [ ] Complete a table-by-table RLS/grant review for `permissions`, `registration_requests`, `schema_migrations`, `tenants`, and `users` on an isolated branch; test anonymous, logged-in, cross-tenant, bootstrap, admin, and migration paths.
 - [ ] Execute the least-privilege role migration on an isolated branch and verify role membership, `SET ROLE lexa_app`, absence of direct sensitive-table access, and login behavior.
 - [ ] Prepare backup, rollback, secret rotation and explicit approval plan before any production role/schema cutover.

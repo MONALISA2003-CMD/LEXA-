@@ -1,4 +1,4 @@
-# Migration source recovery notes — updated 15 October 2026
+# Migration source recovery notes — updated 20 October 2026
 
 ## Recovered source
 
@@ -9,13 +9,26 @@
 - Verified Git blob SHA-1: `caefc2e3b46c5a4bae2ff2592b787d3b4092dd61`
 - Verification method: recomputed the Git blob hash from recovered file bytes and matched GitHub's historical file API result.
 
+## Recovered source — 027 release convergence (20 October 2026)
+
+- Full version: `027_release_convergence`
+- Canonical path: `migrations/027_release_convergence.sql`
+- Recovered source path: `lexa_v280_src/migrations/027_release_convergence.sql`
+- Source commit: `51355d941eb50e075e3d4f884838a11b6807778b`
+- Source repository: `MONALISA2003-CMD/LEXA-`
+- Verified Git blob SHA-1: `e6d9242d7dedb2cbf7b1a71a46fe635b3ab051d8`
+- Verified SHA-256: `404334dde3e34a80d3176b1ba38347eb1def3cc8793f6b52d3a663cbc05b19cd`
+- Source size: `16,980` bytes
+- Verification method: recovered file bytes recompute to the GitHub blob SHA-1; SHA-256 is recorded in `source_gaps.json` under `recovered_sources`.
+- Scope/caveat: the legacy `lexa_v280_src/migrations/README.md` describes 027 as the additive schema-parity/readiness/analytics convergence point and the 023–026 purchasing entries as historical lineage markers. The live ledger records version names, not source checksums; this validates tracked artifact provenance, but it is not an independent checksum of the SQL originally executed on the database. Do not reapply this source to the live branch as part of source recovery.
+
 ## Canonical ledger recheck — 15 October 2026
 
 A read-only query against `public.schema_migrations` on Neon project `wispy-mud-75323042`, branch `lexa-live` (`br-soft-star-b1dj2m2w`), database `neondb`, returned the same 27 full version strings as the 13 October snapshot. A separate read-only query confirmed migration 028, the refresh lookup function, `lexa_app` EXECUTE privilege, and a `SECURITY DEFINER` owner with RLS bypass. See `live_ledger_snapshot_2026-10-15.json` for the refreshed ledger evidence and retain the `2026-10-13` snapshot as historical evidence.
 
 ## Unresolved historical sources
 
-The following applied full version strings remain absent from the supplied package and inspected Git history:
+Six applied full version strings remain absent from the supplied package and inspected Git history after recovering 027:
 
 - `010_phase2_catalog_intelligence`
 - `011_phase2_catalog_runtime_constraints`
@@ -23,13 +36,12 @@ The following applied full version strings remain absent from the supplied packa
 - `024_phase4_purchasing_security`
 - `025_phase4_purchasing_permissions`
 - `026_phase4_membership_branch_integrity`
-- `027_release_convergence`
 
-Search of connected repository history and public results did not reveal authoritative copies. Their SQL was not fabricated from live-schema inference. Run `python scripts/check_migration_sources.py`; `--strict` remains blocked until exact source artifacts are recovered and reviewed.
+Search of connected repository history and public results did not reveal authoritative copies. Their SQL was not fabricated from live-schema inference. Run `python scripts/check_migration_sources.py`; `--strict` remains blocked until the remaining exact source artifacts are recovered and reviewed.
 
 ## Dynamic SQL validation
 
-The corrected dynamic Brain RLS policy block in `022_phase6a_brain_foundation.sql` was executed on the existing disposable Neon branch `lexa-convergence-test-2026-10-08` only. A follow-up read of `pg_policies` verified all seven expected Brain policies use a properly quoted empty-string predicate. This validates the corrected dynamic SQL statement; it does not prove a full from-zero replay, because the seven historic SQL gaps remain.
+The corrected dynamic Brain RLS policy block in `022_phase6a_brain_foundation.sql` was executed on the existing disposable Neon branch `lexa-convergence-test-2026-10-08` only. A follow-up read of `pg_policies` verified all seven expected Brain policies use a properly quoted empty-string predicate. This validates the corrected dynamic SQL statement; it does not prove a full from-zero replay, because the six remaining historic SQL gaps remain.
 
 ## Deployment evidence — 15 October 2026
 

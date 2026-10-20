@@ -38,12 +38,6 @@
       "expected_path": "migrations/026_phase4_membership_branch_integrity.sql",
       "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
       "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
-    },
-    {
-      "version": "027_release_convergence",
-      "expected_path": "migrations/027_release_convergence.sql",
-      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
-      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
     }
   ],
   "numeric_prefix_collisions": {
@@ -51,5 +45,18 @@
       "023_phase2_identity_tenancy_authorization_foundation",
       "023_phase4_purchasing_core"
     ]
-  }
+  },
+  "recovered_sources": [
+    {
+      "version": "027_release_convergence",
+      "path": "migrations/027_release_convergence.sql",
+      "recovered_from_path": "lexa_v280_src/migrations/027_release_convergence.sql",
+      "source_repository": "MONALISA2003-CMD/LEXA-",
+      "source_commit": "51355d941eb50e075e3d4f884838a11b6807778b",
+      "git_blob_sha1": "e6d9242d7dedb2cbf7b1a71a46fe635b3ab051d8",
+      "sha256": "404334dde3e34a80d3176b1ba38347eb1def3cc8793f6b52d3a663cbc05b19cd",
+      "size_bytes": 16980,
+      "verification": "Recovered source bytes recompute to the original Git blob SHA-1 and documented SHA-256. Database ledger records the full version but does not record a source checksum, so this proves artifact provenance, not an independent DB-side checksum of applied bytes."
+    }
+  ]
 }
