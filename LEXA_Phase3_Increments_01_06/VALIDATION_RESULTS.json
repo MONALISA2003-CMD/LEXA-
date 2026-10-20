@@ -14,12 +14,13 @@
   "package_validation_runtime": {
     "python": "CPython 3.13.x",
     "node": "Node v22.16.0 (contract suite); full application validation on Node 24 remains open",
-    "typescript": "isolated fixture compiler check"
+    "typescript": "isolated fixture compiler check",
+    "python_tests": "38 tests passed (CPython 3.13.x); includes workspace SQL identity binding, commerce RowMapping serializer regression, and Render-observed journal-entry/precautionary fiscal-document optional status filter regression contracts"
   },
   "passed": [
     {
       "command": "bash scripts/validate-package.sh :: python -m pytest -q tests",
-      "result": "36 passed; pure-domain and source contracts, updated workspace SQL identity-binding checks, migration preflight and replay-candidate generator tests"
+      "result": "38 passed; domain/source contracts, workspace SQL identity binding, commerce RowMapping serializer regression, journal-entry and fiscal-document optional status filters, migration preflight and replay-candidate generator tests"
     },
     {
       "command": "python -m compileall -q overrides/apps/api/app scripts",
@@ -82,6 +83,12 @@
       "check": "Full repository test suite after candidate overlay installed in disposable source checkout",
       "command": "python -m pytest -q",
       "result": "116 passed, 1 skipped; the skipped apps/api/tests/test_auth_refresh.py requires Redis, which was unavailable in the disposable environment"
+    },
+    {
+      "check": "Read-only Render runtime audit and locally staged regression correction",
+      "workspace": "My Workspace",
+      "service_id": "srv-dakm8k95efls73egg9a0",
+      "result": "latest Render deploy events succeeded and service listed live; logs confirmed a journal-entries HTTP 500 for absent status due to PostgreSQL AmbiguousParameter; candidate applies conditional parameterized status filters to journal entries and, as a precaution, fiscal documents; no production setting, branch, database or deployment changed"
     }
   ],
   "not_run_or_not_proven": [
@@ -93,7 +100,7 @@
     "No canonical live schema parity signoff; prior comparisons have outstanding differences.",
     "Exact historical SQL files 010, 011, and 023–026 remain unrecovered; strict historical-source checker must remain failed.",
     "Original 021 migration remains malformed; its separately generated repair candidate requires human review and preserves the historical original.",
-    "No hosted branch, source commit, pull request, CI run, production migration, runtime-role cutover, service-setting change or deployment. Prior GitHub branch-creation attempt returned 403.",
+    "Direct external HTTP smoke tests against Render were inconclusive because DNS resolution was unavailable in the audit execution environment; logs show /ready and /health HTTP 200.",
     "The exact final Phase 3 overlay is still not merged/deployed; the isolated SQL helper check validates one regression, not fresh full migration replay or application-wide authorization."
   ],
   "release_gates_still_blocking": [
@@ -104,11 +111,11 @@
     "Run authenticated API/browser tests for workspace, role, invitation and branch-boundary invariants, including concurrency and UI responsive/keyboard matrix.",
     "Resolve GitHub branch/PR/CI access and bind approvals, rollback and release evidence to an immutable reviewed SHA.",
     "Approve runtime database-role and production configuration changes separately; no production mutation is authorized by this package.",
-    "Complete the infrastructure gate: resolve the production role/RLS findings on a reviewed staging-to-production runbook; confirm Render workspace, inspect service/deploy/log state and configure the health check through an authorized release; finish candidate Node 24 app build, Redis auth test and authenticated E2E."
+    "Complete the infrastructure gate: resolve the production role/RLS findings on a reviewed staging-to-production runbook; LEXA Render has an empty healthCheckPath and a logged journal-entries 500 whose local correction is not deployed (the matching fiscal-documents predicate was also corrected locally); configure /ready and post-deploy smoke test only through authorized release; finish candidate Node 24 app build, Redis auth test and authenticated E2E."
   ],
-  "package_status": "candidate package validation complete; application/release gates remain open",
+  "package_status": "candidate package validation passed (38 Python + 8 Node contracts, compileall, fixture tsc); Render runtime fixes are local-only and app/release gates remain open",
   "infrastructure_audit": {
-    "checked_at_utc": "2026-10-20T14:20Z to 2026-10-20T14:45Z",
+    "checked_at_utc": "2026-10-20T14:20Z to 2026-10-20T15:57Z (Neon/Vercel audit earlier; Render runtime follow-up later)",
     "neon_live_branch": {
       "branch_id": "br-soft-star-b1dj2m2w",
       "state": "ready",
@@ -149,10 +156,50 @@
     },
     "render": {
       "workspace_found": "My Workspace",
-      "service_inventory": "not inspected; tool requires explicit workspace selection confirmation",
-      "last_smoke_from_isolated_sandbox": "HTTP 000 timeout to /health and /ready; inconclusive network probe, not evidence that service itself is down",
-      "live_health_check_path": "previous read-only evidence says blank although render.yaml declares /ready",
-      "disposition": "NOT VERIFIED; user confirmation of Render workspace is required before proceeding with service inspection"
+      "service_id": "srv-dakm8k95efls73egg9a0",
+      "service_url": "https://lexa-n10e.onrender.com",
+      "source_repository": "MONALISA2003-CMD/LEXA-",
+      "branch": "main",
+      "root_directory": "apps/api",
+      "runtime": "python / uvicorn",
+      "region": "frankfurt",
+      "plan": "free",
+      "auto_deploy": "yes",
+      "latest_deployment_id": "dep-dbbgra1srm7s7386q0l0",
+      "latest_deployed_commit": "a1ed64eec79daf3d74456c7b8b854d84f634d6fd",
+      "latest_deployment_state": "live; latest build and deploy events succeeded",
+      "health_check_path": "blank",
+      "health_log_evidence": {
+        "/ready": "HTTP 200 in logs at 2026-10-20T07:01:36Z and later sampled times",
+        "/health": "HTTP 200 in logs at 2026-10-20T06:58:31Z"
+      },
+      "confirmed_application_errors": [
+        {
+          "timestamp_utc": "2026-10-20T07:01:40Z",
+          "endpoint": "GET /api/v1/accounting/journal-entries",
+          "status": 500,
+          "cause": "psycopg.errors.AmbiguousParameter: could not determine data type of parameter $2 with status=None and predicate (:s IS NULL OR status=:s)",
+          "fix_status": "candidate source now dynamically adds the parameterized status filter only when supplied; regression contract passes; not committed, merged or deployed"
+        },
+        {
+          "timestamp_utc": "not observed in queried runtime logs; discovered by source sweep",
+          "endpoint": "GET /api/v1/compliance/fiscal-documents",
+          "status": "no correlated 500 found",
+          "cause": "same optional status predicate shape can produce PostgreSQL AmbiguousParameter when status is omitted",
+          "fix_status": "same conditional parameterized status filter implemented in candidate as a precaution; no deployment performed"
+        },
+        {
+          "timestamp_utc": "2026-10-20T04:38Z and 2026-10-15T12:38Z/13:41Z",
+          "endpoint": "GET /api/v1/commerce/dashboard",
+          "status": 500,
+          "cause": "SQLAlchemy RowMapping serializer attempted row._mapping",
+          "fix_status": "currently inspected default-branch source handles Mapping and Row; no later same stack was returned in queried logs; post-release smoke test remains"
+        }
+      ],
+      "recent_failure_events": "No server_failed event was present in the returned recent event page; this does not negate the confirmed application-level HTTP 500s.",
+      "external_probe": "not directly verified: DNS resolution failed in the audit execution environment; direct-probe failure is inconclusive",
+      "disposition": "BLOCKED: latest deploy metadata is live/successful, but a 500 is backed by application logs, the source fix is not deployed, the health check path is blank, and candidate Node 24/authenticated E2E/release gates remain open",
+      "production_mutations": "none"
     }
   }
 }

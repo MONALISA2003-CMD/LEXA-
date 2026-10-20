@@ -228,3 +228,31 @@ def test_tenant_wide_finance_and_analytics_reports_require_full_branch_assignmen
     assert analytics.count('require_full_branch_scope(') >= 5
     assert 'membership_branch_assignments mba' in analytics
     assert 'a.location_id IN (SELECT loc.id' in analytics
+
+
+def test_journal_entries_optional_status_filter_avoids_untyped_null_parameter():
+    finance = (ROOT / "overrides/apps/api/app/routes/finance.py").read_text()
+    route = finance.split('@router.get("/journal-entries")', 1)[1].split(
+        '@router.get("/journal-entries/{entry_id}")', 1
+    )[0]
+    assert 'if status is not None:' in route
+    assert 'query += " AND status=:s"' in route
+    assert 'params["s"] = status' in route
+    assert 'AND (:s IS NULL OR status=:s)' not in route
+    assert 'require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])' in route
+    fiscal_route = finance.split('@compliance.get("/fiscal-documents")', 1)[1].split(
+        '@compliance.post("/sales/{sale_id}/fiscalize")', 1
+    )[0]
+    assert 'if status is not None:' in fiscal_route
+    assert 'query += " AND status=:s"' in fiscal_route
+    assert 'params["s"] = status' in fiscal_route
+    assert 'AND (:s IS NULL OR status=:s)' not in fiscal_route
+
+
+def test_commerce_serializer_handles_rowmapping_from_sqlalchemy_queries():
+    source = (ROOT / "overrides/apps/api/app/routes/commerce.py").read_text()
+    serializer = source.split("def out(row: Any)", 1)[1].split("\n\ndef default_currency", 1)[0]
+    # Render captured a 500 because a SQLAlchemy RowMapping does not expose
+    # Row._mapping. Keep the RowMapping branch explicit in the source contract.
+    assert "from collections.abc import Mapping" in source
+    assert "values = row if isinstance(row, Mapping) else row._mapping" in serializer

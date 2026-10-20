@@ -3,8 +3,8 @@
   "repository": "MONALISA2003-CMD/LEXA-",
   "base_commit": "8124cca301062eac6ffe59f68d02fc689a3ffae1",
   "base_ref": "refs/heads/main; inspected 2026-10-20",
-  "package_scope": "Combined Phase 3 Increments 01–06: business setup prerequisites, workspace context/onboarding, member/invitation/branch assignment lifecycle, member role assignment, core branch-scoped inventory/sales authorization, role and permission administration; Phase 0–3 recovery evidence.",
-  "delivery_state": "reviewable source-only candidate; not merged, committed, deployed, or applied to production",
+  "package_scope": "Combined Phase 3 Increments 01–06: business setup prerequisites, workspace context/onboarding, member/invitation/branch assignment lifecycle, member role assignment, core branch-scoped inventory/sales authorization, role and permission administration; Phase 0–3 recovery evidence. Includes source-only fixes for the Render-observed /accounting/journal-entries missing-status 500 and the same risky optional-status predicate in /compliance/fiscal-documents; no runtime write or deployment is included.",
+  "delivery_state": "reviewable source-only candidate; Render-observed journal-entry correction and precautionary fiscal-document filter correction remain local-only and are not committed, merged, or deployed",
   "installer": "scripts/apply_phase3_increments_02_03.py",
   "installer_invariants": [
     "exact pinned baseline commit in actual checkout",
@@ -48,8 +48,9 @@
       "target": "apps/api/app/routes/finance.py",
       "mode": "replace",
       "package_source": "overrides/apps/api/app/routes/finance.py",
-      "source_sha256": "e99892c2a6eac5d5c712d6a1543e5f382d904798466740d6e4ddc235ecacaa4e",
-      "original_git_blob_sha1": "a9048bc6afa0c5882de78af225a989710c0635ea"
+      "source_sha256": "4ff959f0a5f69ac874ec6bed27bbbee9b46e521c00d17757c6b1259b7b103924",
+      "original_git_blob_sha1": "a9048bc6afa0c5882de78af225a989710c0635ea",
+      "note": "Removes the PostgreSQL ambiguous-parameter failure when the optional journal-entry status filter is omitted; also applies the same safe conditional filter pattern to fiscal documents; regression contracts cover both."
     },
     {
       "target": "apps/web/app/administration/page.tsx",
@@ -256,7 +257,7 @@
     "rls_test": "under lexa_app, tenant-scoped reads filtered to one tenant and cross-tenant invite/assignment inserts were rejected; synthetic fixtures removed"
   },
   "validation_summary": {
-    "python_tests": "36 passed: package domain/source-contract/migration preflight/replay generator tests; includes authenticated workspace SQL identity-binding contract",
+    "python_tests": "38 passed: package domain/source-contract/migration preflight/replay generator tests; includes workspace SQL identity binding, commerce RowMapping serializer, journal-entry and fiscal-document optional status-filter regressions",
     "python_compile": "passed: python -m compileall -q overrides/apps/api/app scripts",
     "node_contract_tests": "8 passed: node --test tests/phase3-increments-02-03.test.mjs",
     "typescript_contract_fixture": "passed: isolated TypeScript UI/API-helper contract fixture via tsc --noEmit",
@@ -265,7 +266,8 @@
     "installer_integration": "passed in disposable reconstructed source checkout with a temporary copy of the installer HEAD pin adjusted; exact source-file blob guards remained unchanged. Not equivalent to installation against the original pinned Git checkout.",
     "isolated_database": "Selected cross-tenant RLS behavior tests passed on the previously replayed isolated Neon branch. Added and ran tests/sql/lexa_list_active_user_workspaces_context_test.sql against the isolated branch: cross-user workspace enumeration denied; missing app.user_id failed closed; no residual fixtures. Not a fresh empty-database replay or canonical parity signoff.",
     "node24_overlay": "not completed; the isolated Node 24 sandbox stopped before dependencies could be verified. Earlier pass applies to the pinned base only.",
-    "production": "No production DB/role/config/credential/release/deployment writes performed. Read-only live audit found lexa_runtime has CREATEDB/CREATEROLE/REPLICATION/BYPASSRLS and neon_superuser membership, five public tables lack RLS, and Render service inventory remains unverified pending workspace confirmation."
+    "production": "No production DB/role/config/credential/release/deployment writes performed. Read-only live audit found lexa_runtime has CREATEDB/CREATEROLE/REPLICATION/BYPASSRLS and neon_superuser membership, and five public tables lack RLS. Render My Workspace service inventory and logs were inspected read-only.",
+    "render_runtime_audit": "Read-only audit of Render My Workspace found the LEXA service listed live with successful latest deploy events, blank healthCheckPath, historical commerce-dashboard row-mapping 500s, and a 2026-10-20 journal-entries 500 due to a nullable untyped SQL parameter. Candidate fixes the journal-entry filter and proactively applies the same safe optional-filter pattern to fiscal documents; neither change is deployed."
   },
   "known_limitations": [
     "six exact historical SQL source files remain unrecovered; strict source checker remains failed",
@@ -277,34 +279,39 @@
     "no hosted branch/commit/PR/CI/deployment was created; previous GitHub branch write returned 403",
     "no production DB/service settings/live data were mutated",
     "original migration 021 remains malformed; repair candidate is separate and requires review",
-    "Latest read-only infrastructure audit is not green: canonical Neon lexa_runtime remains elevated and five sensitive tables lack RLS; Vercel latest deployment is READY but not the candidate SHA, and Render service state/settings were not rechecked because workspace confirmation is pending."
+    "Latest read-only infrastructure audit is not green: canonical Neon lexa_runtime remains elevated and five public tables lack RLS; Vercel latest deployment is READY but not the candidate SHA; Render LEXA was inspected in My Workspace and has a blank healthCheckPath plus a logged journal-entries 500 whose source-only correction is not deployed; the similar fiscal-documents predicate was proactively corrected in the candidate."
   ],
   "package_file_inventory_note": "SHA-256 and byte sizes inventory all stable package files, excluding PATCH_MANIFEST.json and SHA256SUMS.txt themselves. Cache directories and Python bytecode are removed from the delivery archive.",
   "package_files": [
     {
       "path": "README.md",
-      "sha256": "64fc4512d8fbf15bad99bf44c5320338570ab6972fc34bc894f76dbe7a5e0db2",
-      "size_bytes": 9862
+      "sha256": "c28724c290aafc861f3d252c9ff2e418a90cc62462771a3f84d0ab25cb2f37ef",
+      "size_bytes": 11040
     },
     {
       "path": "VALIDATION_RESULTS.json",
-      "sha256": "e6e4de22327607ecf3aa7df288365fedc722f65817d2d589df61d311acde1f26",
-      "size_bytes": 10403
+      "sha256": "ffe241231d0d8d2acbdf2be9ad4143a407202c55b7127493bc5dc94eaf87db78",
+      "size_bytes": 13895
     },
     {
       "path": "docs/ACCEPTANCE_MATRIX.md",
-      "sha256": "afceed4e084ea823c775c162df7572e4dc1c4841dd53b7abcd0211ce52f2688e",
-      "size_bytes": 5199
+      "sha256": "dba1b967569ce84c2da86c20d52a278dc0e8f2964297760a797334f24b770ef3",
+      "size_bytes": 6048
     },
     {
       "path": "docs/IMPLEMENTATION_REPORT.md",
-      "sha256": "3133057ad1403b6343cb8d8cb8e5c1f85e324bf3f3cb6573d2289599407991ed",
-      "size_bytes": 8765
+      "sha256": "ad1070d2f5afc60bf93e72e37b8c979712c986ab21a3d05662ca9e10cab336b8",
+      "size_bytes": 10786
     },
     {
       "path": "docs/PHASE0_TO_PHASE3_CLOSURE_MATRIX.md",
-      "sha256": "bb6b6e347968bbe38c31d76fb4a7ab183e0d9e5050a99e2fa1a02892fbd6d3e4",
-      "size_bytes": 7207
+      "sha256": "209fbd2a8335729585db7e08c9eb7f6be57b833c9cab74c7a72cab2950aada95",
+      "size_bytes": 7942
+    },
+    {
+      "path": "docs/RENDER_RUNTIME_AUDIT_2026-10-20.md",
+      "sha256": "abbd1a67e074b34f5d34173517fab6e34cda8e8470e3d2ef51b22700a26af60e",
+      "size_bytes": 4932
     },
     {
       "path": "fixtures/typecheck/apps/web/app/administration/members/page.tsx",
@@ -368,8 +375,8 @@
     },
     {
       "path": "overrides/apps/api/app/routes/finance.py",
-      "sha256": "e99892c2a6eac5d5c712d6a1543e5f382d904798466740d6e4ddc235ecacaa4e",
-      "size_bytes": 20028
+      "sha256": "4ff959f0a5f69ac874ec6bed27bbbee9b46e521c00d17757c6b1259b7b103924",
+      "size_bytes": 20603
     },
     {
       "path": "overrides/apps/api/app/routes/inventory.py",
@@ -402,14 +409,14 @@
       "size_bytes": 2947
     },
     {
-      "path": "overrides/apps/web/app/administration/members/page.tsx",
-      "sha256": "64cd2d56a0dfdc15eadce5ddc3bd8c102eda176674e46adcd1db30a0cb7046dd",
-      "size_bytes": 17929
-    },
-    {
       "path": "overrides/apps/web/app/administration.page.tsx",
       "sha256": "b5716c0846d51e5a8c975fb4b437649e5cf1ba4f574887d346be8d7f09d76868",
       "size_bytes": 17707
+    },
+    {
+      "path": "overrides/apps/web/app/administration/members/page.tsx",
+      "sha256": "64cd2d56a0dfdc15eadce5ddc3bd8c102eda176674e46adcd1db30a0cb7046dd",
+      "size_bytes": 17929
     },
     {
       "path": "overrides/apps/web/app/invite/page.tsx",
@@ -483,8 +490,8 @@
     },
     {
       "path": "tests/test_phase3_increments_02_03_contract.py",
-      "sha256": "34a645ef568ab007647c9446ccc73cfd16d17ad41d03ab8ef01c0ed0b1e29fec",
-      "size_bytes": 12868
+      "sha256": "65f7dd47c822c1307e819014cb6d546d0a315b2e089c86d8f72669d09079ba5c",
+      "size_bytes": 14377
     },
     {
       "path": "tests/test_workspace_domain.py",
@@ -492,5 +499,40 @@
       "size_bytes": 2705
     }
   ],
-  "package_file_count": 42
+  "package_file_count": 43,
+  "render_runtime_followup": {
+    "checked_at_utc": "2026-10-20T16:20Z",
+    "workspace": "My Workspace",
+    "service_id": "srv-dakm8k95efls73egg9a0",
+    "service_url": "https://lexa-n10e.onrender.com",
+    "latest_deploy_id": "dep-dbbgra1srm7s7386q0l0",
+    "latest_deployed_commit": "a1ed64eec79daf3d74456c7b8b854d84f634d6fd",
+    "latest_deploy_status": "live; successful build and deploy events",
+    "health_check_path": "blank",
+    "application_errors": [
+      {
+        "timestamp_utc": "2026-10-20T07:01:40Z",
+        "path": "GET /api/v1/accounting/journal-entries",
+        "status": 500,
+        "cause": "psycopg.errors.AmbiguousParameter for the absent optional status parameter in (:s IS NULL OR status=:s)",
+        "candidate_correction": "Append AND status=:s only if status is not None; regression contract passes; not deployed"
+      },
+      {
+        "timestamp_utc": "not observed in queried runtime logs; identified by source sweep",
+        "path": "GET /api/v1/compliance/fiscal-documents",
+        "status": "no correlated 500 found",
+        "cause": "same nullable optional status predicate pattern could produce PostgreSQL AmbiguousParameter when status is omitted",
+        "candidate_correction": "Apply the same conditional parameterized status filter; regression contract added; not deployed"
+      },
+      {
+        "timestamp_utc": "2026-10-20T04:38Z and 2026-10-15T12:38Z/13:41Z",
+        "path": "GET /api/v1/commerce/dashboard",
+        "status": 500,
+        "cause": "serializer assumed Row._mapping when given RowMapping",
+        "disposition": "current source handles Mapping and Row; no later matching stack returned by queried logs; post-release smoke test still needed"
+      }
+    ],
+    "health_log_evidence": "/ready and /health returned HTTP 200 in application logs; direct external probes from the audit environment failed due to DNS resolution failure and are inconclusive",
+    "production_changes": "none"
+  }
 }

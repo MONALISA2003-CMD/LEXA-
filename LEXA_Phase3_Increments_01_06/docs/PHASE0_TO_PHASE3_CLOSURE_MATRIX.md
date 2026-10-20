@@ -7,7 +7,7 @@
 
 | Phase/workstream | Candidate coverage | Latest evidence | State / remaining gate |
 |---|---|---|---|
-| Phase 0 — auth/session and tenant security | Existing auth/session model retained; active workspace options; switching revokes old session before tenant GUC change; tenant invitation/assignment RLS remains forced; workspace-list helper binds argument to authenticated `app.user_id`. | Package suite 36 Python + 8 Node; isolated identity-binding SQL regression; selected isolated `lexa_app` RLS test. | Partial. Historical source gaps, least-privilege runtime role, full grants/RLS and authenticated E2E not signed off. |
+| Phase 0 — auth/session and tenant security | Existing auth/session model retained; active workspace options; switching revokes old session before tenant GUC change; tenant invitation/assignment RLS remains forced; workspace-list helper binds argument to authenticated `app.user_id`. | Package suite 38 Python + 8 Node; isolated identity-binding SQL regression; selected isolated `lexa_app` RLS test. | Partial. Historical source gaps, least-privilege runtime role, full grants/RLS and authenticated E2E not signed off. |
 | Phase 1 — tenant/membership foundation | Uses tenant/membership/role/session schema and additive mappings/migration candidate. | Installer source guards and isolated schema metadata. | Partial. Exact history and clean replay/parity gates remain open. |
 | Phase 2 — contracts, CI and source recovery | Hash-guarded installer, explicit migration candidates, manifests, tests. | Installer smoke integration in disposable source tree; installed-overlay full repo pytest passed 116 with 1 Redis-dependent skip; strict original-source gap list remains. | Partial. Hosted CI/branch protection unavailable; Node 24 app build and Redis integration remain open. |
 | Phase 3 Increment 01 — business profile/branch prerequisites | Profile and branch/warehouse/location/POS API/UI prerequisite. | Static contract tests and installer source guards. | Candidate implemented; DB transaction/idempotency/accessibility tests remain. |
@@ -20,11 +20,15 @@
 
 ## Test and replay evidence
 
-Latest package validation passes 36 Python tests, Python compilation, 8 Node source-contract tests and the isolated TypeScript UI/API fixture check. The new isolated Neon SQL regression proved the workspace-list SECURITY DEFINER function is bound to `app.user_id`; it denied a cross-user query and returned no rows when that context was blank. The post-check found no residual test fixtures. An earlier isolated Neon candidate replay reached 119 tables, 1,300 columns, 446 indexes, 1,799 constraints, 116 policies, 460 public functions and 36 user triggers; selected cross-tenant invitation/assignment RLS attempts were denied. These are selected isolated checks, not current canonical schema parity.
+Latest package validation passes 38 Python tests, Python compilation, 8 Node source-contract tests and the isolated TypeScript UI/API fixture check. The new isolated Neon SQL regression proved the workspace-list SECURITY DEFINER function is bound to `app.user_id`; it denied a cross-user query and returned no rows when that context was blank. The post-check found no residual test fixtures. An earlier isolated Neon candidate replay reached 119 tables, 1,300 columns, 446 indexes, 1,799 constraints, 116 policies, 460 public functions and 36 user triggers; selected cross-tenant invitation/assignment RLS attempts were denied. These are selected isolated checks, not current canonical schema parity.
 
 A disposable installer integration test applied the candidate overlay to a temporary source checkout reconstructed from the pinned source archive. The test copy's expected HEAD hash was changed to the temporary generated commit for this smoke test only, while original source-file Git blob guards remained unchanged. This demonstrates the installer copy/stage path but does not replace an apply test on the exact original Git clone.
 
 Full Node 24 application clean install/typecheck/tests/build against the expanded overlay did not complete because the sandbox stopped before dependency verification. An earlier Node 24 run passed on the pinned **base only**, so it must not be presented as overlay validation. The Redis-dependent auth-refresh integration and authenticated app/browser E2E remain open.
+
+## Render runtime follow-up — 2026-10-20
+
+The confirmed Render workspace reports LEXA live with recent successful build/deploy events, but its health-check path is blank. Runtime logs show `/ready` and `/health` succeeding, an older commerce-dashboard mapping 500 whose source fix is now present, and a later 500 from `/api/v1/accounting/journal-entries` when the optional `status` parameter is omitted. The candidate now appends `AND status=:s` only when a status is supplied. The same safe optional-filter pattern was applied to `/api/v1/compliance/fiscal-documents` as a precaution; regression contracts cover both. These source fixes are not deployed; post-release smoke coverage and health-check configuration are still gated.
 
 ## Six unresolved original SQL gaps
 
