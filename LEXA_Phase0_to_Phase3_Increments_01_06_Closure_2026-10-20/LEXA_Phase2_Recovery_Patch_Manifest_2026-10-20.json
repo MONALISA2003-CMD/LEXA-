@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "base_archive": "LEXA_Phase0-2_Closure_Increment_07_2026-10-20.zip",
+  "patch_archive": "LEXA_Phase2_Recovery_CI_Patch_2026-10-20.zip",
+  "created_at": "2026-10-20",
+  "change_count": 24,
+  "changes": [
+    {
+      "path": ".github/workflows/lexa-ci.yml",
+      "operation": "modify",
+      "bytes": 3222,
+      "sha256": "0ac88fb2168b3383e385d4bfa92dc9cb33714e54ec8217258fb907f658d3d96e"
+    },
+    {
+      "path": ".gitignore",
+      "operation": "modify",
+      "bytes": 367,
+      "sha256": "c573b756b355254812263f9b2c92ee095af5d41e401672588fbafed94bbab5ad"
+    },
+    {
+      "path": "README.md",
+      "operation": "modify",
+      "bytes": 12272,
+      "sha256": "def4e4ef205bcbcdae0905b2a2a99fc8a62d0276b0665f5e9b70de6f804ebcb1"
+    },
+    {
+      "path": "apps/web/e2e/README.md",
+      "operation": "add",
+      "bytes": 1381,
+      "sha256": "ba46dbb0fede3acbc48ef6cb3bd89e51a88625722e6248f0f4fe39f151ec6620"
+    },
+    {
+      "path": "apps/web/e2e/acceptance.spec.ts",
+      "operation": "add",
+      "bytes": 2522,
+      "sha256": "2ba582c20874f48a160e52e57d32c0a7d52859ac54d7799738c9c740339b91b9"
+    },
+    {
+      "path": "apps/web/playwright.config.ts",
+      "operation": "add",
+      "bytes": 800,
+      "sha256": "c6f3932576eea574701e325160c0bc3d29632483165f731b7f3e21d9938e91fb"
+    },
+    {
+      "path": "apps/web/tsconfig.json",
+      "operation": "modify",
+      "bytes": 706,
+      "sha256": "872ee66200e3d47c0bbca235b44dc90a5d0d745c4dcc82a319443d53d76a5423"
+    },
+    {
+      "path": "migrations/reconstructed/010_phase2_catalog_intelligence.equivalent.sql",
+      "operation": "add",
+      "bytes": 10522,
+      "sha256": "a1d414eb36186e28fbc24e3fd2274b9eae688b0e0f5556b83ce53430649c8d8e"
+    },
+    {
+      "path": "migrations/reconstructed/011_phase2_catalog_runtime_constraints.equivalent.sql",
+      "operation": "add",
+      "bytes": 8129,
+      "sha256": "650aad6e622bc230b6ea85575bc2eed52e5387085f3d718e97ec162bfdc4e1b8"
+    },
+    {
+      "path": "migrations/reconstructed/016_payments_tenant_identity_compatibility.equivalent.sql",
+      "operation": "add",
+      "bytes": 452,
+      "sha256": "690d7279944f5a395c0b37958cd8a94994524177633e2c3e95e3de7e2dc95d19"
+    },
+    {
+      "path": "migrations/reconstructed/023_phase4_purchasing_core.equivalent.sql",
+      "operation": "add",
+      "bytes": 13582,
+      "sha256": "f1631d11e65e7b3dc6d9d755b57cb7449139762cd6004b7a1146fc0cfdbe16e2"
+    },
+    {
+      "path": "migrations/reconstructed/024_phase4_purchasing_security.equivalent.sql",
+      "operation": "add",
+      "bytes": 2353,
+      "sha256": "696365a93831c30b98b89884ad59c0950949bfd21514cdf3ae0a98a74ccc1419"
+    },
+    {
+      "path": "migrations/reconstructed/025_phase4_purchasing_permissions.equivalent.sql",
+      "operation": "add",
+      "bytes": 1193,
+      "sha256": "71777cb9740f55bd1f52bfa3c7a11bc677b5958216aad319a19a32f7dfbe09ad"
+    },
+    {
+      "path": "migrations/reconstructed/026_phase4_membership_branch_integrity.equivalent.sql",
+      "operation": "add",
+      "bytes": 2082,
+      "sha256": "992be2a5c405ccfea2ead9aa2fcce0d45240aee27618de64e0952aaa76691cec"
+    },
+    {
+      "path": "migrations/reconstructed/README.md",
+      "operation": "add",
+      "bytes": 1566,
+      "sha256": "76c7dc6cfdb69c3e7b43a23aebcac7ff41cd8df21595af0e0e416fe5471a36e4"
+    },
+    {
+      "path": "migrations/reconstructed/schema_observation_compatibility.equivalent.sql",
+      "operation": "add",
+      "bytes": 7753,
+      "sha256": "36e31c3877f19efcbf8db556c6566850b0fed1aa87f3d7845c4f11cebb82aa72"
+    },
+    {
+      "path": "migrations/reconstructed_source_manifest.json",
+      "operation": "add",
+      "bytes": 9112,
+      "sha256": "6e1d4c9fd544bb44167ee45c9eff84cd28940ada8f3ed6b9e634f33cf5f66592"
+    },
+    {
+      "path": "reports/LEXA_Historical_ZIP_Recovery_Scan_2026-10-20.json",
+      "operation": "add",
+      "bytes": 784,
+      "sha256": "2a8241c2f4e1cf2185e8d771c5ae5e12e967d730acfab10186e0a99c40da430d"
+    },
+    {
+      "path": "reports/LEXA_Isolated_Schema_Replay_Diff_2026-10-20.json",
+      "operation": "add",
+      "bytes": 3457,
+      "sha256": "e1f2a2e0aa5071dc2221071308a549426307f26e543b7d564420e5a20781c4cc"
+    },
+    {
+      "path": "reports/LEXA_Phase0-2_Closure_Increment_08_2026-10-20.md",
+      "operation": "add",
+      "bytes": 11080,
+      "sha256": "ce8b85e6a960419f2d60792a6fa7916caa138e5179b8fc044ac4960f42037461"
+    },
+    {
+      "path": "reports/LEXA_Phase2_Validation_Results_2026-10-20.json",
+      "operation": "add",
+      "bytes": 5720,
+      "sha256": "2680d5eeb07d6b2262db064423e9b07ed20c7e4791f8c6aff88bc2664e1fd4a2"
+    },
+    {
+      "path": "reports/PATCH_APPLY_INSTRUCTIONS.md",
+      "operation": "add",
+      "bytes": 1568,
+      "sha256": "97d9b9c2e1c0f23ae5c16d61b8b53c9daa9645520daa9dd37c0230803918171b"
+    },
+    {
+      "path": "scripts/check_migration_recovery_manifest.py",
+      "operation": "add",
+      "bytes": 5183,
+      "sha256": "70e4bb58428f0af710937b440dbacd75177515d49605a9350a5da049216a7834"
+    },
+    {
+      "path": "tests/test_migration_recovery_manifest.py",
+      "operation": "add",
+      "bytes": 1172,
+      "sha256": "3f68e2f516437462b06ba1b6cd5233e64c2bc2dd83aa6d213c5d4d9112a2cdda"
+    }
+  ],
+  "note": "This manifest covers patch payload paths; it is external to the patch zip to avoid self-referential hashing. Patch is a no-deletion overlay; review on a feature branch."
+}

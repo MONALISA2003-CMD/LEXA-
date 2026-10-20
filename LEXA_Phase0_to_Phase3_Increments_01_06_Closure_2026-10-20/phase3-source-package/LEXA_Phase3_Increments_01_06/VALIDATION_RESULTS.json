@@ -1,0 +1,100 @@
+{
+  "checked_date": "2026-10-20",
+  "repository": "MONALISA2003-CMD/LEXA-",
+  "baseline_main_commit": "8124cca301062eac6ffe59f68d02fc689a3ffae1",
+  "delivery_state": "guarded source-only candidate overlay; not installed to hosted repository, committed, merged, migrated in production, or deployed",
+  "candidate_scope": [
+    "Phase 3 Increment 01 business profile, branch, warehouse, location and POS prerequisites",
+    "Increment 02 workspace context, switching and resumable onboarding",
+    "Increment 03 membership lifecycle, invitations and branch assignment management",
+    "Increment 04 member role assignment UI/API with owner/last-owner guards",
+    "Increment 05 core inventory/sales/return branch enforcement and fail-closed full-workspace operations",
+    "Increment 06 owner-only role and permission administration"
+  ],
+  "package_validation_runtime": {
+    "python": "CPython 3.13.x",
+    "node": "local Node test runner",
+    "typescript": "isolated fixture compiler check"
+  },
+  "passed": [
+    {
+      "command": "bash scripts/validate-package.sh :: python -m pytest -q tests",
+      "result": "34 passed; pure-domain, source-contract, replay-candidate generator, migration preflight and index-idempotency checks"
+    },
+    {
+      "command": "python -m compileall -q overrides/apps/api/app scripts",
+      "result": "passed; candidate API modules, installer and replay-candidate builder compile"
+    },
+    {
+      "command": "node --test tests/phase3-increments-02-03.test.mjs",
+      "result": "8 passed, 0 failed; workspace/invite, member-role assignment, role/permission editor and branch guard source contracts"
+    },
+    {
+      "command": "(cd fixtures/typecheck && tsc --noEmit -p tsconfig.json)",
+      "result": "passed; isolated TypeScript UI/API-helper contract fixture, not full app typecheck"
+    },
+    {
+      "check": "Guarded installer smoke integration",
+      "result": "passed in disposable source checkout reconstructed from pinned-source archive. To accommodate a temporary generated Git commit, only a copied installer's expected HEAD value was adjusted; original target blob SHA-1 checks stayed unchanged. This demonstrates stage/copy behavior but is not proof of exact-HEAD installer application."
+    },
+    {
+      "check": "Compile installed API source",
+      "command": "python -m compileall -q apps/api/app",
+      "result": "passed on disposable installed-overlay checkout"
+    },
+    {
+      "check": "Isolated Neon Phase 0\u20133 replay candidate branch",
+      "project_id": "wispy-mud-75323042",
+      "branch_id": "br-purple-art-b1horduo",
+      "database": "lexa_phase0_3_cleanbridge",
+      "result": "reached migration 030 using labelled equivalents and replay-only reconciliation steps; final 025a/030 PK/index DDL was reapplied idempotently"
+    },
+    {
+      "check": "Isolated candidate schema metadata snapshot",
+      "result": {
+        "tables": 119,
+        "views": 0,
+        "columns": 1300,
+        "indexes": 446,
+        "constraints": 1799,
+        "rls_policies": 116,
+        "public_functions": 460,
+        "user_triggers": 36
+      }
+    },
+    {
+      "check": "Selected tenant RLS behavior under lexa_app",
+      "result": "tenant A reads saw only tenant A invitation/branch assignment fixtures; attempts to insert tenant B invitation/assignment were rejected; fixture transaction was rolled back/cleaned and post-check confirmed no residual synthetic fixtures"
+    },
+    {
+      "check": "Branch access source enforcement",
+      "result": "core inventory and sales/returns paths validate assigned locations/branches; workspace-wide finance/compliance/rebuild operations fail closed unless the actor has every active branch; comprehensive authenticated E2E is not claimed"
+    },
+    {
+      "check": "Full repository test suite after candidate overlay installed in disposable source checkout",
+      "command": "python -m pytest -q",
+      "result": "116 passed, 1 skipped; the skipped apps/api/tests/test_auth_refresh.py requires Redis, which was unavailable in the disposable environment"
+    }
+  ],
+  "not_run_or_not_proven": [
+    "Full app Node 24 clean install, typecheck, frontend contract suite, and production build on the expanded overlay did not complete: the isolated sandbox stopped before dependency state could be verified. Earlier Node 24 pass was against the pinned base only.",
+    "One auth-refresh integration test remains skipped because Redis is not installed; a dependency-complete run including Redis is still required.",
+    "No authenticated API/browser/database E2E for workspace switching/revocation, invitation expiry/replay, concurrent last-owner changes, role escalation, branch-crossing denial, or complete responsive/keyboard acceptance.",
+    "No query-by-query route/table audit proving comprehensive branch enforcement across every endpoint. Core inventory/sales and workspace-wide fail-closed gates are implemented, but acceptance still requires static audit and authenticated negative tests.",
+    "No brand-new empty database replay from the start using the exact final bundle; final 025a/030 DDL was reapplied idempotently to an existing isolated replay.",
+    "No canonical live schema parity signoff; prior comparisons have outstanding differences.",
+    "Exact historical SQL files 010, 011, and 023\u2013026 remain unrecovered; strict historical-source checker must remain failed.",
+    "Original 021 migration remains malformed; its separately generated repair candidate requires human review and preserves the historical original.",
+    "No hosted branch, source commit, pull request, CI run, production migration, runtime-role cutover, service-setting change or deployment. Prior GitHub branch-creation attempt returned 403."
+  ],
+  "release_gates_still_blocking": [
+    "Recover/review exact historical SQL for migrations 010, 011 and 023\u2013026, or approve a hash-pinned forward-history strategy without pretending equivalents are originals.",
+    "Review the 021 repair candidate and the generated 004 equivalent plus 005a/025a replay-only steps.",
+    "Run a fresh full-history replay from a new empty isolated database and compare tables, defaults, constraints, indexes, RLS, grants, functions and triggers with a current read-only canonical snapshot.",
+    "Install Redis to rerun the skipped auth-refresh integration and run app-level Node 24 checks on this expanded overlay.",
+    "Run authenticated API/browser tests for workspace, role, invitation and branch-boundary invariants, including concurrency and UI responsive/keyboard matrix.",
+    "Resolve GitHub branch/PR/CI access and bind approvals, rollback and release evidence to an immutable reviewed SHA.",
+    "Approve runtime database-role and production configuration changes separately; no production mutation is authorized by this package."
+  ],
+  "package_status": "candidate package validation complete; application/release gates remain open"
+}
