@@ -1,0 +1,50 @@
+{
+  "checked_date": "2026-10-20",
+  "repository": "MONALISA2003-CMD/LEXA-",
+  "baseline_main_commit": "8124cca301062eac6ffe59f68d02fc689a3ffae1",
+  "delivery_state": "source-only candidate overlay; not applied to repository, committed, merged, migrated, or deployed",
+  "validation_runtime": {
+    "python": "3.13.5",
+    "node": "v22.16.0",
+    "npm": "10.9.2",
+    "typescript": "5.8.3"
+  },
+  "passed": [
+    {
+      "command": "python -m pytest -q tests",
+      "result": "21 passed"
+    },
+    {
+      "command": "python -m compileall -q overrides/apps/api/app scripts",
+      "result": "passed; API candidate modules and installer compile"
+    },
+    {
+      "command": "node --test tests/phase3-increments-02-03.test.mjs",
+      "result": "4 passed, 0 failed"
+    },
+    {
+      "command": "tsc --noEmit -p fixtures/typecheck/tsconfig.json",
+      "result": "passed for isolated TypeScript UI and appended API-helper contract fixtures; not the real app typecheck"
+    },
+    {
+      "command": "git ref lookup for refs/heads/main",
+      "result": "main head re-verified as 8124cca301062eac6ffe59f68d02fc689a3ffae1"
+    }
+  ],
+  "not_run_or_not_proven": [
+    "Full Node 24 clean install, full LEXA frontend typecheck, test suite and production build for this overlay",
+    "Full dependency-complete LEXA backend test suite for this overlay",
+    "Live Postgres migration, transaction, RLS, role-privilege and schema-parity acceptance",
+    "Authenticated end-to-end browser test for workspace switching, invitation acceptance, expiry/replay, session revocation or last-owner concurrency",
+    "Effective branch-level authorization across every branch-scoped business endpoint",
+    "Remote commit, pull request, CI or deployment; GitHub branch write attempts previously returned HTTP 403"
+  ],
+  "release_gates_still_blocking": [
+    "Recover exact historical SQL sources 010_phase2_catalog_intelligence.sql and 011_phase2_catalog_runtime_constraints.sql",
+    "Recover exact historical SQL sources 023_phase4_purchasing_core.sql, 024_phase4_purchasing_security.sql, 025_phase4_purchasing_permissions.sql and 026_phase4_membership_branch_integrity.sql",
+    "Review and provenance-repair malformed migration 021_phase5_analytics_foundation.sql",
+    "Complete a clean full-history isolated migration replay and resolve canonical schema parity differences",
+    "Resolve approved runtime database role model; no production role change attempted",
+    "Review and test all new access-control flows under the effective application DB role"
+  ]
+}

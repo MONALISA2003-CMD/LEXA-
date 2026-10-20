@@ -1,0 +1,85 @@
+// Minimal validated seam for checking the appended API-helper types independently of the full app.
+export type AuthResponse = { access_token: string; token_type: string; session_id: string; tenant_id: string; tenant_name: string };
+export type BusinessProfile = { id: string; tenant_id: string; legal_name: string; display_name: string; country_code: string; currency_code: string };
+export type Branch = { id: string; tenant_id: string; name: string; code: string; status: string };
+export type Warehouse = { id: string; tenant_id: string; name: string; code: string; branch_id?: string | null; status: string };
+export type Location = { id: string; tenant_id: string; warehouse_id: string; name: string; code: string; status: string };
+function key(): string { return "typecheck-idempotency-key"; }
+function getJson<T>(_path: string, _init?: RequestInit): Promise<T> { return Promise.reject(new Error("fixture only")); }
+function setAccessToken(_token: string): void { /* fixture only */ }
+
+// Phase 3 Increment 02: authoritative workspace context and resumable setup.
+export type WorkspaceOption = { tenant_id: string; tenant_name: string; membership_id: string; current: boolean };
+export type WorkspaceContext = {
+  workspace: { id: string; name: string; status: string };
+  membership: { id: string; status: string };
+  branches: { id: string; name: string; code: string; assigned: boolean }[];
+  session_id: string;
+};
+export type SetupProgress = {
+  status: "COMPLETE" | "IN_PROGRESS";
+  complete: boolean;
+  completed_required_steps: number;
+  required_steps: number;
+  resume_path: string;
+  steps: { key: string; label: string; href: string; required: boolean; complete: boolean }[];
+};
+export function getWorkspaceOptions() { return getJson<{ items: WorkspaceOption[] }>("/api/v1/workspace/options"); }
+export async function selectWorkspace(tenantId: string) {
+  const session = await getJson<AuthResponse>("/api/v1/workspace/select", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tenant_id: tenantId }),
+  });
+  setAccessToken(session.access_token);
+  return session;
+}
+export function getWorkspaceContext() { return getJson<WorkspaceContext>("/api/v1/workspace/context"); }
+export function getSetupProgress() { return getJson<SetupProgress>("/api/v1/workspace/setup/progress"); }
+
+// Phase 3 Increment 03: member lifecycle, invitation lifecycle and branch scope.
+export type WorkspaceRole = { id: string; tenant_id: string; name: string; description?: string | null };
+export type WorkspaceMember = {
+  id: string; user_id: string; email: string; status: "ACTIVE" | "INACTIVE";
+  roles: { id: string; name: string }[]; branch_ids: string[];
+};
+export type WorkspaceInvitation = {
+  id: string; email: string; status: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+  role_id: string; branch_ids: string[]; expires_at: string; created_at?: string | null;
+};
+export function getWorkspaceRoles() { return getJson<WorkspaceRole[]>("/api/v1/rbac/roles"); }
+export function getWorkspaceMembers() { return getJson<{ items: WorkspaceMember[] }>("/api/v1/members"); }
+export function updateWorkspaceMemberStatus(id: string, status: "ACTIVE" | "INACTIVE") {
+  return getJson<{ id: string; status: string; changed: boolean }>(`/api/v1/members/${encodeURIComponent(id)}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
+  });
+}
+export function replaceWorkspaceMemberBranches(id: string, branchIds: string[]) {
+  return getJson<{ membership_id: string; branch_ids: string[]; status: string }>(`/api/v1/members/${encodeURIComponent(id)}/branches`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ branch_ids: branchIds }),
+  });
+}
+export function getWorkspaceInvitations() { return getJson<{ items: WorkspaceInvitation[] }>("/api/v1/invitations"); }
+export function createWorkspaceInvitation(body: { email: string; role_id: string; branch_ids: string[]; expires_in_days: number }) {
+  return getJson<{ id: string; status: string; email: string; expires_at: string; invite_url: string | null; replayed: boolean; message?: string }>(
+    "/api/v1/invitations", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key() }, body: JSON.stringify(body) },
+  );
+}
+export function resendWorkspaceInvitation(id: string) {
+  return getJson<{ id: string; email?: string; status: string; invite_url: string | null; replayed: boolean; message?: string }>(
+    `/api/v1/invitations/${encodeURIComponent(id)}/resend`, { method: "POST", headers: { "Idempotency-Key": key() } },
+  );
+}
+export function revokeWorkspaceInvitation(id: string) {
+  return getJson<{ id: string; status: string; changed: boolean }>(`/api/v1/invitations/${encodeURIComponent(id)}/revoke`, { method: "POST" });
+}
+export function previewWorkspaceInvitation(token: string) {
+  return getJson<{ email: string; workspace_name: string; expires_at: string }>("/api/v1/invitations/preview", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }),
+  });
+}
+export async function acceptWorkspaceInvitation(token: string, password: string) {
+  const session = await getJson<AuthResponse & { user_id: string }>("/api/v1/invitations/accept", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, password }),
+  });
+  setAccessToken(session.access_token);
+  return session;
+}
