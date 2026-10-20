@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AppShell } from "../../components/app-shell";
 import { ResponsiveDataTable } from "../../components/ui";
 import {
@@ -43,8 +43,12 @@ export default function InventoryPage() {
   const [locationFilter, setLocationFilter] = useState("");
   const [ledgerType, setLedgerType] = useState("");
   const [busy, setBusy] = useState(true);
+  const [filtersBusy, setFiltersBusy] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState("");
+  const [stockError, setStockError] = useState("");
+  const firstFilterEffect = useRef(true);
+  const stockRequestId = useRef(0);
   const [message, setMessage] = useState("");
 
   const [adjustLocation, setAdjustLocation] = useState("");
@@ -76,7 +80,8 @@ export default function InventoryPage() {
   const selectedCount = useMemo(() => counts.find((x) => x.id === selectedCountId) || null, [counts, selectedCountId]);
 
   async function load() {
-    setBusy(true); setError(""); setHasLoaded(false); setBalances([]);
+    const requestId = ++stockRequestId.current;
+    setBusy(true); setError(""); setStockError(""); setFiltersBusy(false); setHasLoaded(false);
     try {
       const [l, w, b, v, bal, led, adj, cnt, tr, check] = await Promise.all([
         getLocations(), getWarehouses(), getBranches(), getVariantOptions(),
@@ -84,7 +89,8 @@ export default function InventoryPage() {
         getInventoryLedger({ location_id: locationFilter || undefined, transaction_type: ledgerType || undefined }),
         getAdjustments(), getStockCounts(), getTransfers(), getInventoryIntegrity(),
       ]);
-      setLocations(l); setWarehouses(w); setBranches(b); setVariants(v); setBalances(bal); setLedger(led); setAdjustments(adj); setCounts(cnt); setTransfers(tr); setIntegrity(check.status); setHasLoaded(true);
+      setLocations(l); setWarehouses(w); setBranches(b); setVariants(v); setAdjustments(adj); setCounts(cnt); setTransfers(tr); setIntegrity(check.status); setHasLoaded(true);
+      if (requestId === stockRequestId.current) { setBalances(bal); setLedger(led); setStockError(""); }
       if (!adjustLocation && l[0]) setAdjustLocation(l[0].id);
       if (!countLocation && l[0]) setCountLocation(l[0].id);
       if (!transferFrom && l[0]) setTransferFrom(l[0].id);
@@ -93,12 +99,37 @@ export default function InventoryPage() {
       if (!selectedCountId && cnt[0]) setSelectedCountId(cnt[0].id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to load inventory.");
-      setHasLoaded(false); setLocations([]); setWarehouses([]); setBranches([]); setVariants([]); setBalances([]); setLedger([]); setAdjustments([]); setCounts([]); setTransfers([]); setIntegrity("unavailable");
+      setHasLoaded(false); setLocations([]); setWarehouses([]); setBranches([]); setVariants([]); setAdjustments([]); setCounts([]); setTransfers([]); setIntegrity("unavailable");
+      if (requestId === stockRequestId.current) { setBalances([]); setLedger([]); setStockError(e instanceof Error ? e.message : "Unable to load inventory balances."); }
     }
     finally { setBusy(false); }
   }
 
-  useEffect(() => { const timer = setTimeout(() => void load(), 200); return () => clearTimeout(timer); }, [locationFilter, search, ledgerType]);
+  // Load workspace/reference data once. Search and filter edits below refresh only
+  // the two affected datasets instead of refetching every inventory workflow.
+  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    if (firstFilterEffect.current) { firstFilterEffect.current = false; return; }
+    const controller = new AbortController();
+    const requestId = ++stockRequestId.current;
+    setFiltersBusy(true); setStockError("");
+    const timer = window.setTimeout(async () => {
+      try {
+        const [nextBalances, nextLedger] = await Promise.all([
+          getInventoryBalances({ location_id: locationFilter || undefined, q: search.trim() || undefined }, controller.signal),
+          getInventoryLedger({ location_id: locationFilter || undefined, transaction_type: ledgerType || undefined }, controller.signal),
+        ]);
+        if (controller.signal.aborted || requestId !== stockRequestId.current) return;
+        setBalances(nextBalances); setLedger(nextLedger); setStockError("");
+      } catch (e) {
+        if (controller.signal.aborted || requestId !== stockRequestId.current) return;
+        setStockError(e instanceof Error ? e.message : "Unable to refresh the filtered stock data.");
+      } finally {
+        if (!controller.signal.aborted && requestId === stockRequestId.current) setFiltersBusy(false);
+      }
+    }, 200);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [locationFilter, search, ledgerType]);
   useEffect(() => {
     const query = new URLSearchParams(window.location.search).get("q");
     if (query) setSearch(query);
@@ -189,12 +220,13 @@ export default function InventoryPage() {
   const low = balances.filter((row) => Number(row.available) > 0 && Number(row.available) <= 5).length;
   const out = balances.filter((row) => Number(row.available) <= 0).length;
   const mismatch = integrity === "mismatch";
-  const metricUnavailable = !hasLoaded || Boolean(error);
-  const stockTableState = error ? "error" : !hasLoaded && busy ? "loading" : balances.length ? "success" : "empty";
+  const metricUnavailable = !hasLoaded || busy || filtersBusy || Boolean(error) || Boolean(stockError);
+  const visibleStockError = error || stockError;
+  const stockTableState = visibleStockError ? "error" : (!hasLoaded || busy || filtersBusy) ? "loading" : balances.length ? "success" : "empty";
 
   return <AppShell title="Inventory" eyebrow="Operations">
     <div className="module-toolbar"><div><strong>Stock control</strong><span>Historical ledger · projected balances · controlled operational workflows</span></div><div className="toolbar-actions"><button className="button button-soft" onClick={() => void load()} disabled={busy}>Refresh</button><button className="button button-dark" onClick={() => setTab("Adjustments")}>+ Inventory action</button></div></div>
-    {message && <div className="notice">{message}</div>}{error && <div className="notice notice-error">{error}</div>}
+    {message && <div className="notice">{message}</div>}{visibleStockError && <div className="notice notice-error">{visibleStockError}</div>}
     <div className="metric-strip" aria-label="Inventory summary"><div><span>Stock value</span><strong>{metricUnavailable ? "—" : money(total)}</strong><small>{metricUnavailable ? "Current total unavailable" : "Projected from posted inventory state"}</small></div><div><span>Locations</span><strong>{metricUnavailable ? "—" : locations.length}</strong><small>{metricUnavailable ? "Not confirmed" : `${warehouses.length} warehouses`}</small></div><div><span>Low stock</span><strong>{metricUnavailable ? "—" : low}</strong><small>Available quantity ≤ 5</small></div><div><span>Out of stock</span><strong>{metricUnavailable ? "—" : out}</strong><small>Available quantity ≤ 0</small></div></div>
 
     <section className="panel"><div className="module-tabs">{tabs.map((name) => <button key={name} className={tab===name?"active":""} onClick={()=>setTab(name)}>{name}</button>)}</div>
@@ -205,8 +237,8 @@ export default function InventoryPage() {
         mobileTitle={(row) => variantMap.get(row.variant_id)?.name || short(row.variant_id)}
         mobileSubtitle={(row) => variantMap.get(row.variant_id)?.sku || "Variant"}
         state={stockTableState}
-        stateTitle={error ? "Stock balances could not be loaded" : busy ? "Checking current stock" : "No stock rows"}
-        stateDescription={error ? "The current inventory state could not be confirmed. Retry before making stock decisions." : busy ? "Checking posted ledger balances and location data." : "Stock will appear here after inventory balances are established."}
+        stateTitle={visibleStockError ? "Stock balances could not be loaded" : busy || filtersBusy ? "Checking current stock" : "No stock rows"}
+        stateDescription={visibleStockError ? "The current inventory state could not be confirmed. Retry before making stock decisions." : busy || filtersBusy ? "Checking posted ledger balances and location data." : "Stock will appear here after inventory balances are established."}
         onRetry={() => void load()}
         columns={[
           { key: "item", label: "Item", hideOnMobile: true, render: (row) => <><strong>{variantMap.get(row.variant_id)?.name || short(row.variant_id)}</strong><small>{variantMap.get(row.variant_id)?.sku || "Variant"}</small></> },

@@ -138,7 +138,10 @@ export function createPriceList(body:{name:string;currency?:string;price_type?:s
 export function getPrices(params: {variant_id?:string; price_list_id?:string}={}) { const q=new URLSearchParams(); Object.entries(params).forEach(([k,v])=>v&&q.set(k,v)); return getJson<ProductPrice[]>(`/api/v1/catalog/prices?${q}`); }
 export function createPrice(body:{price_list_id:string;variant_id:string;unit_price:string;minimum_quantity?:string;effective_from:string;effective_to?:string|null}) { return getJson<ProductPrice>('/api/v1/catalog/prices',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)}); }
 
+export type CatalogLookupResult = { variant_id: string; product_id: string; product_name: string; variant_name: string; sku: string };
 export function getProducts(query = "", signal?: AbortSignal) { const params = new URLSearchParams({ limit: "50" }); if (query.trim()) params.set("q", query.trim()); return getJson<Page<Product>>(`/api/v1/catalog/products?${params.toString()}`, { signal }); }
+export function getProduct(productId: string, signal?: AbortSignal) { return getJson<Product>(`/api/v1/catalog/products/${encodeURIComponent(productId)}`, signal ? { signal } : undefined); }
+export function getCatalogLookup(query: string, signal?: AbortSignal) { const params = new URLSearchParams({ q: query.trim(), limit: "10" }); return getJson<CatalogLookupResult[]>(`/api/v1/catalog/lookup?${params.toString()}`, signal ? { signal } : undefined); }
 export function getVariants(productId: string) { return getJson<Variant[]>(`/api/v1/catalog/products/${productId}/variants`); }
 
 export type Branch = { id:string; tenant_id:string; name:string; code:string; status:string };
@@ -149,9 +152,9 @@ export function createWarehouse(body: {name:string; code:string; branch_id?:stri
 export function createLocation(body: {name:string; code:string; warehouse_id:string}) { return getJson<Location>("/api/v1/organization/locations", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
 export function getLocations() { return getJson<Location[]>("/api/v1/organization/locations"); }
 export function getVariantOptions() { return getJson<VariantOption[]>("/api/v1/inventory/variant-options"); }
-export function getInventoryBalances(params: { location_id?: string; variant_id?: string; q?: string } = {}) { const q = new URLSearchParams(); q.set("limit", "500"); Object.entries(params).forEach(([k,v]) => v && q.set(k,v)); return getJson<InventoryBalance[]>(`/api/v1/inventory/balances?${q}`); }
+export function getInventoryBalances(params: { location_id?: string; variant_id?: string; q?: string } = {}, signal?: AbortSignal) { const q = new URLSearchParams(); q.set("limit", "500"); Object.entries(params).forEach(([k,v]) => v && q.set(k,v)); return getJson<InventoryBalance[]>(`/api/v1/inventory/balances?${q}`, signal ? { signal } : undefined); }
 export function getInventoryIntegrity() { return getJson<{status:string;checked:number;mismatches:any[]}>("/api/v1/inventory/integrity"); }
-export function getInventoryLedger(params: { location_id?: string; variant_id?: string; transaction_type?: string } = {}) { const q = new URLSearchParams(); q.set("limit", "500"); Object.entries(params).forEach(([k,v]) => v && q.set(k,v)); return getJson<InventoryLedger[]>(`/api/v1/inventory/ledger?${q}`); }
+export function getInventoryLedger(params: { location_id?: string; variant_id?: string; transaction_type?: string } = {}, signal?: AbortSignal) { const q = new URLSearchParams(); q.set("limit", "500"); Object.entries(params).forEach(([k,v]) => v && q.set(k,v)); return getJson<InventoryLedger[]>(`/api/v1/inventory/ledger?${q}`, signal ? { signal } : undefined); }
 export function getProductInventory(variantId:string) { return getJson<{balances:InventoryBalance[];ledger:InventoryLedger[]}>(`/api/v1/inventory/products/${variantId}`); }
 export function getAdjustments() { return getJson<InventoryAdjustment[]>("/api/v1/inventory/adjustments?limit=100"); }
 export function getStockCounts() { return getJson<StockCount[]>("/api/v1/inventory/stock-counts?limit=100"); }

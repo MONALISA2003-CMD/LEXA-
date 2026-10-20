@@ -525,3 +525,134 @@ input, select, textarea { accent-color: var(--blue); }
   .top-search input { padding-inline: 5px; font-size: 13px; }
   .ask-lexa { padding-inline: 7px; }
 }
+
+
+/* LEXA Phase 2 — Increment 02: tokenized shared UI primitives.
+   Additive overrides intentionally preserve route-specific legacy classes during migration. */
+:root {
+  --lexa-success: #267457;
+  --lexa-success-soft: #eaf6f0;
+  --lexa-success-border: #c8e6d7;
+  --lexa-info: #315b91;
+  --lexa-info-soft: #eef5ff;
+  --lexa-info-border: #d3e2f5;
+  --lexa-warning-soft: #fff7e7;
+  --lexa-warning-border: #eed9a9;
+  --lexa-danger-soft: #fff1ef;
+  --lexa-danger-border: #efcfcb;
+  --lexa-control-height: 42px;
+  --lexa-shadow-overlay: 0 28px 90px rgb(7 18 39 / 30%);
+  --lexa-motion-fast: 140ms;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--lexa-control-height);
+  border-radius: var(--lexa-radius-md);
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  transition: background var(--lexa-motion-fast) ease, border-color var(--lexa-motion-fast) ease,
+    color var(--lexa-motion-fast) ease, box-shadow var(--lexa-motion-fast) ease, transform var(--lexa-motion-fast) ease;
+}
+.button-dark {
+  background: var(--lexa-brand-900);
+  color: #fff;
+  box-shadow: 0 3px 10px rgb(16 35 68 / 12%);
+}
+.button-dark:hover { background: var(--lexa-brand-800); }
+.button-soft {
+  background: var(--lexa-surface);
+  color: var(--lexa-text);
+  border-color: var(--lexa-border-strong);
+  box-shadow: none;
+}
+.button-soft:hover { background: var(--lexa-surface-muted); border-color: #aebed2; }
+.button-light { background: var(--lexa-surface); color: var(--lexa-brand-900); border-color: var(--lexa-border); }
+.button-light:hover { background: var(--lexa-surface-muted); }
+.button-danger { background: #a83f39; border-color: #a83f39; color: #fff; }
+.button-danger:hover { background: #91352f; border-color: #91352f; }
+.button-small { min-height: 36px; padding: 7px 11px; border-radius: var(--lexa-radius-sm); font-size: 12px; }
+.button-large { min-height: 48px; padding: 13px 19px; border-radius: var(--lexa-radius-md); font-size: 14px; }
+.button-full { width: 100%; }
+.button:disabled, .button[aria-disabled="true"] { opacity: .62; cursor: not-allowed; transform: none; box-shadow: none; }
+.button:focus-visible { outline: 3px solid var(--lexa-focus-ring); outline-offset: 3px; }
+.lexa-button-progress { display: inline-block; animation: lexa-spin 1.2s linear infinite; font-size: 1.1em; line-height: 1; }
+
+.lexa-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+.lexa-badge-neutral { color: #526278; background: #f1f4f8; border-color: #e0e6ee; }
+.lexa-badge-info { color: var(--lexa-info); background: var(--lexa-info-soft); border-color: var(--lexa-info-border); }
+.lexa-badge-success { color: var(--lexa-success); background: var(--lexa-success-soft); border-color: var(--lexa-success-border); }
+.lexa-badge-warning { color: #805b16; background: var(--lexa-warning-soft); border-color: var(--lexa-warning-border); }
+.lexa-badge-danger { color: #9c3f39; background: var(--lexa-danger-soft); border-color: var(--lexa-danger-border); }
+
+.lexa-skeleton {
+  display: block;
+  max-width: 100%;
+  background: linear-gradient(100deg, #e9eef5 20%, #f5f7fa 38%, #e9eef5 56%);
+  background-size: 220% 100%;
+  animation: lexa-skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--lexa-radius-sm);
+}
+.lexa-skeleton-text { width: 100%; height: 12px; border-radius: 6px; }
+.lexa-skeleton-rect { width: 100%; min-height: 36px; border-radius: var(--lexa-radius-md); }
+.lexa-skeleton-circle { width: 36px; height: 36px; border-radius: 50%; }
+@keyframes lexa-skeleton-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -120% 0; } }
+
+.status-banner { border-radius: var(--lexa-radius-md); }
+.status-banner-success { color: var(--lexa-success); background: var(--lexa-success-soft); border-color: var(--lexa-success-border); }
+.status-banner-success .status-banner-mark { background: #d7eee3; }
+.status-banner-warning { color: #795b20; background: var(--lexa-warning-soft); border-color: var(--lexa-warning-border); }
+.status-banner-error { color: #8c3e3b; background: var(--lexa-danger-soft); border-color: var(--lexa-danger-border); }
+.data-state { border-radius: var(--lexa-radius-lg); border-color: var(--lexa-border-strong); background: var(--lexa-surface-muted); }
+.data-state-compact { border-radius: var(--lexa-radius-md); }
+.form-field > label { color: var(--lexa-text); }
+.form-field input, .form-field select, .form-field textarea {
+  border-color: var(--lexa-border-strong);
+  border-radius: var(--lexa-radius-sm);
+  color: var(--lexa-text);
+}
+.form-field input:focus, .form-field select:focus, .form-field textarea:focus {
+  border-color: var(--lexa-focus-ring);
+  box-shadow: 0 0 0 3px rgb(49 85 217 / 12%);
+}
+.form-field-invalid input, .form-field-invalid select, .form-field-invalid textarea {
+  border-color: var(--lexa-danger);
+}
+.form-field-invalid input:focus, .form-field-invalid select:focus, .form-field-invalid textarea:focus {
+  box-shadow: 0 0 0 3px rgb(180 71 66 / 12%);
+}
+.confirm-dialog { border-radius: var(--lexa-radius-xl); box-shadow: var(--lexa-shadow-overlay); }
+.confirm-dialog:focus { outline: none; }
+.confirm-dialog:focus-visible { outline: 3px solid var(--lexa-focus-ring); outline-offset: 4px; }
+
+@media (max-width: 600px) {
+  .lexa-badge { min-height: 23px; padding-inline: 8px; }
+  .button-large { width: 100%; }
+}
+
+
+/* Phase 2 Increment 02: structured skeletons for real loading-only branches. */
+.loading-placeholder-skeleton { display: grid; align-content: start; gap: 12px; text-align: left; }
+.loading-placeholder-skeleton > strong { color: var(--lexa-text-muted); font-size: 12px; font-weight: 650; line-height: 1.4; }
+.loading-placeholder-skeleton .lexa-skeleton-rect { min-height: 30px; }

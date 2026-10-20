@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AppShell } from "../../components/app-shell";
-import { ResponsiveDataTable } from "../../components/ui";
+import { Badge, ResponsiveDataTable } from "../../components/ui";
 import {
   createBarcode, createPrice, createPriceList, createProduct, createVariant,
-  getBarcodes, getBrands, getCategories, getInventoryBalances, getPriceLists,
-  getPrices, getProducts, getUnits, getVariants, updateVariant,
+  getBarcodes, getBrands, getCatalogLookup, getCategories, getInventoryBalances, getPriceLists,
+  getPrices, getProduct, getProducts, getUnits, getVariants, updateVariant,
   type Barcode, type Brand, type Category, type InventoryBalance,
   type PriceList, type Product, type ProductPrice, type Unit, type Variant,
 } from "../../lib/api";
 
 type DetailTab = "Overview" | "Variants" | "Pricing" | "Barcodes" | "Inventory";
-function statusClass(status: string) { return status === "ACTIVE" ? "status-good" : "status-muted"; }
 function money(value: string | number, currency = "UGX") { return new Intl.NumberFormat("en-UG", { style: "currency", currency, maximumFractionDigits: 0 }).format(Number(value)); }
 function dateTimeInput() { const local = new Date(Date.now() - new Date().getTimezoneOffset() * 60000); return local.toISOString().slice(0, 16); }
 function iso(value: string) { return new Date(value).toISOString(); }
@@ -21,7 +20,9 @@ function short(id: string) { return `${id.slice(0, 8)}…`; }
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]), [categories, setCategories] = useState<Category[]>([]), [brands, setBrands] = useState<Brand[]>([]), [units, setUnits] = useState<Unit[]>([]), [priceLists, setPriceLists] = useState<PriceList[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]), [selected, setSelected] = useState<Product | null>(null), [selectedVariant, setSelectedVariant] = useState<Variant | null>(null), [prices, setPrices] = useState<ProductPrice[]>([]), [barcodes, setBarcodes] = useState<Barcode[]>([]), [balances, setBalances] = useState<InventoryBalance[]>([]);
-  const [tab, setTab] = useState<DetailTab>("Overview"), [search, setSearch] = useState(""), [busy, setBusy] = useState(true), [message, setMessage] = useState("");
+  const [tab, setTab] = useState<DetailTab>("Overview"), [search, setSearch] = useState(""), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
+  const [referencesState, setReferencesState] = useState<"loading" | "success" | "error">("loading");
+  const productRequestId = useRef(0);
   const [catalogState, setCatalogState] = useState<"loading" | "success" | "error">("loading");
   const [productName, setProductName] = useState(""), [productDescription, setProductDescription] = useState(""), [category, setCategory] = useState(""), [brand, setBrand] = useState("");
   const [variantName, setVariantName] = useState(""), [sku, setSku] = useState(""), [unit, setUnit] = useState(""), [variantCosting, setVariantCosting] = useState("WEIGHTED_AVERAGE");
@@ -33,17 +34,60 @@ export default function ProductsPage() {
   const unitMap = useMemo(() => new Map(units.map((x) => [x.id, x])), [units]);
   const priceListMap = useMemo(() => new Map(priceLists.map((x) => [x.id, x])), [priceLists]);
 
-  async function loadCatalog() {
-    setBusy(true); setMessage(""); setProducts([]); setCatalogState("loading");
+  async function loadCatalog(query = search, signal?: AbortSignal) {
+    const requestId = ++productRequestId.current;
+    setCatalogState("loading");
     try {
-      const [p, c, b, u, pl] = await Promise.all([getProducts(search), getCategories(), getBrands(), getUnits(), getPriceLists()]);
-      setProducts(p.items); setCategories(c.items); setBrands(b.items); setUnits(u.items); setPriceLists(pl); setCatalogState("success");
-      if (!category && c.items[0]) setCategory(c.items[0].id); if (!unit && u.items[0]) setUnit(u.items[0].id); if (!priceListId && pl[0]) setPriceListId(pl[0].id);
-    } catch (error) { setProducts([]); setCatalogState("error"); setMessage(error instanceof Error ? error.message : "Unable to load the product catalogue."); }
-    finally { setBusy(false); }
+      const normalized = query.trim();
+      const [result, matches] = await Promise.all([
+        getProducts(normalized, signal),
+        normalized ? getCatalogLookup(normalized, signal) : Promise.resolve([]),
+      ]);
+      const found = new Map(result.items.map((product) => [product.id, product]));
+      const missingProductIds = [...new Set(matches.map((match) => match.product_id))]
+        .filter((id) => !found.has(id)).slice(0, 10);
+      const details = await Promise.allSettled(missingProductIds.map((id) => getProduct(id, signal)));
+      if (signal?.aborted || requestId !== productRequestId.current) return;
+      let detailFailures = 0;
+      for (const detail of details) {
+        if (detail.status === "fulfilled") found.set(detail.value.id, detail.value);
+        else detailFailures += 1;
+      }
+      if (!result.items.length && missingProductIds.length > 0 && detailFailures === details.length) {
+        throw new Error("SKU or barcode matches were found, but their product details could not be loaded. Please retry.");
+      }
+      setProducts([...found.values()]);
+      setCatalogState("success");
+    } catch (error) {
+      // Aborted or superseded searches are expected during quick typing and
+      // must not replace a newer result with a stale error.
+      if (signal?.aborted || requestId !== productRequestId.current) return;
+      setCatalogState("error");
+      setMessage(error instanceof Error ? error.message : "Unable to load the product catalogue.");
+    }
   }
 
-  useEffect(() => { const timer = setTimeout(() => void loadCatalog(), 250); return () => clearTimeout(timer); }, [search]);
+  async function loadCatalogReferences() {
+    setReferencesState("loading");
+    try {
+      const [c, b, u, pl] = await Promise.all([getCategories(), getBrands(), getUnits(), getPriceLists()]);
+      setCategories(c.items); setBrands(b.items); setUnits(u.items); setPriceLists(pl);
+      setCategory((current) => current || c.items[0]?.id || "");
+      setUnit((current) => current || u.items[0]?.id || "");
+      setPriceListId((current) => current || pl[0]?.id || "");
+      setReferencesState("success");
+    } catch (error) {
+      setReferencesState("error");
+      setMessage(error instanceof Error ? error.message : "Catalogue reference data could not be loaded.");
+    }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => void loadCatalog(search, controller.signal), 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [search]);
+  useEffect(() => { void loadCatalogReferences(); }, []);
   useEffect(() => {
     const query = new URLSearchParams(window.location.search).get("q");
     if (query) setSearch(query);
@@ -93,7 +137,7 @@ export default function ProductsPage() {
 
   async function addPriceList(event: FormEvent) {
     event.preventDefault(); if (!priceListName.trim() || !effectiveFrom) return; setBusy(true);
-    try { const created = await createPriceList({ name: priceListName.trim(), currency: priceListCurrency, price_type: priceListType, effective_from: iso(effectiveFrom) }); setPriceListName(""); setPriceListId(created.id); setMessage("Price list created. Now attach prices to sellable variants."); await loadCatalog(); }
+    try { const created = await createPriceList({ name: priceListName.trim(), currency: priceListCurrency, price_type: priceListType, effective_from: iso(effectiveFrom) }); setPriceListName(""); setPriceListId(created.id); setMessage("Price list created. Now attach prices to sellable variants."); await loadCatalogReferences(); }
     catch (error) { setMessage(error instanceof Error ? error.message : "Could not create the price list."); } finally { setBusy(false); }
   }
 
@@ -104,7 +148,7 @@ export default function ProductsPage() {
   }
 
   return <AppShell title="Products" eyebrow="Catalog">
-    <div className="module-toolbar"><div><strong>Product catalogue</strong><span>{catalogState === "loading" ? "Checking current catalogue…" : catalogState === "error" ? "Catalogue unavailable" : `${products.length} visible products · structured SKU, barcode and pricing identity`}</span></div><button className="button button-dark" onClick={() => document.getElementById("new-product")?.scrollIntoView({behavior:"smooth"})}>+ New product</button></div>
+    <div className="module-toolbar"><div><strong>Product catalogue</strong><span>{catalogState === "loading" ? "Checking current catalogue…" : catalogState === "error" ? "Catalogue unavailable" : `${products.length} visible products · structured SKU, barcode and pricing identity`}</span>{referencesState === "error" && <small className="form-field-error">Some catalogue reference data is unavailable; refresh before creating records.</small>}</div><div className="toolbar-actions"><button type="button" className="button button-soft" onClick={() => { void loadCatalog(); void loadCatalogReferences(); }} disabled={catalogState === "loading" || busy}>Refresh</button><button type="button" className="button button-dark" onClick={() => document.getElementById("new-product")?.scrollIntoView({behavior:"smooth"})}>+ New product</button></div></div>
     {message && <div className="notice">{message}</div>}
 
     <div className="workspace-grid">
@@ -125,7 +169,7 @@ export default function ProductsPage() {
             { key: "category", label: "Category", render: (product) => categoryMap.get(product.category_id) || "—" },
             { key: "brand", label: "Brand", render: (product) => brandMap.get(product.brand_id || "") || "—" },
             { key: "identity", label: "Identity", render: (product) => product.has_variants ? "Variant-based" : "Single item" },
-            { key: "status", label: "Status", render: (product) => <span className={`status-pill ${statusClass(product.status)}`}>{product.status}</span> },
+            { key: "status", label: "Status", render: (product) => <Badge variant={product.status === "ACTIVE" ? "success" : "neutral"}>{product.status}</Badge> },
           ]}
         />
       </section>

@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const css = readFileSync(resolve('app/globals.css'), 'utf8');
-const shell = readFileSync(resolve('components/app-shell.tsx'), 'utf8');
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const css = readFileSync(resolve(webRoot, 'app/globals.css'), 'utf8');
+const shell = readFileSync(resolve(webRoot, 'components/app-shell.tsx'), 'utf8');
 
 test('Phase 2 shell tokens are defined and used by the existing shell', () => {
   for (const token of ['--lexa-brand-900', '--lexa-brand-800', '--lexa-accent', '--lexa-canvas', '--lexa-border', '--lexa-focus-ring']) {
