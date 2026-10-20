@@ -44,7 +44,7 @@ Earlier commerce-dashboard HTTP 500s traced to `out(row)` assuming a SQLAlchemy 
 
 ## Verification evidence
 
-Latest `bash scripts/validate-package.sh` results: **38 Python tests passed**, Python compilation passed, **8 Node contract tests passed**, and the isolated TypeScript contract fixture passed. The suite includes the updated migration 030 identity-binding contract, authenticated-call ordering checks, member role/permission/branch source contracts and reconstruction-generator checks.
+Latest `bash scripts/validate-package.sh` results: **46 Python tests passed**, Python compilation passed, **8 Node contract tests passed**, and the isolated TypeScript contract fixture passed. The suite includes the updated migration 030 identity-binding contract, authenticated-call ordering checks, member role/permission/branch source contracts and reconstruction-generator checks.
 
 The separate SQL regression `tests/sql/lexa_list_active_user_workspaces_context_test.sql` passed on isolated Neon branch `br-purple-art-b1horduo` / database `lexa_phase0_3_cleanbridge`. It proved that user B cannot enumerate user A’s workspaces by passing A’s UUID and that missing `app.user_id` fails closed. Catalog verification showed `PUBLIC EXECUTE=false` and `lexa_app EXECUTE=true`; a post-run query found zero test tenants, users and memberships. This was an isolated branch write only, not a production change.
 

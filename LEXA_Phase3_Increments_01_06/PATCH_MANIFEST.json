@@ -4,7 +4,7 @@
   "base_commit": "8124cca301062eac6ffe59f68d02fc689a3ffae1",
   "base_ref": "refs/heads/main; inspected 2026-10-20",
   "package_scope": "Combined Phase 3 Increments 01–06: business setup prerequisites, workspace context/onboarding, member/invitation/branch assignment lifecycle, member role assignment, core branch-scoped inventory/sales authorization, role and permission administration; Phase 0–3 recovery evidence. Includes source-only fixes for the Render-observed /accounting/journal-entries missing-status 500 and the same risky optional-status predicate in /compliance/fiscal-documents; no runtime write or deployment is included.",
-  "delivery_state": "reviewable source-only candidate; Render-observed journal-entry correction and precautionary fiscal-document filter correction remain local-only and are not committed, merged, or deployed",
+  "delivery_state": "reviewable source-only candidate with labelled historical SQL replacement fallback and Node 24 CI workflow candidate; not committed, merged, applied to production, or deployed",
   "installer": "scripts/apply_phase3_increments_02_03.py",
   "installer_invariants": [
     "exact pinned baseline commit in actual checkout",
@@ -207,6 +207,41 @@
       "install_mode": "generate-on-install; never overwrites historical original",
       "install_note": "",
       "size_bytes": 5709
+    },
+    {
+      "target": "scripts/replace_missing_migrations.py",
+      "package_source": "scripts/replace_missing_migrations.py",
+      "install_mode": "run from a full checkout with --apply after dry-run/review; generates six labelled canonical-path replacements and records provenance",
+      "install_note": "Does not execute SQL; refuses to overwrite any non-identical existing migration.",
+      "size_bytes": 12125
+    },
+    {
+      "target": "scripts/check_migration_sources_replacement_aware.py",
+      "package_source": "scripts/check_migration_sources_replacement_aware.py",
+      "install_mode": "installed by replacement installer alongside archived original checker",
+      "install_note": "Default strict historical-byte gate remains blocked when replacements are present; --allow-replacements only permits path coverage for disposable replay.",
+      "size_bytes": 5353
+    },
+    {
+      "target": "release-controls/lexa-ci.yml",
+      "package_source": "release-controls/lexa-ci.yml",
+      "install_mode": "manual reviewed install to .github/workflows/lexa-ci.yml",
+      "install_note": "The repository ZIP extractor protects .github/workflows; current GitHub integration cannot create a feature branch (403).",
+      "size_bytes": 2423
+    },
+    {
+      "target": "docs/EXECUTION_REMAINING_WORK_2026-10-20.md",
+      "package_source": "docs/EXECUTION_REMAINING_WORK_2026-10-20.md",
+      "install_mode": "documentation",
+      "install_note": "Records current connected Neon/Render/Vercel/GitHub disposition and uncompleted gates.",
+      "size_bytes": 8427
+    },
+    {
+      "target": "tests/test_replace_missing_migrations.py",
+      "package_source": "tests/test_replace_missing_migrations.py",
+      "install_mode": "validation tests",
+      "install_note": "Validates replacement provenance, metadata, checker behavior and CI candidate contracts.",
+      "size_bytes": 7509
     }
   ],
   "generated_replay_candidates": [
@@ -257,7 +292,7 @@
     "rls_test": "under lexa_app, tenant-scoped reads filtered to one tenant and cross-tenant invite/assignment inserts were rejected; synthetic fixtures removed"
   },
   "validation_summary": {
-    "python_tests": "38 passed: package domain/source-contract/migration preflight/replay generator tests; includes workspace SQL identity binding, commerce RowMapping serializer, journal-entry and fiscal-document optional status-filter regressions",
+    "python_tests": "46 passed: package domain/source contracts, Render nullable status regressions, workspace SQL identity binding, migration preflight/replay builder, and migration replacement/checker fallback tests",
     "python_compile": "passed: python -m compileall -q overrides/apps/api/app scripts",
     "node_contract_tests": "8 passed: node --test tests/phase3-increments-02-03.test.mjs",
     "typescript_contract_fixture": "passed: isolated TypeScript UI/API-helper contract fixture via tsc --noEmit",
@@ -267,10 +302,11 @@
     "isolated_database": "Selected cross-tenant RLS behavior tests passed on the previously replayed isolated Neon branch. Added and ran tests/sql/lexa_list_active_user_workspaces_context_test.sql against the isolated branch: cross-user workspace enumeration denied; missing app.user_id failed closed; no residual fixtures. Not a fresh empty-database replay or canonical parity signoff.",
     "node24_overlay": "not completed; the isolated Node 24 sandbox stopped before dependencies could be verified. Earlier pass applies to the pinned base only.",
     "production": "No production DB/role/config/credential/release/deployment writes performed. Read-only live audit found lexa_runtime has CREATEDB/CREATEROLE/REPLICATION/BYPASSRLS and neon_superuser membership, and five public tables lack RLS. Render My Workspace service inventory and logs were inspected read-only.",
-    "render_runtime_audit": "Read-only audit of Render My Workspace found the LEXA service listed live with successful latest deploy events, blank healthCheckPath, historical commerce-dashboard row-mapping 500s, and a 2026-10-20 journal-entries 500 due to a nullable untyped SQL parameter. Candidate fixes the journal-entry filter and proactively applies the same safe optional-filter pattern to fiscal documents; neither change is deployed."
+    "render_runtime_audit": "Read-only audit of Render My Workspace found the LEXA service listed live with successful latest deploy events, blank healthCheckPath, historical commerce-dashboard row-mapping 500s, and a 2026-10-20 journal-entries 500 due to a nullable untyped SQL parameter. Candidate fixes the journal-entry filter and proactively applies the same safe optional-filter pattern to fiscal documents; neither change is deployed.",
+    "migration_replacement_fallback": "implemented; six expected equivalents have pinned Git blob SHA-1 guards, generated replacement SHA-256 manifest, source_gaps migration and replacement-aware checker. Historical source gate remains blocked by default; package installer not applied to a full remote checkout.",
+    "ci_candidate": "release-controls/lexa-ci.yml includes Python 3.13 + Redis, Node 24 app tests/build and explicit migration provenance gate; not installed due GitHub branch creation HTTP 403."
   },
   "known_limitations": [
-    "six exact historical SQL source files remain unrecovered; strict source checker remains failed",
     "full fresh replay from an empty database using exact final bundle and canonical schema parity review remain required",
     "full dependency-complete backend test suite with Redis and Node 24 frontend install/typecheck/tests/build on this expanded overlay remain unverified",
     "authenticated browser/API E2E for workspace switching, invitation lifecycle, role escalation, last-owner races, and cross-branch denial remain unrun",
@@ -279,38 +315,46 @@
     "no hosted branch/commit/PR/CI/deployment was created; previous GitHub branch write returned 403",
     "no production DB/service settings/live data were mutated",
     "original migration 021 remains malformed; repair candidate is separate and requires review",
-    "Latest read-only infrastructure audit is not green: canonical Neon lexa_runtime remains elevated and five public tables lack RLS; Vercel latest deployment is READY but not the candidate SHA; Render LEXA was inspected in My Workspace and has a blank healthCheckPath plus a logged journal-entries 500 whose source-only correction is not deployed; the similar fiscal-documents predicate was proactively corrected in the candidate."
+    "Latest read-only infrastructure audit is not green: canonical Neon lexa_runtime remains elevated and five public tables lack RLS; Vercel latest deployment is READY but not the candidate SHA; Render LEXA was inspected in My Workspace and has a blank healthCheckPath plus a logged journal-entries 500 whose source-only correction is not deployed; the similar fiscal-documents predicate was proactively corrected in the candidate.",
+    "Six exact historical SQL files remain unrecovered; a fail-closed replacement installer is included but has not been run against a full checkout. Exact-byte parity remains unresolved until recovery or an approved replacement disposition.",
+    "The Node 24 workflow candidate is packaged at release-controls/lexa-ci.yml but not installed remotely: connected GitHub branch creation returned HTTP 403. No new CI run or branch protection change is claimed.",
+    "Render journal-entry fix and /ready health-check configuration remain undeployed/unconfigured; production role and five RLS-disabled table reviews remain open."
   ],
-  "package_file_inventory_note": "SHA-256 and byte sizes inventory all stable package files, excluding PATCH_MANIFEST.json and SHA256SUMS.txt themselves. Cache directories and Python bytecode are removed from the delivery archive.",
+  "package_file_inventory_note": "package_files lists SHA-256 and byte size for every payload file except PATCH_MANIFEST.json and SHA256SUMS.txt. SHA256SUMS.txt is regenerated to include the manifest and every payload file except itself.",
   "package_files": [
     {
       "path": "README.md",
-      "sha256": "c28724c290aafc861f3d252c9ff2e418a90cc62462771a3f84d0ab25cb2f37ef",
-      "size_bytes": 11040
+      "sha256": "57fba5ec782f8799f468e65eb8c658ece3c0faad219f3f20912c81e3e0b8b55b",
+      "size_bytes": 12828
     },
     {
       "path": "VALIDATION_RESULTS.json",
-      "sha256": "ffe241231d0d8d2acbdf2be9ad4143a407202c55b7127493bc5dc94eaf87db78",
-      "size_bytes": 13895
+      "sha256": "5bc494adc5c57a727c563534487a6ce7350302d1d3800815a7c87449512a0928",
+      "size_bytes": 16595
     },
     {
       "path": "docs/ACCEPTANCE_MATRIX.md",
-      "sha256": "dba1b967569ce84c2da86c20d52a278dc0e8f2964297760a797334f24b770ef3",
+      "sha256": "3eb36018133dc2fb133a23e385c978c062fb7a2609058a3cb6f1767142c354a7",
       "size_bytes": 6048
     },
     {
+      "path": "docs/EXECUTION_REMAINING_WORK_2026-10-20.md",
+      "sha256": "ea21086d481748626948a88d35577cf11a72333d897266532fe1117c6675df22",
+      "size_bytes": 8427
+    },
+    {
       "path": "docs/IMPLEMENTATION_REPORT.md",
-      "sha256": "ad1070d2f5afc60bf93e72e37b8c979712c986ab21a3d05662ca9e10cab336b8",
+      "sha256": "46e17bba0d79e590c190bf453ac97d39bfd5e7698079f96e58b67eb839bdde77",
       "size_bytes": 10786
     },
     {
       "path": "docs/PHASE0_TO_PHASE3_CLOSURE_MATRIX.md",
-      "sha256": "209fbd2a8335729585db7e08c9eb7f6be57b833c9cab74c7a72cab2950aada95",
+      "sha256": "971e27d47320fde55d8f2fc67f8b2c0b06017c9f2bcb5c373f6b55256baa76db",
       "size_bytes": 7942
     },
     {
       "path": "docs/RENDER_RUNTIME_AUDIT_2026-10-20.md",
-      "sha256": "abbd1a67e074b34f5d34173517fab6e34cda8e8470e3d2ef51b22700a26af60e",
+      "sha256": "e228955d5222cc00a9b23e73d1e57512f27c7241254c95b2be4f7d4d36bc666f",
       "size_bytes": 4932
     },
     {
@@ -409,14 +453,14 @@
       "size_bytes": 2947
     },
     {
-      "path": "overrides/apps/web/app/administration.page.tsx",
-      "sha256": "b5716c0846d51e5a8c975fb4b437649e5cf1ba4f574887d346be8d7f09d76868",
-      "size_bytes": 17707
-    },
-    {
       "path": "overrides/apps/web/app/administration/members/page.tsx",
       "sha256": "64cd2d56a0dfdc15eadce5ddc3bd8c102eda176674e46adcd1db30a0cb7046dd",
       "size_bytes": 17929
+    },
+    {
+      "path": "overrides/apps/web/app/administration.page.tsx",
+      "sha256": "b5716c0846d51e5a8c975fb4b437649e5cf1ba4f574887d346be8d7f09d76868",
+      "size_bytes": 17707
     },
     {
       "path": "overrides/apps/web/app/invite/page.tsx",
@@ -459,6 +503,11 @@
       "size_bytes": 6212
     },
     {
+      "path": "release-controls/lexa-ci.yml",
+      "sha256": "ca22b3e6cc9d5d5fdcfd607bffc1fdcbd98ce5cac8a06678fb68145ddb8a86a1",
+      "size_bytes": 2423
+    },
+    {
       "path": "scripts/apply_phase3_increments_02_03.py",
       "sha256": "18ac039538f0694d1ab636fbb37d5e30d7ea334acc55b9b6fbee36e590b3ae2b",
       "size_bytes": 15687
@@ -467,6 +516,16 @@
       "path": "scripts/build_phase0_3_replay_candidates.py",
       "sha256": "f68e88723edfb39a64774f700435a29dcba1bdf7c5cc19a9a382f2aa42ec4192",
       "size_bytes": 5709
+    },
+    {
+      "path": "scripts/check_migration_sources_replacement_aware.py",
+      "sha256": "b43ea9a10905559ed9b0b0c1193c9c51929bcdd8448f452391ba10acab0d26c6",
+      "size_bytes": 5353
+    },
+    {
+      "path": "scripts/replace_missing_migrations.py",
+      "sha256": "3f1800c30a7cf7ce909f6f8414c1e9e09c48a579f213293eda5847c2dd5e61a5",
+      "size_bytes": 12125
     },
     {
       "path": "scripts/validate-package.sh",
@@ -494,12 +553,17 @@
       "size_bytes": 14377
     },
     {
+      "path": "tests/test_replace_missing_migrations.py",
+      "sha256": "f9a8b270875eb14ca9f37521b1039e8076186c78ddbe080d020980721eb98f55",
+      "size_bytes": 7509
+    },
+    {
       "path": "tests/test_workspace_domain.py",
       "sha256": "c5b82749390bd2ab6916e4ec9b78bc33cde9d11d5d2676d40dca4ff83f042392",
       "size_bytes": 2705
     }
   ],
-  "package_file_count": 43,
+  "package_file_count": 48,
   "render_runtime_followup": {
     "checked_at_utc": "2026-10-20T16:20Z",
     "workspace": "My Workspace",
@@ -507,8 +571,8 @@
     "service_url": "https://lexa-n10e.onrender.com",
     "latest_deploy_id": "dep-dbbgra1srm7s7386q0l0",
     "latest_deployed_commit": "a1ed64eec79daf3d74456c7b8b854d84f634d6fd",
-    "latest_deploy_status": "live; successful build and deploy events",
-    "health_check_path": "blank",
+    "latest_deploy_status": "live; successful build/deploy events, but journal-entry HTTP 500 remains in logs and local correction is not deployed",
+    "health_check_path": "blank; /ready is logged HTTP 200 but setting is not reconciled",
     "application_errors": [
       {
         "timestamp_utc": "2026-10-20T07:01:40Z",
@@ -534,5 +598,6 @@
     ],
     "health_log_evidence": "/ready and /health returned HTTP 200 in application logs; direct external probes from the audit environment failed due to DNS resolution failure and are inconclusive",
     "production_changes": "none"
-  }
+  },
+  "historical_source_gaps_note": "Exact historical SQL bytes remain unavailable. Scripted canonical-path replacements can be created from separately labelled equivalents, but replacements are never described as byte-recovered history and require a fresh isolated replay/parity review before release."
 }

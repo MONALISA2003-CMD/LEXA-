@@ -15,12 +15,12 @@
     "python": "CPython 3.13.x",
     "node": "Node v22.16.0 (contract suite); full application validation on Node 24 remains open",
     "typescript": "isolated fixture compiler check",
-    "python_tests": "38 tests passed (CPython 3.13.x); includes workspace SQL identity binding, commerce RowMapping serializer regression, and Render-observed journal-entry/precautionary fiscal-document optional status filter regression contracts"
+    "python_tests": "46 tests passed (CPython 3.13.x); includes workspace SQL identity binding, commerce RowMapping serializer regression, Render-observed optional status filter regressions, and fail-closed historical SQL replacement/checker tests"
   },
   "passed": [
     {
       "command": "bash scripts/validate-package.sh :: python -m pytest -q tests",
-      "result": "38 passed; domain/source contracts, workspace SQL identity binding, commerce RowMapping serializer regression, journal-entry and fiscal-document optional status filters, migration preflight and replay-candidate generator tests"
+      "result": "46 passed; Phase 3 domain/source contracts, workspace SQL identity binding, commerce RowMapping serializer, Render optional filters, migration preflight/replay generator, and labelled migration replacement/checker tests"
     },
     {
       "command": "python -m compileall -q overrides/apps/api/app scripts",
@@ -89,6 +89,14 @@
       "workspace": "My Workspace",
       "service_id": "srv-dakm8k95efls73egg9a0",
       "result": "latest Render deploy events succeeded and service listed live; logs confirmed a journal-entries HTTP 500 for absent status due to PostgreSQL AmbiguousParameter; candidate applies conditional parameterized status filters to journal entries and, as a precaution, fiscal documents; no production setting, branch, database or deployment changed"
+    },
+    {
+      "command": "bash scripts/validate-package.sh",
+      "result": "passed with exit code 0 on 2026-10-20: 46 Python tests, 8 Node source-contract tests, Python compileall and isolated TypeScript fixture typecheck"
+    },
+    {
+      "check": "Historical SQL replacement fallback implementation",
+      "result": "package unit tests verify source Git blob guard, labelled non-historical output, refusal to overwrite unknown SQL, replacement manifest checksums, source_gaps update, preserved original checker, default strict historical gate block, and explicit --allow-replacements path-mode behavior; generator not applied to the connected repository"
     }
   ],
   "not_run_or_not_proven": [
@@ -98,24 +106,27 @@
     "No query-by-query route/table audit proving comprehensive branch enforcement across every endpoint. Core inventory/sales and workspace-wide fail-closed gates are implemented, but acceptance still requires static audit and authenticated negative tests.",
     "No brand-new empty database replay from the start using the exact final bundle; final 025a/030 DDL was reapplied idempotently to an existing isolated replay.",
     "No canonical live schema parity signoff; prior comparisons have outstanding differences.",
-    "Exact historical SQL files 010, 011, and 023–026 remain unrecovered; strict historical-source checker must remain failed.",
     "Original 021 migration remains malformed; its separately generated repair candidate requires human review and preserves the historical original.",
     "Direct external HTTP smoke tests against Render were inconclusive because DNS resolution was unavailable in the audit execution environment; logs show /ready and /health HTTP 200.",
-    "The exact final Phase 3 overlay is still not merged/deployed; the isolated SQL helper check validates one regression, not fresh full migration replay or application-wide authorization."
+    "The exact final Phase 3 overlay is still not merged/deployed; the isolated SQL helper check validates one regression, not fresh full migration replay or application-wide authorization.",
+    "Exact historical SQL bytes for migrations 010, 011 and 023–026 remain unavailable; a pinned fallback installer now creates clearly labelled replacements from the repository equivalents, but the installer has not been applied to a full checkout and no fresh clean replay of its generated targets has been run.",
+    "A release-ready GitHub CI workflow candidate is packaged at release-controls/lexa-ci.yml but is not installed at .github/workflows/lexa-ci.yml because feature-branch creation returned HTTP 403 Resource not accessible by integration.",
+    "The live Render accounting journal-entry 500 has a tested local source correction, but the correction and healthCheckPath=/ready have not been deployed/configured; the candidate Vercel/Render revisions are not one reviewed immutable release SHA."
   ],
   "release_gates_still_blocking": [
-    "Recover/review exact historical SQL for migrations 010, 011 and 023–026, or approve a hash-pinned forward-history strategy without pretending equivalents are originals.",
     "Review the 021 repair candidate and the generated 004 equivalent plus 005a/025a replay-only steps.",
     "Run a fresh full-history replay from a new empty isolated database and compare tables, defaults, constraints, indexes, RLS, grants, functions and triggers with a current read-only canonical snapshot.",
     "Install Redis to rerun the skipped auth-refresh integration and run app-level Node 24 checks on this expanded overlay.",
     "Run authenticated API/browser tests for workspace, role, invitation and branch-boundary invariants, including concurrency and UI responsive/keyboard matrix.",
     "Resolve GitHub branch/PR/CI access and bind approvals, rollback and release evidence to an immutable reviewed SHA.",
     "Approve runtime database-role and production configuration changes separately; no production mutation is authorized by this package.",
-    "Complete the infrastructure gate: resolve the production role/RLS findings on a reviewed staging-to-production runbook; LEXA Render has an empty healthCheckPath and a logged journal-entries 500 whose local correction is not deployed (the matching fiscal-documents predicate was also corrected locally); configure /ready and post-deploy smoke test only through authorized release; finish candidate Node 24 app build, Redis auth test and authenticated E2E."
+    "Complete the infrastructure gate: resolve the production role/RLS findings on a reviewed staging-to-production runbook; LEXA Render has an empty healthCheckPath and a logged journal-entries 500 whose local correction is not deployed (the matching fiscal-documents predicate was also corrected locally); configure /ready and post-deploy smoke test only through authorized release; finish candidate Node 24 app build, Redis auth test and authenticated E2E.",
+    "Choose and review exact-history recovery versus the explicit replacement strategy. If replacements are accepted, run the replacement installer against a full checkout, review all six SQL diffs, run a new isolated clean replay, and complete canonical schema, indexes, constraints, functions, triggers, grants and RLS parity checks. Historical byte parity remains unresolved.",
+    "Install the workflow candidate through a separately authorized GitHub PR and enable required branch protection/status checks; current integration cannot create a branch (HTTP 403)."
   ],
-  "package_status": "candidate package validation passed (38 Python + 8 Node contracts, compileall, fixture tsc); Render runtime fixes are local-only and app/release gates remain open",
+  "package_status": "Candidate package validation passed (46 Python tests, 8 Node contracts, compileall and isolated TypeScript fixture); replacement fallback and Node 24 CI candidate packaged. Hosted source, production security cutover, full clean replay and authenticated acceptance remain blocked.",
   "infrastructure_audit": {
-    "checked_at_utc": "2026-10-20T14:20Z to 2026-10-20T15:57Z (Neon/Vercel audit earlier; Render runtime follow-up later)",
+    "checked_at_utc": "2026-10-20T16:20Z to 2026-10-20T16:53Z",
     "neon_live_branch": {
       "branch_id": "br-soft-star-b1dj2m2w",
       "state": "ready",
@@ -138,21 +149,24 @@
         "createrole": true,
         "replication": true,
         "bypassrls": true,
-        "member_of_neon_superuser": true
+        "memberof_neon_superuser": true,
+        "can_set_lexa_app": true,
+        "safe_login_role_exists": false
       },
       "lexa_runtime_safe_present": false,
-      "disposition": "BLOCKED: no production role/credential/RLS writes were performed; role cutover and table-specific policy design require a reviewed plan"
+      "disposition": "security blocker remains; no production role, grant or RLS mutation made"
     },
     "vercel": {
       "project_id": "prj_QicfCnse8LU6hnq4ik9liHc289VW",
-      "latest_production_deployment_id": "dpl_4xUBW7NFrLyHTNydiKaKUvi7MmSK",
+      "latest_production_deployment_id": "dpl_7FNGbSWeQQfeVAf57GhHMNvPJ7PF",
       "latest_production_deployment_state": "READY",
-      "latest_deployed_commit": "5055cc230a6e23f4536056373f3a0d1b3e8cd561",
+      "latest_deployed_commit": "ee729a193ff3cc8ce7f0d414a2798cd62bb73129",
       "runtime_error_summary_last_24h": "none reported",
       "production_error_logs_last_30m": "none returned",
       "full_24h_runtime_log_query": "unavailable on current retention tier",
       "older_failed_deployments": "present; at least one recent failure reports lint_or_type_error / npm run build exited 1",
-      "disposition": "not certified green for Phase 3 candidate because hosted source SHA is not candidate SHA and candidate Node 24 app build is not verified"
+      "disposition": "not certified green for the candidate overlay; only Vercel status is green on inspected main and hosted SHA is not a reviewed Phase 3 candidate",
+      "latest_deployment_state": "READY"
     },
     "render": {
       "workspace_found": "My Workspace",
@@ -167,7 +181,7 @@
       "auto_deploy": "yes",
       "latest_deployment_id": "dep-dbbgra1srm7s7386q0l0",
       "latest_deployed_commit": "a1ed64eec79daf3d74456c7b8b854d84f634d6fd",
-      "latest_deployment_state": "live; latest build and deploy events succeeded",
+      "latest_deployment_state": "live; most recent build/deploy events succeeded",
       "health_check_path": "blank",
       "health_log_evidence": {
         "/ready": "HTTP 200 in logs at 2026-10-20T07:01:36Z and later sampled times",
@@ -199,7 +213,21 @@
       "recent_failure_events": "No server_failed event was present in the returned recent event page; this does not negate the confirmed application-level HTTP 500s.",
       "external_probe": "not directly verified: DNS resolution failed in the audit execution environment; direct-probe failure is inconclusive",
       "disposition": "BLOCKED: latest deploy metadata is live/successful, but a 500 is backed by application logs, the source fix is not deployed, the health check path is blank, and candidate Node 24/authenticated E2E/release gates remain open",
-      "production_mutations": "none"
+      "production_mutations": "none",
+      "confirmed_application_error": "GET /api/v1/accounting/journal-entries returned HTTP 500 at 2026-10-20T07:01:40Z when status was omitted; source-only candidate removes the nullable (:s IS NULL OR status=:s) predicate",
+      "candidate_correction_deployed": false,
+      "health_check_reconciled": false
     }
+  },
+  "execution_followup": {
+    "candidate_python_tests": 46,
+    "candidate_node_contract_tests": 8,
+    "compileall": "PASS",
+    "typescript_fixture": "PASS",
+    "replacement_fallback": "implemented and tested in package; not applied to full checkout",
+    "candidate_ci_workflow": "release-controls/lexa-ci.yml; not installed remotely",
+    "github_write_attempt": "branch creation HTTP 403 Resource not accessible by integration",
+    "production_mutations": false,
+    "release_disposition": "NO-GO pending listed release gates"
   }
 }

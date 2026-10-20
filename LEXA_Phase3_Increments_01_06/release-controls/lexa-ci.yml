@@ -1,0 +1,86 @@
+name: LEXA CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lexa-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests (Python 3.13 + Redis)
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: apps/api/pyproject.toml
+      - name: Install backend dependencies
+        working-directory: apps/api
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest redis
+      - name: Run API and source-contract tests
+        run: python -m pytest -q tests apps/api/tests
+      - name: Compile API source
+        run: python -m compileall -q apps/api/app apps/api/tests
+
+  frontend:
+    name: Frontend (Node 24)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Clean dependency install
+        working-directory: apps/web
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        working-directory: apps/web
+        run: npm run typecheck
+      - name: Frontend tests
+        working-directory: apps/web
+        run: npm test
+      - name: Production build
+        working-directory: apps/web
+        run: npm run build
+
+  migration-source-provenance:
+    name: Migration source provenance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify migration sources
+        env:
+          ALLOW_RECONSTRUCTED_MIGRATIONS: ${{ vars.LEXA_ALLOW_SQL_REPLACEMENTS }}
+        run: |
+          set -euo pipefail
+          if [[ "${ALLOW_RECONSTRUCTED_MIGRATIONS:-}" == "true" ]]; then
+            python scripts/check_migration_sources.py --strict --allow-replacements
+          else
+            python scripts/check_migration_sources.py --strict
+          fi
