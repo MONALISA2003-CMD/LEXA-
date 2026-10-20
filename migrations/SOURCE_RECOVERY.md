@@ -52,3 +52,27 @@ The corrected dynamic Brain RLS policy block in `022_phase6a_brain_foundation.sq
 - Connected Render service `LEXA` still reports a blank live `healthCheckPath`, though this package's `render.yaml` declares `/ready`.
 
 No SQL mutation was made on canonical `lexa-live` during this validation. The connected Render tool does not expose a direct health-check setting update; no production deployment was triggered. Credentialed browser/API acceptance remains pending until a dedicated test account is available. GitHub branch creation was denied with HTTP 403, so this is a ZIP handoff rather than a pushed release.
+
+
+## Canonical ledger recheck — 20 October 2026
+
+A fresh read-only query of `public.schema_migrations` on project `wispy-mud-75323042`, branch `br-soft-star-b1dj2m2w`, database `neondb` returned these relevant rows:
+
+| Full recorded version | Applied timestamp (UTC) | Exact source in current package? |
+|---|---|---|
+| `010_phase2_catalog_intelligence` | `2026-09-20T20:53:12.510Z` | Missing |
+| `011_phase2_catalog_runtime_constraints` | `2026-09-20T21:02:49.364Z` | Missing |
+| `023_phase4_purchasing_core` | `2026-10-08T12:37:54.528Z` | Missing |
+| `024_phase4_purchasing_security` | `2026-10-08T12:38:45.629Z` | Missing |
+| `025_phase4_purchasing_permissions` | `2026-10-08T12:39:27.658Z` | Missing |
+| `026_phase4_membership_branch_integrity` | `2026-10-08T12:43:33.086Z` | Missing |
+| `027_release_convergence` | `2026-10-08T16:00:40.435Z` | Recovered from tracked Git blob; DB has no source checksum |
+| `028_phase0_auth_rls_runtime_hardening` | `2026-10-13T10:42:36.374Z` | Source exists elsewhere in the package lineage |
+
+The current ledger records these versions as applied; the six source files remain unrecovered from exact authoritative artifacts. Do not delete or edit ledger rows to make the repository appear consistent. Do not re-run guessed migrations. The ledger has only `version` and `applied_at`, so none of these rows contains a checksum proving which bytes were executed.
+
+## Expanded recovery searches — 20 October 2026
+
+After recovering 027, each of the six outstanding basenames was searched using (1) all 24 ZIP archives currently available under `/mnt/data`, including additional older archives materialized from the connected File Library, (2) a recursive Library search for standalone `.sql` files (none returned), (3) the recursively enumerated GitHub repository tree and known historical source prefixes, (4) direct GitHub API path history queries for `migrations/<basename>` and `lexa_v280_src/migrations/<basename>`, (5) exact-name GitHub code and commit searches, and (6) exact-name/public developer-web searches. No authoritative copy was found for any of the six. This means no source artifact can be restored from the currently reachable materials; it is not proof that no owner-held backup exists. The strict checker remains intentionally failing until sources are supplied and reviewed.
+
+The live `schema_migrations` table has only `version` and `applied_at` and cannot prove the exact SQL bytes applied. A ledger name or matching live schema is not a substitute for source recovery.

@@ -1,6 +1,6 @@
 # LEXA Phase 3 Entry Checklist
 
-This is the go/no-go checklist for Phase 3 (business setup and workspace configuration). The authoritative current status is `docs/PHASE0_2_CLOSURE_AUDIT_2026-10-20.md`; older readiness audits are historical snapshots.
+This is the go/no-go checklist for Phase 3 (business setup and workspace configuration). The authoritative status is the combination of `docs/PHASE0_2_CLOSURE_AUDIT_2026-10-20.md`, `docs/PHASE0_2_REMAINING_GATE_REGISTER_2026-10-20.md`, and `docs/PHASE0_2_TABLE_ACCESS_DESIGN_2026-10-20.md`; older readiness audits are historical snapshots. The gate register is the detailed source of truth for owners, evidence and blockers.
 
 ## Phase 3 goal
 
@@ -18,6 +18,10 @@ Implement reliable business/workspace setup and ongoing administration using exi
 - [ ] Node 24 clean install, typecheck, frontend tests, and production build pass.
 - [ ] Phase 2 five-width responsive and accessibility review is recorded.
 - [ ] Render health-check configuration and deployed source commit are reconciled in the release record.
+
+## Current disposition (20 October 2026)
+
+**NO-GO for Phase 3 production schema changes.** GitHub main and both hosted deployments align with each other on SHA `a1ed64eec79daf3d74456c7b8b854d84f634d6fd`, but the local candidate is not deployed; only Vercel success appears in GitHub commit status, root CI and branch protection are still absent, Render `healthCheckPath` is blank, and a new Increment 07 package hash must be validated. The production DB role/table-access gates, six exact historic SQL sources, true Node 24 build and credentialed E2E/browser acceptance also remain open. Do not mark any checkbox complete without evidence recorded against the actual candidate SHA.
 
 ## Phase 3 design/implementation sequence once gates permit
 

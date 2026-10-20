@@ -9,7 +9,7 @@
 - Production `lexa_runtime` remains connected and overprivileged through Neon-managed role membership. `lexa_runtime_safe` is absent on production and migration 029 is not recorded there.
 - On isolated branch `lexa-phase1-security-test-2026-10-19` (`br-red-voice-b16z9b0i`), migration 029 is recorded. Read-only catalog inspection shows `lexa_runtime_safe` is LOGIN/NOINHERIT/NOCREATEDB/NOCREATEROLE/NOREPLICATION/NOBYPASSRLS, not a member of `neon_superuser`, and has SET membership in `lexa_app`. The existing `lexa_runtime` remains elevated on that test branch too; migration 029 intentionally leaves it untouched.
 - The isolated safe role has no production secret provisioned by this runbook. The application still needs a deliberately created secret for any credential cutover.
-- `permissions`, `registration_requests`, `schema_migrations`, `tenants`, and `users` have RLS disabled/no policies on production. Ten sampled business-engine tables are RLS enabled and forced, but that does not prove all table grants/policies are complete.
+- A fresh catalog query (20 October) confirmed `permissions`, `registration_requests`, `schema_migrations`, `tenants`, and `users` each have RLS disabled, FORCE RLS disabled, no policies, and `lexa_app` has SELECT/INSERT/UPDATE/DELETE on every one. The login role `lexa_runtime` is elevated (CREATEDB, CREATEROLE, REPLICATION, BYPASSRLS, and `neon_superuser` membership); `lexa_runtime_safe` is absent in production. Ten sampled business-engine tables were RLS enabled and forced, but this does not prove full-database coverage.
 - Render's `/ready` endpoint is healthy and reports database/cache `ok`, but service metadata has an empty `healthCheckPath`; the checked-in `render.yaml` specifies `/ready`.
 - GitHub `main` is unprotected and required status checks are off. Root CI workflow is absent on active main; the existing ZIP extractor protects `.github/workflows/**`, so a ZIP overlay will not install a root workflow.
 - The exact source for `027_release_convergence.sql` is now restored and hash-verified against historical Git blob `e6d9242d7dedb2cbf7b1a71a46fe635b3ab051d8`. Six full migration sources remain missing; strict replay remains blocked.
@@ -29,7 +29,7 @@
 
 ## 3. RLS/grants policy design — do not use a blanket enable switch
 
-For each of the five tables, enumerate every SQL/API/bootstrap/migration call, owner, direct grant, SECURITY DEFINER helper, and expected no-session behavior before drafting a policy:
+The live schema, effective grants, observed helper functions, route call paths and recommended end state for all five tables are recorded in [`PHASE0_2_TABLE_ACCESS_DESIGN_2026-10-20.md`](PHASE0_2_TABLE_ACCESS_DESIGN_2026-10-20.md). Use that document as a reviewed design input, not as evidence of deployed remediation. Before drafting policies, enumerate every SQL/API/bootstrap/migration call, owner, direct grant, SECURITY DEFINER helper, and expected no-session behavior:
 
 - `users`: authentication identity lookups require a very narrow pre-tenant path; ordinary queries must not permit cross-tenant enumeration. Prefer specific existing security-definer lookup functions or a separate identity service contract over broad user-table access.
 - `tenants`: workspace discovery for a user with zero/one/multiple memberships must not rely on a caller-controlled tenant ID. Check `lexa_list_user_workspaces` and other narrowly scoped lookup functions for grants and tenant binding.
@@ -67,3 +67,8 @@ Before any production RLS change: write table-specific policies, add tests for u
 - [ ] Responsive and keyboard acceptance is recorded at 320, 360, 390, 430, 600, 601, 768, 800 and 1280 CSS px.
 
 No steps in this document have altered canonical production settings, roles, credentials or data.
+
+
+## Increment 07 current hosted evidence
+
+As of 20 October 2026, GitHub main, the current Vercel production-target deployment, and current Render live deployment all point at `a1ed64eec79daf3d74456c7b8b854d84f634d6fd`; the Vercel and Render targets are live/READY. The combined GitHub status contains only Vercel success, not LEXA backend/frontend CI. Render service metadata still reports a blank health-check path despite `/ready` returning 200. These observations do not imply the local Increment 07 candidate is deployed or release-accepted. See the remaining gate register for exact IDs and acceptance proof.

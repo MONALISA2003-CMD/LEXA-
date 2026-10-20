@@ -91,7 +91,7 @@ The following 11 local ZIP archives were searched by exact migration basename. N
 - `LEXA_Deployment_Integration_v0.6.2_Flat_Audited(1).zip`
 - duplicated materialized Phase 1 consolidated source ZIP
 
-Also checked the complete recursively listed GitHub tree, direct path history for each expected canonical filename, repository commit search by exact filename, and public web queries. Exact hits were found only for the tracked 027 source. The older `lexa_v280_src/migrations/README.md` describes `023`–`026` as historical purchasing lineage markers, but it does not contain the SQL source files. The database migration ledger records version names, not a hash of executed source bytes.
+The Increment 07 sweep additionally materialized the older LEXA source archives exposed in the connected File Library, then scanned all 24 ZIP archives currently present under `/mnt/data` by exact basename. No matches were found. A recursive File Library metadata search for standalone `.sql` files returned no results. Also checked the complete recursively listed GitHub tree, direct path history for each expected canonical filename, repository commit search by exact filename, and public web/developer queries. Exact hits were found only for the tracked 027 source. The older `lexa_v280_src/migrations/README.md` describes `023`–`026` as historical purchasing lineage markers, but it does not contain the SQL source files. The database migration ledger records version names, not a hash of executed source bytes.
 
 Remaining gaps:
 
@@ -119,3 +119,50 @@ The visual direction should remain a calm, professional operations workspace—r
 7. Run a real browser viewport matrix at 320, 360, 390, 430, 600, 601, 768, 800 and 1280 CSS px plus keyboard/focus/responsive acceptance; do not claim WCAG conformity from source tests alone.
 
 **Phase 3 go/no-go: NO-GO for production schema changes.** Non-mutating Phase 3 discovery can be prepared separately, but the current evidence does not warrant declaring Phase 0–2 fully release-accepted.
+
+
+## Increment 07 supplemental re-check — 20 October 2026
+
+This dated supplement supersedes the hosted-state snapshot above where it names the earlier commit. The test counts above belong to Increment 06; the Increment 07 package audit records its own rerun results and checksums separately.
+
+### Fresh hosted state (read-only)
+
+- GitHub `main` is now `a1ed64eec79daf3d74456c7b8b854d84f634d6fd`; branch protection API reports `protected=false`.
+- Latest Vercel production-target deployment `dpl_5FkFEqKoyQLeFYiU1GJqJH8hDdFc` is `READY` on that same SHA and aliases `lexa-green.vercel.app`.
+- Latest Render deployment `dep-dbbgra1srm7s7386q0l0` is `live` on that same SHA. Read-only public probes returned `/health` HTTP 200 and `/ready` HTTP 200 with `database=ok` and `cache=ok` at inspection time.
+- Render service metadata still has `healthCheckPath` empty (`""`), while the checked-in `render.yaml` declares `/ready`.
+- GitHub combined status for the current SHA exposes only the `Vercel: success` context. No LEXA backend/frontend GitHub Actions status is present, so this is not a green LEXA CI acceptance.
+- The hosted commit is the remote repository main head, not the local Increment 07 source ZIP. Hosting readiness is not acceptance of unmerged candidate contents.
+
+The migration ledger was also re-read on 20 October. It records `010_phase2_catalog_intelligence` (`2026-09-20T20:53:12.510Z`), `011_phase2_catalog_runtime_constraints` (`2026-09-20T21:02:49.364Z`), `023_phase4_purchasing_core` (`2026-10-08T12:37:54.528Z`), `024_phase4_purchasing_security` (`2026-10-08T12:38:45.629Z`), `025_phase4_purchasing_permissions` (`2026-10-08T12:39:27.658Z`), and `026_phase4_membership_branch_integrity` (`2026-10-08T12:43:33.086Z`) as applied. Their exact source bytes are missing from the current source package. This confirms an applied-source reproducibility gap; it does not authorize recreating or reapplying them. Full timestamps and 027 caveat are in [`migrations/SOURCE_RECOVERY.md`](../migrations/SOURCE_RECOVERY.md).
+
+### Fresh database privilege evidence (read-only)
+
+A direct read-only catalog query confirmed all five tables `public.permissions`, `public.registration_requests`, `public.schema_migrations`, `public.tenants`, and `public.users` have RLS disabled, `FORCE RLS` disabled, and no policy rows; `lexa_app` currently has `SELECT`, `INSERT`, `UPDATE`, and `DELETE` privileges on each. This is a more specific and actionable finding than a generic note that these tables need RLS review. Their schemas and auth/registration call paths are different, so blanket RLS is unsafe; use `docs/PHASE0_2_TABLE_ACCESS_DESIGN_2026-10-20.md` as the proposed design, not as a deployed fix.
+
+The live `schema_migrations` table contains only `version` and `applied_at`, and therefore cannot checksum the historical SQL actually executed. Current role catalog: `lexa_runtime` has LOGIN, INHERIT, CREATEDB, CREATEROLE, REPLICATION, BYPASSRLS and membership in `neon_superuser`; `lexa_runtime_safe` is absent from production. `lexa_app` itself is NOLOGIN, non-superuser and does not have these attributes. No privilege or production data was changed.
+
+### Increment 07 record of remaining gates
+
+The complete gate-by-gate status and closure evidence are now consolidated in `docs/PHASE0_2_REMAINING_GATE_REGISTER_2026-10-20.md`. It records the six historical source gaps, strict replay block, need for effective root CI and branch protection, clean Node 24 build, table-specific production security design/cutover, true credentialed E2E and browser viewport/keyboard acceptance, backup/rollback evidence, Render health-check parity and new package hash verification. Phase 3 production schema work remains **NO-GO** until those gates are closed or a formally reviewed scope exception is recorded for genuinely non-schema work.
+
+
+### Increment 07 validation rerun
+
+| Check | Increment 07 result | Scope/limitation |
+|---|---|---|
+| `node --test apps/web/tests/*.test.mjs` | **23 passed, 0 failed** | Frontend contract and behavior tests; not a full browser test |
+| `python -m pytest -q tests apps/api/tests` | **113 passed, 1 skipped** | `apps/api/tests/test_auth_refresh.py` skips because the local environment is missing `redis`; a dependency-complete CI run is still needed |
+| Focused migration/source and business-date checks | **5 passed** | Confirms gap accounting, restored artifact hash and business-date contract; does not clear six missing migrations |
+| `python -m compileall -q apps/api/app apps/api/tests scripts` | **PASS** | Python source compilation |
+| `python -m py_compile scripts/package_phase2_zip.py scripts/check_migration_sources.py` | **PASS** | Packaging/source-checker scripts compile |
+| `bash -n scripts/verify-phase0.sh scripts/verify-phase1.sh scripts/verify-phase3.sh` | **PASS** | Shell syntax only |
+| `python scripts/check_migration_sources.py` | **PASS with six reported gaps** | Non-strict check correctly displays blocked source list |
+| `python scripts/check_migration_sources.py --strict` | **EXPECTED EXIT 1** | This is the required fail-closed result until exact source recovery |
+| TypeScript transpile syntax | **28 candidate TS/TSX files discovered; 27 normal files transpiled with 0 diagnostics** | `next-env.d.ts` is a generated declaration file and TypeScript `transpileModule` does not emit output for it; this syntax pass is not a typecheck. Current runner remains Node 22.16 although package requires Node 24 |
+| Frontend typecheck/build | **NOT VERIFIED** | Dependency install did not complete; do not treat this as a pass |
+| ZIP integrity | **Verified separately by the Increment 07 packaging command and external manifest** | See the Increment 07 source ZIP and manifest in the handoff |
+
+The status above is evidence of local source checks only. It does not replace a clean Node 24 installation/build, full dependency-complete backend suite, credentialed E2E, real-browser accessibility matrix, CI/branch protection, or approved security cutover.
+
+Increment 07 archive verification includes **235 project source files plus the embedded manifest (236 ZIP entries)**. The companion external manifest records the exact ZIP SHA-256, size, required root paths, and per-file hashes; it is the checksum authority for this build.
