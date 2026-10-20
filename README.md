@@ -100,3 +100,7 @@ This source-only candidate adds a separately provisioned least-privilege databas
 **No production change is implied by this package.** The new role must be provisioned and verified on an isolated Neon branch, given a password through secret management, and only then configured in Render during an explicitly approved release. The old elevated `lexa_runtime` role remains unchanged until a safe cutover and separate decommission plan.
 
 See `docs/PHASE1_SECURITY_STABILITY_RUNBOOK.md` and `docs/PHASE1_SECURITY_STABILITY_REPORT_2026-10-19.md`. Run `bash scripts/verify-phase1.sh` from the repository root. Strict full migration replay remains blocked by six remaining missing historical SQL sources; frontend typecheck/build and credentialed hosted authentication acceptance remain release gates.
+
+## Phase 0–2 closure evidence (2026-10-20)
+
+See [`reports/LEXA_Phase0-2_Closure_Increment_08_2026-10-20.md`](reports/LEXA_Phase0-2_Closure_Increment_08_2026-10-20.md) for the historical ZIP scan, isolated replay results, CI/hosting access blockers and Phase 3 re-entry gates. The six missing SQL sources remain explicitly unresolved; reconstructed equivalents are isolated under `migrations/reconstructed/` and do not satisfy exact source recovery.

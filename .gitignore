@@ -16,3 +16,9 @@ htmlcov/
 
 # TypeScript compiler cache
 *.tsbuildinfo
+# Generated browser-test outputs and editable package metadata
+apps/web/playwright-report/
+apps/web/test-results/
+playwright-report/
+test-results/
+apps/api/*.egg-info/
