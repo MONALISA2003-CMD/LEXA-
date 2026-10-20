@@ -51,6 +51,7 @@ def test_render_runtime_contract_is_intact():
     assert "uvicorn app.main:app --host 0.0.0.0 --port $PORT" in render
     assert "healthCheckPath: /ready" in render
     assert "key: DATABASE_APP_ROLE" in render
+    assert "key: DATABASE_LOGIN_ROLE" in render
 
 
 def test_readiness_imports_required_database_and_cache_checks():

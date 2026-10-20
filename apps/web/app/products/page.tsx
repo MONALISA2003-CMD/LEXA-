@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AppShell } from "../../components/app-shell";
-import { ResponsiveDataTable } from "../../components/ui";
+import { Badge, ResponsiveDataTable } from "../../components/ui";
 import {
   createBarcode, createPrice, createPriceList, createProduct, createVariant,
   getBarcodes, getBrands, getCategories, getInventoryBalances, getPriceLists,
@@ -12,7 +12,6 @@ import {
 } from "../../lib/api";
 
 type DetailTab = "Overview" | "Variants" | "Pricing" | "Barcodes" | "Inventory";
-function statusClass(status: string) { return status === "ACTIVE" ? "status-good" : "status-muted"; }
 function money(value: string | number, currency = "UGX") { return new Intl.NumberFormat("en-UG", { style: "currency", currency, maximumFractionDigits: 0 }).format(Number(value)); }
 function dateTimeInput() { const local = new Date(Date.now() - new Date().getTimezoneOffset() * 60000); return local.toISOString().slice(0, 16); }
 function iso(value: string) { return new Date(value).toISOString(); }
@@ -125,7 +124,7 @@ export default function ProductsPage() {
             { key: "category", label: "Category", render: (product) => categoryMap.get(product.category_id) || "—" },
             { key: "brand", label: "Brand", render: (product) => brandMap.get(product.brand_id || "") || "—" },
             { key: "identity", label: "Identity", render: (product) => product.has_variants ? "Variant-based" : "Single item" },
-            { key: "status", label: "Status", render: (product) => <span className={`status-pill ${statusClass(product.status)}`}>{product.status}</span> },
+            { key: "status", label: "Status", render: (product) => <Badge variant={product.status === "ACTIVE" ? "success" : "neutral"}>{product.status}</Badge> },
           ]}
         />
       </section>

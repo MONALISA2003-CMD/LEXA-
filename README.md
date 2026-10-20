@@ -2,6 +2,13 @@
 
 LEXA is a real multi-tenant business operating and intelligence system. The canonical business system of record is Neon PostgreSQL project `LEXA`, branch `lexa-live`, database `neondb`.
 
+## Current product direction and first increment
+
+- **Authoritative product direction:** [`docs/LEXA_STATEMENT_OF_TRUTH_2026-10-19.md`](docs/LEXA_STATEMENT_OF_TRUTH_2026-10-19.md)
+- **First increment evidence and blockers:** [`docs/LEXA_FIRST_INCREMENT_IMPLEMENTATION_REPORT_2026-10-19.md`](docs/LEXA_FIRST_INCREMENT_IMPLEMENTATION_REPORT_2026-10-19.md)
+
+These documents distinguish locked product decisions from source-documented implementation and hosted acceptance that remains pending. They do not imply a production deployment.
+
 ## Production hardening carried forward from v2.5.0
 
 This release repairs the production weaknesses identified during the Phase 1 deep review:
@@ -72,3 +79,11 @@ Version 2.9.0 carries the Phase 1 UX foundation implementation from the product/
 The handoff is source-only: the updated build is in the Phase 1 ZIP. On this runner, **104 Python tests and 3 frontend static contract tests passed, with one Python auth-refresh test skipped because the local environment lacks `redis`**. A local frontend dependency install/typecheck/build could not run because the npm registry was unavailable and `undici-types` was not cached; CI is configured to execute `npm ci`, typecheck, tests, and build with Node 24. The five-width visual screenshot checklist and credentialed hosted auth acceptance remain pending.
 
 The Phase 0 blockers remain release blockers: seven exact historical migration SQL sources are missing, hosted production readiness settings still require reconciliation, and GitHub write access returned 403. No production deployment or canonical Neon schema mutation was performed in this pass. See `docs/PHASE1_UX_IMPLEMENTATION_REPORT.md` and `docs/PHASE1_UX_RUNBOOK.md`.
+
+## Phase 1 security and stability candidate (19 October 2026)
+
+This source-only candidate adds a separately provisioned least-privilege database login (`lexa_runtime_safe`), production validation for the expected database login role and TLS/pooler URL, and transaction-local role switching for direct readiness connections. It includes migration `029_phase1_runtime_role_least_privilege.sql`, the regression suite, and a repeatable verification script.
+
+**No production change is implied by this package.** The new role must be provisioned and verified on an isolated Neon branch, given a password through secret management, and only then configured in Render during an explicitly approved release. The old elevated `lexa_runtime` role remains unchanged until a safe cutover and separate decommission plan.
+
+See `docs/PHASE1_SECURITY_STABILITY_RUNBOOK.md` and `docs/PHASE1_SECURITY_STABILITY_REPORT_2026-10-19.md`. Run `bash scripts/verify-phase1.sh` from the repository root. Strict full migration replay remains blocked by seven missing historical SQL sources; frontend typecheck/build and credentialed hosted authentication acceptance remain release gates.

@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Production Hardening & Convergence",
-  "version": "2.8.7",
+  "package": "LEXA Phase 1 Security & Stability",
+  "version": "2.9.1",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -76,7 +76,12 @@
     "Added deletion-manifest applier and listed obsolete unregistered API business_engine route module for checkout cleanup",
     "Scoped pytest collection to canonical tests and separated strict migration replay into a manual release gate",
     "Retried GitHub branch creation on 2026-10-15; integration still returns HTTP 403 and no code was pushed",
-    "Live Render 2026-10-15: /health 200, /ready 200 but database-only readiness payload, first bodyless refresh probe timed out before a warmed retry returned 401, anonymous logout 200"
+    "Live Render 2026-10-15: /health 200, /ready 200 but database-only readiness payload, first bodyless refresh probe timed out before a warmed retry returned 401, anonymous logout 200",
+    "Phase 1: centralize transaction-local application-role switching for ORM and direct readiness connections",
+    "Phase 1: validate DATABASE_LOGIN_ROLE against pooled Neon DATABASE_URL username and require TLS",
+    "Phase 1: add guarded migration 029 for a separate non-inheriting lexa_runtime_safe login with SET-only membership in lexa_app",
+    "Phase 1: add runtime-role security regression tests and scripts/verify-phase1.sh",
+    "Phase 1: document isolated Neon test-branch validation and gated production rollout procedure"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -86,10 +91,10 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Canonical LEXA Neon foundation for deterministic business intelligence, reporting, product performance, customer patterns, branch performance, and inventory health.",
-  "package_version": "2.8.7",
-  "phase": "0 reliability and deployment",
-  "phase_name": "Authentication, Session and Build Reliability",
-  "phase_status": "PHASE0_SOURCE_HANDOFF_VERIFIED_LOCAL_104_PASSED_1_LOCAL_DEPENDENCY_SKIP_LIVE_READY_CACHE_CODE_NOT_DEPLOYED_SEVEN_MIGRATION_GAPS_AND_CREDENTIALLED_E2E_PENDING",
+  "package_version": "2.9.1",
+  "phase": "1 security and stability",
+  "phase_name": "Least-privilege database login, readiness role context, and production config hardening",
+  "phase_status": "SOURCE_CANDIDATE_VERIFIED_LOCAL_109_PASSED_1_DEPENDENCY_SKIP_4_FRONTEND_CONTRACTS_27_TS_SYNTAX_FILES_PASS_SEVEN_HISTORICAL_MIGRATION_GAPS_FRONTEND_BUILD_AND_HOSTED_AUTH_PENDING",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -125,17 +130,14 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": "104 passed, 1 skipped; local offline environment does not have redis runtime dependency, so apps/api/tests/test_auth_refresh.py is skipped locally; CI installs declared API dependencies",
-    "backend_compile": "pass: python -m compileall -q apps/api/app apps/api/tests",
-    "frontend_contract_tests": "pass: 2 Node test files, 0 failures",
-    "typescript_syntax_transpile": "pass: 26 frontend TS/TSX non-declaration files checked, 0 syntax errors",
-    "web_build": "npm ci, npm run typecheck, npm test, and npm run build passed in a separate Vercel sandbox against matching frontend sources; lockfile root deps match package.json",
-    "live_auth_smoke": "Anonymous probes on 2026-10-15: Render /health 200; /ready 200 but only database dependency is reported; first bodyless refresh timed out at 30 seconds, retry after warm-up returned 401 instead of 422 in 0.316 seconds; anonymous logout returned 200. Credentialed login/rotation/identity/protected-read/logout-revocation awaits dedicated test-account credentials.",
-    "migration": "Neon ledger rechecked 2026-10-15 (27 rows); migration 028 and refresh lookup grant/owner properties verified read-only; migration 022 policy block executed and policy expressions verified on a disposable Neon validation branch; seven exact historical migration sources still missing, strict replay blocked",
-    "release": "phase0-implementation-handoff-2.8.7-2026-10-15; source ZIP validated locally; not a production-accepted release",
-    "release_name": "phase-0-reliability-implementation-handoff-production-settings-and-credentialed-e2e-pending",
-    "deployment": "No GitHub write or production deploy. Branch creation retry returned 403. Render LEXA live healthCheckPath remains blank, and /ready uses the older database-only handler. Only existing Render LEXA service and existing Neon test branch used; canonical Neon was read-only during this work."
+    "python_tests": "109 passed, 1 skipped; auth-refresh test requires redis which is not installed in the offline local runner",
+    "frontend_contract_tests": "4 passed, 0 failed",
+    "frontend_typescript_syntax": "pass: 27 TS/TSX files transpile syntactically using the available global TypeScript compiler",
+    "frontend_typecheck_and_build": "not verified: npm ci --offline fails because undici-types@6.21.0 is not cached and registry DNS is unavailable; run npm ci, npm run typecheck, npm test, npm run build in Node 24 CI",
+    "phase1_security_migration": "migration 029 executed on isolated Neon branch lexa-phase1-security-test-2026-10-19; verified lexa_runtime_safe has NOINHERIT/NOCREATEDB/NOCREATEROLE/NOREPLICATION/NOBYPASSRLS, no neon_superuser membership, SET membership in lexa_app, and no direct SELECT on users or DELETE on schema_migrations",
+    "migration_source_replay": "seven historical SQL sources still missing; strict full replay blocked",
+    "production": "no production schema/role/settings/deployments changed; GitHub branch creation denied with 403; Render/Vercel deployments not triggered"
   },
-  "release": "phase0-implementation-candidate-2.8.6-2026-10-13",
-  "release_name": "phase-0-reliability-source-candidate-live-deployment-acceptance-pending"
+  "release": "phase1-security-stability-source-candidate-2.9.1-2026-10-19",
+  "release_name": "phase-1-security-stability-isolated-test-verified-production-cutover-not-authorized"
 }

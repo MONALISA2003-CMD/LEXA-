@@ -17,6 +17,8 @@ services:
         sync: false
       - key: DATABASE_APP_ROLE
         sync: false
+      - key: DATABASE_LOGIN_ROLE
+        sync: false
       - key: LEXA_NEON_PROJECT_ID
         value: wispy-mud-75323042
       - key: LEXA_NEON_BRANCH_ID

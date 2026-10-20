@@ -3,7 +3,7 @@ import logging
 import redis
 from sqlalchemy import text
 
-from .db import engine
+from .db import apply_application_role, engine
 from .config import settings
 
 EXPECTED_DATABASE = "neondb"
@@ -91,6 +91,9 @@ def check_redis() -> tuple[bool, str | None]:
 def check_database() -> tuple[bool, str | dict[str, object] | None]:
     try:
         with engine.connect() as connection:
+            # Direct engine connections do not trigger Session.after_begin.
+            # Apply the same least-privilege role before any catalog/schema reads.
+            apply_application_role(connection)
             connection.execute(text("SELECT 1"))
             identity = connection.execute(
                 text("""

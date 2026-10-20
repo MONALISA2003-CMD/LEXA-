@@ -22,6 +22,20 @@ engine = create_engine(
     connect_args=ENGINE_CONNECT_ARGS,
 )
 
+def apply_application_role(connection, role: str | None = None) -> None:
+    """Switch the current transaction to LEXA's least-privilege database role.
+
+    Use this for ORM sessions and direct engine connections alike. `SET LOCAL`
+    is transaction-scoped and safe with Neon/PgBouncer transaction pooling.
+    """
+    selected_role = settings.database_app_role if role is None else role
+    if not selected_role:
+        return
+    if not re.fullmatch(r"[a-z_][a-z0-9_]*", selected_role):
+        raise ValueError("DATABASE_APP_ROLE must be a simple PostgreSQL role identifier")
+    connection.exec_driver_sql(f"SET LOCAL ROLE {selected_role}")
+
+
 if settings.database_app_role and not re.fullmatch(r"[a-z_][a-z0-9_]*", settings.database_app_role):
     raise ValueError("DATABASE_APP_ROLE must be a simple PostgreSQL role identifier")
 
@@ -29,8 +43,7 @@ if settings.database_app_role and not re.fullmatch(r"[a-z_][a-z0-9_]*", settings
 @event.listens_for(Session, "after_begin")
 def _set_application_role_per_transaction(session, transaction, connection):
     # SET LOCAL works with transaction pooling and avoids startup packet GUCs.
-    if settings.database_app_role:
-        connection.exec_driver_sql(f"SET LOCAL ROLE {settings.database_app_role}")
+    apply_application_role(connection)
     connection.exec_driver_sql("SET LOCAL statement_timeout = '15s'")
     connection.exec_driver_sql("SET LOCAL lock_timeout = '3s'")
     connection.exec_driver_sql("SET LOCAL idle_in_transaction_session_timeout = '30s'")

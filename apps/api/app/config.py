@@ -1,3 +1,6 @@
+import re
+from urllib.parse import parse_qs, unquote, urlsplit
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -5,6 +8,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str
     database_app_role: str = ""
+    database_login_role: str = "lexa_runtime"
     redis_url: str
     jwt_secret: str
     jwt_issuer: str = "lexa"
@@ -32,7 +36,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
-def validate_production_settings(*, app_env: str, database_app_role: str, jwt_secret: str, cors_origins: list[str], database_url: str | None = None) -> bool:
+def validate_production_settings(*, app_env: str, database_app_role: str, jwt_secret: str, cors_origins: list[str], database_url: str | None = None, database_login_role: str = "lexa_runtime") -> bool:
     if app_env.strip().lower() != "production":
         return True
     if database_app_role != "lexa_app":
@@ -41,8 +45,17 @@ def validate_production_settings(*, app_env: str, database_app_role: str, jwt_se
         raise ValueError("JWT_SECRET must be at least 32 characters in production")
     if not cors_origins or any("localhost" in origin.lower() or origin == "*" for origin in cors_origins):
         raise ValueError("CORS_ORIGINS must contain only explicit production origins")
-    if database_url is not None and "-pooler" not in database_url:
-        raise ValueError("DATABASE_URL must use the Neon pooled endpoint in production")
+    if not re.fullmatch(r"[a-z_][a-z0-9_]*", database_login_role):
+        raise ValueError("DATABASE_LOGIN_ROLE must be a simple PostgreSQL role identifier")
+    if database_url is not None:
+        parsed = urlsplit(database_url.strip())
+        if "-pooler" not in (parsed.hostname or ""):
+            raise ValueError("DATABASE_URL must use the Neon pooled endpoint in production")
+        if unquote(parsed.username or "") != database_login_role:
+            raise ValueError("DATABASE_URL username must match DATABASE_LOGIN_ROLE")
+        sslmode = parse_qs(parsed.query).get("sslmode", [""])[0].lower()
+        if sslmode not in {"require", "verify-ca", "verify-full"}:
+            raise ValueError("DATABASE_URL must require TLS in production")
     return True
 
 
@@ -53,4 +66,5 @@ validate_production_settings(
     jwt_secret=settings.jwt_secret,
     cors_origins=settings.cors_origin_list,
     database_url=settings.database_url,
+    database_login_role=settings.database_login_role,
 )
