@@ -57,3 +57,9 @@ Use this checklist for every Phase 2 source package and release. A READY platfor
 - [ ] Backend, frontend, migration, browser, and platform checks are recorded against the same source commit.
 - [ ] Known skips and environmental blockers are named explicitly.
 - [ ] No production promotion, Render settings change, or Neon mutation occurs without explicit authorization.
+
+## Dated final audit status — 20 October 2026
+
+See `docs/PHASE0_2_FINAL_READINESS_AUDIT_2026-10-20.md` for the current hosted probes, phase-by-phase matrix, database findings, official platform references, and detailed go/no-go criteria. See `docs/PHASE3_ENTRY_CHECKLIST.md` for the Phase 3 entry gate.
+
+Latest Vercel and Render deployments are green on GitHub commit `2cbfda1b24864d7cc03ad2cbb3972639545fe28d`, and read-only `/health`, `/ready`, frontend login, and API-proxy probes pass. This does **not** close release acceptance: GitHub Actions has no run for that commit, root workflow path/branch protection need repair, the runtime DB login remains overprivileged, five public tables have RLS disabled, seven exact migration sources are missing, credentialed hosted E2E is pending, and full local Node 24 build/responsive QA is not recorded. Phase 3 schema-changing work remains **NO-GO** until the required gates in the audit are evidenced.
