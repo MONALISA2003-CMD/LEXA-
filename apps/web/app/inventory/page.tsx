@@ -6,16 +6,16 @@ import { ResponsiveDataTable } from "../../components/ui";
 import {
   approveAdjustment, approveStockCount, approveTransfer, completeTransfer, createAdjustment, createLocation,
   createStockCount, createTransfer, createWarehouse, dispatchTransfer, getAdjustments, getBranches,
-  getInventoryBalances, getInventoryIntegrity, getInventoryLedger, getLocations, getStockCounts, getTransfers,
+  getInventoryBalances, getInventoryIntegrity, getInventoryLedger, getInventoryReplenishmentPolicies, getInventoryReplenishmentRecommendations, getLocations, getStockCounts, getTransfers, upsertInventoryReplenishmentPolicy,
   getVariantOptions, getWarehouses, postAdjustment, postStockCount, receiveTransfer, submitStockCount,
-  updateCountLines, type Branch, type InventoryAdjustment, type InventoryBalance, type InventoryLedger,
+  updateCountLines, type Branch, type InventoryAdjustment, type InventoryBalance, type InventoryLedger, type ReplenishmentPolicy, type ReplenishmentRecommendation,
   type Location, type StockCount, type Transfer, type VariantOption, type Warehouse,
 } from "../../lib/api";
 
-type Tab = "Stock" | "Ledger" | "Adjustments" | "Counts" | "Transfers" | "Locations";
+type Tab = "Stock" | "Ledger" | "Adjustments" | "Counts" | "Transfers" | "Locations" | "Replenishment";
 type LineDraft = { variantId: string; quantity: string; unitCost?: string };
 
-const tabs: Tab[] = ["Stock", "Ledger", "Adjustments", "Counts", "Transfers", "Locations"];
+const tabs: Tab[] = ["Stock", "Ledger", "Adjustments", "Counts", "Transfers", "Locations", "Replenishment"];
 const money = (value: string | number) => new Intl.NumberFormat("en-UG", { style: "currency", currency: "UGX", maximumFractionDigits: 0 }).format(Number(value));
 const qty = (value: string | number) => new Intl.NumberFormat("en-UG", { maximumFractionDigits: 3 }).format(Number(value));
 const short = (value: string) => `${value.slice(0, 8)}…`;
@@ -38,6 +38,17 @@ export default function InventoryPage() {
   const [adjustments, setAdjustments] = useState<InventoryAdjustment[]>([]);
   const [counts, setCounts] = useState<StockCount[]>([]);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [replenishmentPolicies, setReplenishmentPolicies] = useState<ReplenishmentPolicy[]>([]);
+  const [replenishmentRecommendations, setReplenishmentRecommendations] = useState<ReplenishmentRecommendation[]>([]);
+  const [replenishmentLocation, setReplenishmentLocation] = useState("");
+  const [replenishmentVariant, setReplenishmentVariant] = useState("");
+  const [replenishmentLeadDays, setReplenishmentLeadDays] = useState("7");
+  const [replenishmentReviewDays, setReplenishmentReviewDays] = useState("7");
+  const [replenishmentLookbackDays, setReplenishmentLookbackDays] = useState("30");
+  const [replenishmentMinimum, setReplenishmentMinimum] = useState("0");
+  const [replenishmentSafety, setReplenishmentSafety] = useState("0");
+  const [replenishmentBusy, setReplenishmentBusy] = useState(false);
+  const [replenishmentError, setReplenishmentError] = useState("");
   const [integrity, setIntegrity] = useState("checking");
   const [search, setSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
@@ -134,6 +145,40 @@ export default function InventoryPage() {
     const query = new URLSearchParams(window.location.search).get("q");
     if (query) setSearch(query);
   }, []);
+
+  async function loadReplenishment() {
+    setReplenishmentBusy(true); setReplenishmentError("");
+    try {
+      const [policies, recommendations] = await Promise.all([
+        getInventoryReplenishmentPolicies(replenishmentLocation || undefined),
+        getInventoryReplenishmentRecommendations(replenishmentLocation || undefined),
+      ]);
+      setReplenishmentPolicies(policies); setReplenishmentRecommendations(recommendations.items);
+    } catch (e) {
+      setReplenishmentError(e instanceof Error ? e.message : "Replenishment data could not be loaded.");
+      setReplenishmentPolicies([]); setReplenishmentRecommendations([]);
+    } finally { setReplenishmentBusy(false); }
+  }
+
+  async function saveReplenishmentPolicy(event: FormEvent) {
+    event.preventDefault();
+    if (!replenishmentLocation || !replenishmentVariant) { setMessage("Choose a location and tracked variant first."); return; }
+    setReplenishmentBusy(true); setReplenishmentError("");
+    try {
+      await upsertInventoryReplenishmentPolicy({
+        location_id: replenishmentLocation, variant_id: replenishmentVariant,
+        lead_time_days: Number(replenishmentLeadDays), review_period_days: Number(replenishmentReviewDays),
+        lookback_days: Number(replenishmentLookbackDays), minimum_available: replenishmentMinimum,
+        safety_stock: replenishmentSafety, enabled: true,
+      });
+      setMessage("Replenishment policy saved. Recommendations have been recalculated from completed sales and returns.");
+      await loadReplenishment();
+    } catch (e) {
+      setReplenishmentError(e instanceof Error ? e.message : "The replenishment policy could not be saved.");
+    } finally { setReplenishmentBusy(false); }
+  }
+
+  useEffect(() => { if (tab === "Replenishment") void loadReplenishment(); }, [tab, replenishmentLocation]);
 
   function updateLine(setter: (value: LineDraft[]) => void, lines: LineDraft[], index: number, field: keyof LineDraft, value: string) {
     setter(lines.map((line, i) => i === index ? { ...line, [field]: value } : line));
@@ -260,6 +305,8 @@ export default function InventoryPage() {
       {tab === "Transfers" && <div className="operations-layout"><form className="operation-form" onSubmit={submitTransfer}><div><p className="eyebrow">LOCATION TRANSFER</p><h3>Move stock between locations</h3><p>Draft → Approved → Dispatched → Received → Completed. Dispatch reduces source stock; receipt increases destination stock.</p></div><div className="form-grid"><label>From<select value={transferFrom} onChange={e=>setTransferFrom(e.target.value)} required>{locations.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label>To<select value={transferTo} onChange={e=>setTransferTo(e.target.value)} required>{locations.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label></div><label>Notes<textarea value={transferNotes} onChange={e=>setTransferNotes(e.target.value)} rows={2} placeholder="Reason or dispatch note"/></label><div className="line-editor"><div className="line-editor-head"><strong>Items</strong><button type="button" className="button button-soft button-small" onClick={()=>setTransferLines([...transferLines,{variantId:"",quantity:""}])}>+ Add item</button></div>{transferLines.map((line,i)=><div className="editor-row" key={i}><select value={line.variantId} onChange={e=>updateLine(setTransferLines,transferLines,i,"variantId",e.target.value)} required><option value="">Item</option>{variants.map(v=><option key={v.id} value={v.id}>{v.product_name} · {v.name} · {v.sku}</option>)}</select><input type="number" min="0.001" step="0.001" value={line.quantity} onChange={e=>updateLine(setTransferLines,transferLines,i,"quantity",e.target.value)} placeholder="Quantity" required/><button type="button" className="row-remove" onClick={()=>setTransferLines(transferLines.filter((_,idx)=>idx!==i))} aria-label="Remove line">×</button></div>)}</div><button className="button button-dark" disabled={busy}>Create transfer</button></form><div className="operation-list"><div className="list-head"><div><p className="eyebrow">TRANSFER REGISTER</p><h3>Recent transfers</h3></div></div>{transfers.length?transfers.map(item=><div className="workflow-row" key={item.id}><div><strong>{short(item.id)} · {locationMap.get(item.source_location_id)?.name||short(item.source_location_id)} → {locationMap.get(item.destination_location_id)?.name||short(item.destination_location_id)}</strong><small>{item.lines.length} line(s) · {item.notes||"No notes"}</small></div><span className={`status ${statusTone(item.status)}`}>{item.status}</span><div className="row-actions">{item.status==="DRAFT"&&<button className="button button-soft button-small" onClick={()=>void runTransferAction(item.id,"approve")} disabled={busy}>Approve</button>}{item.status==="APPROVED"&&<button className="button button-dark button-small" onClick={()=>void runTransferAction(item.id,"dispatch")} disabled={busy}>Dispatch</button>}{(item.status==="DISPATCHED"||item.status==="PARTIALLY_RECEIVED")&&<button className="button button-dark button-small" onClick={()=>void runTransferAction(item.id,"receive")} disabled={busy}>Receive</button>}{item.status==="RECEIVED"&&<button className="button button-dark button-small" onClick={()=>void runTransferAction(item.id,"complete")} disabled={busy}>Complete</button>}</div></div>):<div className="empty-inline">No transfers created yet.</div>}</div></div>}
 
       {tab === "Locations" && <div className="operations-layout"><form className="operation-form" onSubmit={submitWarehouse}><div><p className="eyebrow">WAREHOUSE</p><h3>Create warehouse</h3><p>Warehouses group operational locations. Branch assignment is optional in the current organization contract.</p></div><label>Name<input value={warehouseName} onChange={e=>setWarehouseName(e.target.value)} placeholder="Main warehouse" required/></label><label>Code<input value={warehouseCode} onChange={e=>setWarehouseCode(e.target.value)} placeholder="WH-KLA-01" required/></label><label>Branch<select value={warehouseBranch} onChange={e=>setWarehouseBranch(e.target.value)}><option value="">No branch assignment</option>{branches.map(x=><option key={x.id} value={x.id}>{x.name} · {x.code}</option>)}</select></label><button className="button button-dark" disabled={busy}>Create warehouse</button></form><form className="operation-form" onSubmit={submitLocation}><div><p className="eyebrow">LOCATION</p><h3>Create inventory location</h3><p>Locations are the concrete stock positions used by balances, transfers and counts.</p></div><label>Warehouse<select value={locationWarehouse} onChange={e=>setLocationWarehouse(e.target.value)} required><option value="">Select warehouse</option>{warehouses.map(x=><option key={x.id} value={x.id}>{x.name} · {x.code}</option>)}</select></label><label>Name<input value={locationName} onChange={e=>setLocationName(e.target.value)} placeholder="Main floor" required/></label><label>Code<input value={locationCode} onChange={e=>setLocationCode(e.target.value)} placeholder="LOC-01" required/></label><button className="button button-dark" disabled={busy}>Create location</button></form><div className="operation-list full-width"><div className="list-head"><div><p className="eyebrow">LOCATION REGISTER</p><h3>{locations.length} locations</h3></div></div>{locations.map(item=><div className="workflow-row" key={item.id}><div><strong>{item.name}</strong><small>{item.code} · Warehouse {warehouseMap.get(item.warehouse_id)?.name||short(item.warehouse_id)}</small></div><span className="status good">{item.status}</span></div>)}{!locations.length&&<div className="empty-inline">No locations yet.</div>}</div></div>}
+
+      {tab === "Replenishment" && <div className="operations-layout"><form className="operation-form" onSubmit={saveReplenishmentPolicy}><div><p className="eyebrow">PHASE 6 · INVENTORY INTELLIGENCE</p><h3>Replenishment policy</h3><p>Configure this variant and location using supplier lead time, review cadence, safety stock and a historical demand window. This saves a policy only; it does not order or move stock.</p></div><label>Location<select value={replenishmentLocation} onChange={e=>setReplenishmentLocation(e.target.value)} required><option value="">Choose location</option>{locations.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label>Tracked item / variant<select value={replenishmentVariant} onChange={e=>setReplenishmentVariant(e.target.value)} required><option value="">Choose item</option>{variants.map(v=><option key={v.id} value={v.id}>{v.product_name} · {v.name} · {v.sku}</option>)}</select></label><div className="form-grid"><label>Lead time (days)<input type="number" min="0" max="365" value={replenishmentLeadDays} onChange={e=>setReplenishmentLeadDays(e.target.value)} required/></label><label>Review period (days)<input type="number" min="1" max="90" value={replenishmentReviewDays} onChange={e=>setReplenishmentReviewDays(e.target.value)} required/></label></div><div className="form-grid"><label>Demand lookback (days)<input type="number" min="7" max="365" value={replenishmentLookbackDays} onChange={e=>setReplenishmentLookbackDays(e.target.value)} required/></label><label>Minimum available<input type="number" min="0" step="0.001" value={replenishmentMinimum} onChange={e=>setReplenishmentMinimum(e.target.value)} required/></label></div><label>Safety stock<input type="number" min="0" step="0.001" value={replenishmentSafety} onChange={e=>setReplenishmentSafety(e.target.value)} required/></label><button className="button button-dark" disabled={replenishmentBusy}>Save policy</button></form><div className="operation-list"><div className="list-head"><div><p className="eyebrow">EXPLAINABLE SUGGESTIONS</p><h3>Reorder recommendations</h3><small>Computed from completed SALE units minus completed returned units, at the selected inventory location.</small></div><button className="button button-soft button-small" onClick={()=>void loadReplenishment()} disabled={replenishmentBusy}>Refresh</button></div>{replenishmentError&&<div className="notice notice-error">{replenishmentError}</div>}{replenishmentBusy?<div className="empty-inline">Recalculating from posted records…</div>:replenishmentRecommendations.length?replenishmentRecommendations.map(item=><div className="workflow-row" key={item.policy_id}><div><strong>{item.product_name} · {item.variant_name}</strong><small>{item.sku||"No SKU"} · {item.location_name} · {item.reason_code.replaceAll("_"," ")}</small><small>Available {qty(item.available)} · inbound {qty(item.inbound)} · daily demand {qty(item.average_daily_demand)} · cover {item.days_cover===null?"not estimable":`${qty(item.days_cover)} days`}</small><small>Target {qty(item.target_stock)} · suggested reorder {qty(item.reorder_quantity)} · estimated value {money(item.estimated_reorder_value)}</small></div><span className={`status ${item.recommended_action==="REORDER"?"warn":"good"}`}>{item.recommended_action}</span></div>):<div className="empty-inline">No recommendations yet. Save a policy for a location and tracked variant. The recommendation is advisory and uses posted business records; it will not create a purchase order.</div>}</div><div className="operation-list full-width"><div className="list-head"><div><p className="eyebrow">POLICY REGISTER</p><h3>{replenishmentPolicies.length} configured policies</h3></div></div>{replenishmentPolicies.map(policy=><div className="workflow-row" key={policy.id}><div><strong>{policy.product_name} · {policy.variant_name}</strong><small>{policy.location_name} · lead {policy.lead_time_days}d · review {policy.review_period_days}d · lookback {policy.lookback_days}d · safety {qty(policy.safety_stock)}</small></div><span className={`status ${policy.enabled?"good":"neutral"}`}>{policy.enabled?"ACTIVE":"DISABLED"}</span></div>)}{!replenishmentPolicies.length&&!replenishmentBusy&&<div className="empty-inline">No policies configured for this location yet.</div>}</div></div>}
     </section>
   </AppShell>;
 }

@@ -1,86 +1,62 @@
-# Migration source recovery notes — updated 20 October 2026
+# Migration source recovery and disposition register
 
-## Recovered source
+**Current operational status: 21 October 2026.** The current machine-readable policy is `migrations/migration_dispositions.json`; current canonical ledger evidence is `migrations/live_ledger_snapshot_2026-10-21.json`. Earlier entries in this file and older dated documents are retained as historical audit notes. They are not the current gate policy where the wording conflicts with this section.
 
-- Full version: `019_phase4a_customer_credit_allocation`
-- Path: `migrations/019_phase4a_customer_credit_allocation.sql`
-- Source commit: `d850ce04c8930134f01a63cd65c5d1947a17b17d`
-- Source repository: `MONALISA2003-CMD/LEXA-`
-- Verified Git blob SHA-1: `caefc2e3b46c5a4bae2ff2592b787d3b4092dd61`
-- Verification method: recomputed the Git blob hash from recovered file bytes and matched GitHub's historical file API result.
+## Phase 3 decision — six permanently replaced historical sources
 
-## Recovered source — 027 release convergence (20 October 2026)
+Phase 3 explicitly declared the following exact SQL originals lost and approved permanent replacements. This decision is final for routine development/release workflow: **do not run further retrieval searches for these files, and do not surface historical recovery as an open blocker again**.
 
-- Full version: `027_release_convergence`
-- Canonical path: `migrations/027_release_convergence.sql`
-- Recovered source path: `lexa_v280_src/migrations/027_release_convergence.sql`
-- Source commit: `51355d941eb50e075e3d4f884838a11b6807778b`
-- Source repository: `MONALISA2003-CMD/LEXA-`
-- Verified Git blob SHA-1: `e6d9242d7dedb2cbf7b1a71a46fe635b3ab051d8`
-- Verified SHA-256: `404334dde3e34a80d3176b1ba38347eb1def3cc8793f6b52d3a663cbc05b19cd`
-- Source size: `16,980` bytes
-- Verification method: recovered file bytes recompute to the GitHub blob SHA-1; SHA-256 is recorded in `source_gaps.json` under `recovered_sources`.
-- Scope/caveat: the legacy `lexa_v280_src/migrations/README.md` describes 027 as the additive schema-parity/readiness/analytics convergence point and the 023–026 purchasing entries as historical lineage markers. The live ledger records version names, not source checksums; this validates tracked artifact provenance, but it is not an independent checksum of the SQL originally executed on the database. Do not reapply this source to the live branch as part of source recovery.
-
-## Canonical ledger recheck — 15 October 2026
-
-A read-only query against `public.schema_migrations` on Neon project `wispy-mud-75323042`, branch `lexa-live` (`br-soft-star-b1dj2m2w`), database `neondb`, returned the same 27 full version strings as the 13 October snapshot. A separate read-only query confirmed migration 028, the refresh lookup function, `lexa_app` EXECUTE privilege, and a `SECURITY DEFINER` owner with RLS bypass. See `live_ledger_snapshot_2026-10-15.json` for the refreshed ledger evidence and retain the `2026-10-13` snapshot as historical evidence.
-
-## Unresolved historical sources
-
-Six applied full version strings remain absent from the supplied package and inspected Git history after recovering 027:
-
-- `010_phase2_catalog_intelligence`
-- `011_phase2_catalog_runtime_constraints`
-- `023_phase4_purchasing_core`
-- `024_phase4_purchasing_security`
-- `025_phase4_purchasing_permissions`
-- `026_phase4_membership_branch_integrity`
-
-Search of connected repository history and public results did not reveal authoritative copies. Their SQL was not fabricated from live-schema inference. Run `python scripts/check_migration_sources.py`; `--strict` remains blocked until the remaining exact source artifacts are recovered and reviewed.
-
-## Dynamic SQL validation
-
-The corrected dynamic Brain RLS policy block in `022_phase6a_brain_foundation.sql` was executed on the existing disposable Neon branch `lexa-convergence-test-2026-10-08` only. A follow-up read of `pg_policies` verified all seven expected Brain policies use a properly quoted empty-string predicate. This validates the corrected dynamic SQL statement; it does not prove a full from-zero replay, because the six remaining historic SQL gaps remain.
-
-## Deployment evidence — 15 October 2026
-
-- Render `https://lexa-n10e.onrender.com/health`: HTTP 200.
-- Render `https://lexa-n10e.onrender.com/ready`: HTTP 200, but the deployed payload still reports only `dependencies.database`; the new Redis/Valkey readiness code is not yet deployed.
-- Bodyless POST `https://lexa-n10e.onrender.com/api/v1/auth/refresh`: HTTP 401 on retry after the service warmed, not HTTP 422.
-- Bodyless POST `https://lexa-n10e.onrender.com/api/v1/auth/logout` without a cookie: HTTP 200, `{"status":"logged_out"}`.
-- Connected Render service `LEXA` still reports a blank live `healthCheckPath`, though this package's `render.yaml` declares `/ready`.
-
-No SQL mutation was made on canonical `lexa-live` during this validation. The connected Render tool does not expose a direct health-check setting update; no production deployment was triggered. Credentialed browser/API acceptance remains pending until a dedicated test account is available. GitHub branch creation was denied with HTTP 403, so this is a ZIP handoff rather than a pushed release.
-
-
-## Canonical ledger recheck — 20 October 2026
-
-A fresh read-only query of `public.schema_migrations` on project `wispy-mud-75323042`, branch `br-soft-star-b1dj2m2w`, database `neondb` returned these relevant rows:
-
-| Full recorded version | Applied timestamp (UTC) | Exact source in current package? |
+| Full version identity | Maintained forward replacement | Historical byte state |
 |---|---|---|
-| `010_phase2_catalog_intelligence` | `2026-09-20T20:53:12.510Z` | Missing |
-| `011_phase2_catalog_runtime_constraints` | `2026-09-20T21:02:49.364Z` | Missing |
-| `023_phase4_purchasing_core` | `2026-10-08T12:37:54.528Z` | Missing |
-| `024_phase4_purchasing_security` | `2026-10-08T12:38:45.629Z` | Missing |
-| `025_phase4_purchasing_permissions` | `2026-10-08T12:39:27.658Z` | Missing |
-| `026_phase4_membership_branch_integrity` | `2026-10-08T12:43:33.086Z` | Missing |
-| `027_release_convergence` | `2026-10-08T16:00:40.435Z` | Recovered from tracked Git blob; DB has no source checksum |
-| `028_phase0_auth_rls_runtime_hardening` | `2026-10-13T10:42:36.374Z` | Source exists elsewhere in the package lineage |
+| `010_phase2_catalog_intelligence` | `migrations/reconstructed/010_phase2_catalog_intelligence.equivalent.sql` | Not recovered; permanently replaced by Phase 3 decision |
+| `011_phase2_catalog_runtime_constraints` | `migrations/reconstructed/011_phase2_catalog_runtime_constraints.equivalent.sql` | Not recovered; permanently replaced by Phase 3 decision |
+| `023_phase4_purchasing_core` | `migrations/reconstructed/023_phase4_purchasing_core.equivalent.sql` | Not recovered; permanently replaced by Phase 3 decision |
+| `024_phase4_purchasing_security` | `migrations/reconstructed/024_phase4_purchasing_security.equivalent.sql` | Not recovered; permanently replaced by Phase 3 decision |
+| `025_phase4_purchasing_permissions` | `migrations/reconstructed/025_phase4_purchasing_permissions.equivalent.sql` | Not recovered; permanently replaced by Phase 3 decision |
+| `026_phase4_membership_branch_integrity` | `migrations/reconstructed/026_phase4_membership_branch_integrity.equivalent.sql` | Not recovered; permanently replaced by Phase 3 decision |
 
-The current ledger records these versions as applied; the six source files remain unrecovered from exact authoritative artifacts. Do not delete or edit ledger rows to make the repository appear consistent. Do not re-run guessed migrations. The ledger has only `version` and `applied_at`, so none of these rows contains a checksum proving which bytes were executed.
+Their exact replacement paths and SHA-256 fingerprints are enforced by `scripts/check_migration_recovery_manifest.py` and `scripts/check_migration_sources.py`. Those checks explicitly do **not** claim the replacements contain the historical bytes. Semantic replacement validation is a distinct pending gate that must be established through clean replay, schema shape, function/trigger and security assertions.
 
-## Expanded recovery searches — 20 October 2026
+## Additional canonical sources recovered 21 October 2026
 
-After recovering 027, each of the six outstanding basenames was searched using (1) all 24 ZIP archives currently available under `/mnt/data`, including additional older archives materialized from the connected File Library, (2) a recursive Library search for standalone `.sql` files (none returned), (3) the recursively enumerated GitHub repository tree and known historical source prefixes, (4) direct GitHub API path history queries for `migrations/<basename>` and `lexa_v280_src/migrations/<basename>`, (5) exact-name GitHub code and commit searches, and (6) exact-name/public developer-web searches. No authoritative copy was found for any of the six. This means no source artifact can be restored from the currently reachable materials; it is not proof that no owner-held backup exists. The strict checker remains intentionally failing until sources are supplied and reviewed.
+These sources were found on the current GitHub `main` branch. They are not additional permanently lost files:
 
-The live `schema_migrations` table has only `version` and `applied_at` and cannot prove the exact SQL bytes applied. A ledger name or matching live schema is not a substitute for source recovery.
+| Full migration | Path | Git blob SHA-1 | SHA-256 | Size |
+|---|---|---|---|---:|
+| `029_phase3_runtime_privilege_surface` | `migrations/029_phase3_runtime_privilege_surface.sql` | `43ed181f1c60722d4f14121f6743ebe994f018bf` | `bd7677c11d008ea4b6fac95dbff374cdf9db7f49629c7edbe28a4250e70e6c59` | 1,536 B |
+| `031_phase3_auth_surface_rls` | `migrations/031_phase3_auth_surface_rls.sql` | `835df668f49b684a66df781d561eb914f30cffc6` | `0e887fd1f3b56c147d8658fc9f32a0f3804be2c8ffc283a28693ba6953abaa53` | 4,083 B |
 
-## Phase 5 Increment 03 source and QA notes — 21 October 2026
+The hashes are checked against the actual bytes by `scripts/check_migration_sources.py`. This recovery corrects a stale consolidated ZIP source tree; it does not change production.
 
-- New candidate migrations `033_phase5_refund_settlement_consistency.sql`, `034_phase5_return_accounting_journals.sql`, and `035_phase5_none_return_receivable_guard.sql` are additive replacement implementation, not historical source recovery.
-- The functions/triggers/account map were checked on QA branch `br-young-base-b1mi15fs`; no production migration was applied. Production remains at migration 031.
-- The QA branch inherited parent data and is not a clean/sanitized staging target. The audit after DDL showed no sales or journal-entry rows but this is not a substitute for a disposable clean replay.
-- A `032_phase5_return_settlement_reconciliation` ledger row exists on an earlier QA branch; its source file is missing from this repository. The increment 03 replacement changes are documented separately; no claim is made that the exact historical `032` SQL was found.
-- The inspected migration 021 source was malformed. The packaged `021_phase5_analytics_foundation.sql` is now explicitly labelled a repair candidate, with valid SQL line breaks, non-SQL trailer removed, and `sales.amount_due` as the authoritative analytics balance. Source parity remains false.
+## Current canonical ledger evidence and numeric collisions
+
+The read-only Neon ledger query for project `wispy-mud-75323042`, branch `br-soft-star-b1dj2m2w`, database `neondb`, was refreshed on 21 October 2026. It contains 31 distinct full version strings. The full ledger identities and `applied_at` timestamps are in `live_ledger_snapshot_2026-10-21.json`.
+
+Two numeric prefixes are shared by distinct historical versions: `023_phase2_identity_tenancy_authorization_foundation` and `023_phase4_purchasing_core`; and `029_phase1_runtime_role_least_privilege` and `029_phase3_runtime_privilege_surface`. Do not sort or compare migrations using only integer prefixes, and do not rewrite production ledger rows.
+
+## Separate legacy issues (not part of the six-file decision)
+
+- `032_phase5_return_settlement_reconciliation` was seen on an earlier QA branch but is absent from the current canonical production ledger. It is documented as `QA_BRANCH_ONLY_NOT_IN_CANONICAL_PRODUCTION_LEDGER`; exclude it from the canonical replay unless a reviewed forward migration formally adopts its behavior.
+- `021_phase5_analytics_foundation.sql` remains `REPAIR_CANDIDATE_NOT_HISTORICAL_BYTES`. Preserve the forensic copy and do not claim byte recovery.
+
+These items have explicit dispositions and must not reopen the six-file recovery decision.
+
+## Current commands
+
+```bash
+python scripts/check_migration_recovery_manifest.py
+python scripts/check_migration_sources.py --strict
+python scripts/run_clean_migration_replay.py --plan-only
+```
+
+The first two verify the permanent source disposition and present files. `--strict` is expected to pass once all missing applied identities have a matching source or valid approved disposition. It does not imply semantic replay has passed. Semantic release evidence is checked separately:
+
+```bash
+python scripts/check_migration_sources.py --strict --require-semantic-validation --evidence artifacts/phase6-replay-evidence.json
+```
+
+That last command fails closed until a PASS evidence artifact is generated from a successful disposable replay, the exact current migration bundle and a pinned source commit. Never use `--apply` against Neon or production; the runner accepts only a loopback database explicitly named for replay/test/CI and refuses a non-empty public schema.
+
+## Historical notes
+
+Earlier paragraphs in older handoff/report files may say that the six files must be recovered before strict source checking can pass. Those statements reflected previous process state and are superseded by the Phase 3 permanent decision recorded above and in `migration_dispositions.json`. They are retained only as a history of earlier searches and are not current instructions.

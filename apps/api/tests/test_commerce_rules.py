@@ -81,3 +81,29 @@ def test_partial_return_proration_rejects_invalid_quantities(return_qty, orig_qt
 
     with pytest.raises(ValueError):
         prorate_return_line_amounts(return_qty, orig_qty, "0", "0", "10")
+
+
+def test_return_inventory_cost_uses_original_sale_cost_basis():
+    from app.commerce_rules import original_sale_inventory_unit_cost
+
+    # Original sale cost is 12 per unit; current stock average could be 15.
+    # The return must reverse COGS at the original 12, not current average 15.
+    assert original_sale_inventory_unit_cost("60", "5") == Decimal("12.0000")
+
+
+@pytest.mark.parametrize(("total_cost", "sold_quantity"), [("-1", "2"), ("10", "0"), ("10", "-2")])
+def test_return_inventory_cost_rejects_invalid_source_ledger(total_cost, sold_quantity):
+    from app.commerce_rules import original_sale_inventory_unit_cost
+
+    with pytest.raises(ValueError, match="valid"):
+        original_sale_inventory_unit_cost(total_cost, sold_quantity)
+
+
+def test_return_line_ids_must_be_unique_within_one_return():
+    from uuid import uuid4
+    from app.commerce_rules import ensure_unique_return_line_ids
+
+    first, second = uuid4(), uuid4()
+    ensure_unique_return_line_ids([first, second])
+    with pytest.raises(ValueError, match="combine quantities"):
+        ensure_unique_return_line_ids([first, second, first])

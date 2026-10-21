@@ -8,13 +8,13 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..catalog import begin_idempotency, emit_event, finish_idempotency, write_audit
-from ..commerce_rules import remaining_refund_balance, prorate_return_line_amounts
+from ..commerce_rules import ensure_unique_return_line_ids, original_sale_inventory_unit_cost, remaining_refund_balance, prorate_return_line_amounts
 from ..branch_access import ensure_branch_access, ensure_location_access, require_full_branch_scope
 from ..dependencies import require_permission
 from ..inventory import post_ledger, tenant_location, tenant_variant
@@ -632,6 +632,12 @@ class ReturnCreate(Strict):
     refund_channel_id: UUID | None = None
     lines: list[ReturnLineIn] = Field(min_length=1)
 
+    @field_validator("lines")
+    @classmethod
+    def each_sale_line_is_returned_once(cls, lines: list[ReturnLineIn]) -> list[ReturnLineIn]:
+        ensure_unique_return_line_ids(line.sale_line_id for line in lines)
+        return lines
+
 @router.get("/returns")
 def list_returns(ctx=Depends(require_permission("returns.manage"))):
     db,actor_id,tenant_id,_=ctx
@@ -677,12 +683,40 @@ def create_return(sale_id: UUID, body: ReturnCreate, idempotency_key: str | None
         if return_branch_id != sale["branch_id"]:
             ensure_branch_access(db, tenant_id=tenant_id, user_id=actor, branch_id=return_branch_id)
         validated=[]; total=Decimal("0")
+        inventory_cost_by_variant: dict[UUID, tuple[bool, Decimal]] = {}
         for req_line in body.lines:
             line=db.execute(text("SELECT * FROM transaction_lines WHERE tenant_id=:t AND id=:id AND transaction_id=:tx"),{"t":str(tenant_id),"id":str(req_line.sale_line_id),"tx":str(sale["transaction_id"])}).mappings().first()
             if not line or not line["product_variant_id"]: raise HTTPException(400,"Return line must reference a product sale line")
             returned=db.execute(text("""SELECT COALESCE(SUM(srl.quantity),0) qty FROM sale_return_lines srl JOIN sale_returns sr ON sr.id=srl.return_id AND sr.tenant_id=srl.tenant_id WHERE srl.tenant_id=:t AND srl.sale_line_id=:sl AND sr.status='COMPLETED'"""),{"t":str(tenant_id),"sl":str(req_line.sale_line_id)}).scalar_one()
             available=Decimal(str(line["quantity"]))-Decimal(str(returned))
             if req_line.quantity>available: raise HTTPException(409,"Return quantity exceeds the remaining sale quantity")
+            variant_id = UUID(str(line["product_variant_id"]))
+            if variant_id not in inventory_cost_by_variant:
+                variant = tenant_variant(db, tenant_id, variant_id)
+                original_inventory = db.execute(text("""
+                  SELECT COALESCE(SUM(ABS(quantity_delta)),0) AS sold_quantity,
+                         COALESCE(SUM(total_cost),0) AS sold_total_cost
+                  FROM inventory_transactions
+                  WHERE tenant_id=:t AND reference_type='sale' AND reference_id=:s
+                    AND variant_id=:v AND transaction_type='SALE' AND quantity_delta<0
+                """), {"t":str(tenant_id), "s":str(sale_id), "v":str(variant_id)}).mappings().one()
+                sold_quantity = Decimal(str(original_inventory["sold_quantity"]))
+                if sold_quantity > 0:
+                    try:
+                        original_unit_cost = original_sale_inventory_unit_cost(
+                            original_inventory["sold_total_cost"], sold_quantity
+                        )
+                    except ValueError as exc:
+                        raise HTTPException(409, "Original sale inventory cost is invalid; reconcile the stock ledger before returning this item") from exc
+                    inventory_cost_by_variant[variant_id] = (True, original_unit_cost)
+                elif variant.track_inventory:
+                    # A tracked sale without its matching immutable movement is not
+                    # safe to restore at today's average cost: that would misstate COGS.
+                    raise HTTPException(409, "Original sale stock movement is missing; reconcile inventory before returning this item")
+                else:
+                    # Services and non-stock products have no inventory/COGS entry.
+                    inventory_cost_by_variant[variant_id] = (False, Decimal("0"))
+            tracks_inventory, original_unit_cost = inventory_cost_by_variant[variant_id]
             line_total, line_discount, line_tax = prorate_return_line_amounts(
                 req_line.quantity, line["quantity"], line["discount_amount"],
                 line["tax_amount"], line["line_total"]
@@ -690,7 +724,7 @@ def create_return(sale_id: UUID, body: ReturnCreate, idempotency_key: str | None
             # A sale line stores the total tax and discount for its full quantity;
             # proportion partial returns instead of copying all original adjustments.
             total += line_total
-            validated.append((req_line, line, line_total, line_discount, line_tax))
+            validated.append((req_line, line, line_total, line_discount, line_tax, tracks_inventory, original_unit_cost))
         total=q(total)
         remaining_sales_value=q(Decimal(str(sale["total"]))-Decimal(str(sale["return_adjustment_amount"])))
         if total<=0 or total>remaining_sales_value: raise HTTPException(422,"Return total is outside the remaining sale value")
@@ -737,12 +771,12 @@ def create_return(sale_id: UUID, body: ReturnCreate, idempotency_key: str | None
         db.add(tx); db.flush()
         db.execute(text("""INSERT INTO sale_returns(tenant_id,sale_id,transaction_id,inventory_location_id,status,reason,total,created_by) VALUES(:t,:s,:tx,:l,'DRAFT',:r,:total,:u) RETURNING id"""),{"t":str(tenant_id),"s":str(sale_id),"tx":str(tx.id),"l":str(return_location),"r":body.reason.strip(),"total":str(total),"u":str(actor)})
         return_id=db.execute(text("SELECT id FROM sale_returns WHERE tenant_id=:t AND transaction_id=:tx"),{"t":str(tenant_id),"tx":str(tx.id)}).scalar_one()
-        from ..models import InventoryBalance
-        for req_line, line, line_total, line_discount, line_tax in validated:
+        for req_line, line, line_total, line_discount, line_tax, tracks_inventory, original_unit_cost in validated:
             db.execute(text("""INSERT INTO sale_return_lines(tenant_id,return_id,sale_line_id,variant_id,quantity,unit_price,discount_amount,tax_amount,line_total) VALUES(:t,:r,:sl,:v,:q,:u,:d,:tax,:total)"""),{"t":str(tenant_id),"r":str(return_id),"sl":str(req_line.sale_line_id),"v":str(line["product_variant_id"]),"q":str(req_line.quantity),"u":str(line["unit_price"]),"d":str(line_discount),"tax":str(line_tax),"total":str(line_total)})
-            balance=db.scalar(select(InventoryBalance).where(InventoryBalance.tenant_id==tenant_id,InventoryBalance.location_id==return_location,InventoryBalance.variant_id==line["product_variant_id"]).with_for_update())
-            unit_cost=balance.average_cost if balance else Decimal("0")
-            post_ledger(db,tenant_id=tenant_id,actor_user_id=actor,location_id=return_location,variant_id=line["product_variant_id"],quantity_delta=q(req_line.quantity),unit_cost=unit_cost,transaction_type="RETURN",reference_type="sale_return",reference_id=return_id,idempotency_key=f"{idempotency_key or return_id}:inventory:{req_line.sale_line_id}",metadata={"sale_id":str(sale_id),"return_id":str(return_id)})
+            if tracks_inventory:
+                # Value returned stock at its originating sale cost. Current average
+                # cost may have changed since checkout and must not rewrite COGS.
+                post_ledger(db,tenant_id=tenant_id,actor_user_id=actor,location_id=return_location,variant_id=line["product_variant_id"],quantity_delta=q(req_line.quantity),unit_cost=original_unit_cost,transaction_type="RETURN",reference_type="sale_return",reference_id=return_id,idempotency_key=f"{idempotency_key or return_id}:inventory:{req_line.sale_line_id}",metadata={"sale_id":str(sale_id),"return_id":str(return_id),"cost_basis":"original_sale_inventory_ledger"},allow_zero_cost_receipt=True)
         db.execute(text("UPDATE sales SET return_adjustment_amount=return_adjustment_amount+:a,updated_at=now() WHERE tenant_id=:t AND id=:s"),{"t":str(tenant_id),"s":str(sale_id),"a":str(total)})
         # NONE reduces the sale value without issuing cash or store credit, so it
         # may offset the open receivable. A cash refund reduces both net collections

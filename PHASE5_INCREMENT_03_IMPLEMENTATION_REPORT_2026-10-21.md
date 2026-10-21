@@ -1,3 +1,5 @@
+> Historical increment snapshot: this report describes the original Increment 03 candidate and its test counts at that time. The current merged core-hardening candidate and authoritative current gates are in `PHASE5_CORE_HARDENING_REPORT_2026-10-21.md` and `PHASE5_RELEASE_GATE_STATUS_2026-10-21.json`.
+
 # Phase 5 Increment 03 — Settlement, Returns, Accounting & EFRIS
 
 ## Scope implemented in source

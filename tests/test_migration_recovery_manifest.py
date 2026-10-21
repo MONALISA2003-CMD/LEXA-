@@ -9,13 +9,14 @@ CHECKER = ROOT / "scripts" / "check_migration_recovery_manifest.py"
 def test_reconstructed_manifest_is_hash_checked_and_kept_separate():
     result = subprocess.run([sys.executable, str(CHECKER)], cwd=ROOT, text=True, capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "EXACT HISTORICAL SOURCES STILL MISSING: 6" in result.stdout
+    assert "HISTORICAL BYTE SOURCES UNRECOVERED BY APPROVED DECISION: 6" in result.stdout
+    assert "PERMANENT REPLACEMENT DISPOSITION: PASS" in result.stdout
 
 
-def test_strict_exact_source_gate_stays_blocked():
+def test_forensic_exact_byte_check_is_not_the_active_release_gate():
     result = subprocess.run([sys.executable, str(CHECKER), "--strict-exact"], cwd=ROOT, text=True, capture_output=True)
     assert result.returncode == 1
-    assert "STRICT EXACT-SOURCE GATE: BLOCKED" in result.stderr
+    assert "STRICT EXACT-BYTE PARITY: NOT POSSIBLE BY APPROVED DISPOSITION" in result.stderr
 
 
 def test_missing_source_names_do_not_exist_at_historical_paths():

@@ -1,3 +1,5 @@
+> **Historical snapshot — superseded for current gate status by Phase 6 (21 October 2026).** Any statement here that requires recovering the six Phase 3-approved lost SQL files is retained only to describe the state at the time. Their historical recovery gate is permanently closed by `docs/decisions/ADR-DB-001-permanent-replacement-of-lost-migrations.md` and `migrations/migration_dispositions.json`. Do not treat this snapshot as the current release-gate register.
+
 # LEXA Phase 0–2 Remaining Gate Register — Increment 07
 
 **Date:** 20 October 2026 (Africa/Kampala)  

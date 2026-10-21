@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import case, func, select
+from sqlalchemy import bindparam, case, func, select, text
 from sqlalchemy.orm import Session
 
 from ..catalog import emit_event, write_audit
@@ -64,6 +64,17 @@ class TransferIn(BaseModel):
     notes: str | None = None; lines: list[TransferLineIn] = Field(min_length=1)
 class TransferReceiveIn(BaseModel):
     lines: list[CountLineIn] = Field(min_length=1)
+
+class ReplenishmentPolicyIn(BaseModel):
+    location_id: UUID
+    variant_id: UUID
+    lead_time_days: int = Field(default=7, ge=0, le=365)
+    review_period_days: int = Field(default=7, ge=1, le=90)
+    lookback_days: int = Field(default=30, ge=7, le=365)
+    minimum_available: Decimal = Field(default=Decimal("0"), ge=0, max_digits=20, decimal_places=6)
+    safety_stock: Decimal = Field(default=Decimal("0"), ge=0, max_digits=20, decimal_places=6)
+    enabled: bool = True
+
 
 class ActionOut(BaseModel):
     id: UUID; status: str
@@ -497,6 +508,189 @@ def get_stock_count(count_id: UUID, ctx=Depends(require_permission("inventory.re
     lines = list(db.scalars(select(StockCountLine).where(StockCountLine.stock_count_id == row.id, StockCountLine.tenant_id == tenant_id)))
     return {"id": row.id, "location_id": row.location_id, "status": row.status, "scope_description": row.scope_description, "started_at": row.started_at, "created_at": row.created_at, "lines": lines}
 
+
+
+@router.get("/replenishment/policies")
+def list_replenishment_policies(
+    location_id: UUID | None = None,
+    variant_id: UUID | None = None,
+    limit: int = Query(100, ge=1, le=500),
+    ctx=Depends(require_permission("inventory.read")),
+):
+    """List location-and-variant-specific replenishment assumptions."""
+    db, actor_id, tenant_id, _ = ctx
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
+    if location_id:
+        ensure_location_access(db, tenant_id=tenant_id, user_id=actor_id, location_id=location_id)
+    stmt = text("""
+        SELECT p.id, p.location_id, p.variant_id, p.lead_time_days, p.review_period_days,
+               p.lookback_days, p.minimum_available, p.safety_stock, p.enabled,
+               p.created_at, p.updated_at, l.name AS location_name, pr.name AS product_name,
+               pv.name AS variant_name, pv.sku
+          FROM public.inventory_replenishment_policies p
+          JOIN public.locations l ON l.tenant_id=p.tenant_id AND l.id=p.location_id
+          JOIN public.product_variants pv ON pv.tenant_id=p.tenant_id AND pv.id=p.variant_id
+          JOIN public.products pr ON pr.tenant_id=p.tenant_id AND pr.id=pv.product_id
+         WHERE p.tenant_id=:tenant_id AND p.location_id IN :allowed_location_ids
+           AND (:location_id IS NULL OR p.location_id=:location_id)
+           AND (:variant_id IS NULL OR p.variant_id=:variant_id)
+         ORDER BY l.name, pr.name, pv.sku
+         LIMIT :limit
+    """).bindparams(bindparam("allowed_location_ids", expanding=True))
+    rows = db.execute(stmt, {
+        "tenant_id": str(tenant_id),
+        "allowed_location_ids": list(allowed_locations),
+        "location_id": str(location_id) if location_id else None,
+        "variant_id": str(variant_id) if variant_id else None,
+        "limit": limit,
+    }).mappings().all()
+    return [{
+        "id": str(r["id"]), "location_id": str(r["location_id"]), "variant_id": str(r["variant_id"]),
+        "location_name": r["location_name"], "product_name": r["product_name"],
+        "variant_name": r["variant_name"], "sku": r["sku"],
+        "lead_time_days": r["lead_time_days"], "review_period_days": r["review_period_days"],
+        "lookback_days": r["lookback_days"], "minimum_available": str(r["minimum_available"]),
+        "safety_stock": str(r["safety_stock"]), "enabled": r["enabled"],
+        "created_at": r["created_at"], "updated_at": r["updated_at"],
+    } for r in rows]
+
+
+@router.put("/replenishment/policies")
+def upsert_replenishment_policy(
+    body: ReplenishmentPolicyIn,
+    ctx=Depends(require_permission("inventory.manage")),
+):
+    """Idempotently configure a replenishment policy for one tracked variant at one location."""
+    db, actor_id, tenant_id, _ = ctx
+    tenant_location(db, tenant_id, body.location_id)
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor_id, location_id=body.location_id)
+    variant = tenant_variant(db, tenant_id, body.variant_id)
+    if not variant.track_inventory:
+        raise HTTPException(422, "Replenishment policies are available only for inventory-tracked variants")
+
+    row = db.execute(text("""
+        INSERT INTO public.inventory_replenishment_policies
+          (tenant_id, location_id, variant_id, lead_time_days, review_period_days,
+           lookback_days, minimum_available, safety_stock, enabled, created_by, updated_by)
+        VALUES
+          (:tenant_id, :location_id, :variant_id, :lead_time_days, :review_period_days,
+           :lookback_days, :minimum_available, :safety_stock, :enabled, :actor_id, :actor_id)
+        ON CONFLICT (tenant_id, location_id, variant_id) DO UPDATE SET
+          lead_time_days=EXCLUDED.lead_time_days,
+          review_period_days=EXCLUDED.review_period_days,
+          lookback_days=EXCLUDED.lookback_days,
+          minimum_available=EXCLUDED.minimum_available,
+          safety_stock=EXCLUDED.safety_stock,
+          enabled=EXCLUDED.enabled,
+          updated_by=EXCLUDED.updated_by,
+          updated_at=now()
+        RETURNING id, location_id, variant_id, lead_time_days, review_period_days,
+                  lookback_days, minimum_available, safety_stock, enabled, updated_at
+    """), {
+        "tenant_id": str(tenant_id), "location_id": str(body.location_id), "variant_id": str(body.variant_id),
+        "lead_time_days": body.lead_time_days, "review_period_days": body.review_period_days,
+        "lookback_days": body.lookback_days, "minimum_available": body.minimum_available,
+        "safety_stock": body.safety_stock, "enabled": body.enabled, "actor_id": str(actor_id),
+    }).mappings().one()
+    write_audit(db, tenant_id=tenant_id, actor_user_id=actor_id, action="inventory.replenishment_policy.upserted", target_type="inventory_replenishment_policy", target_id=row["id"])
+    emit_event(db, tenant_id=tenant_id, event_type="inventory.replenishment_policy.updated.v1", aggregate_type="inventory_replenishment_policy", aggregate_id=row["id"], actor_user_id=actor_id, payload={
+        "location_id": str(body.location_id), "variant_id": str(body.variant_id),
+        "lead_time_days": body.lead_time_days, "review_period_days": body.review_period_days,
+        "lookback_days": body.lookback_days, "enabled": body.enabled,
+    })
+    db.commit()
+    return {
+        "id": str(row["id"]), "location_id": str(row["location_id"]), "variant_id": str(row["variant_id"]),
+        "lead_time_days": row["lead_time_days"], "review_period_days": row["review_period_days"],
+        "lookback_days": row["lookback_days"], "minimum_available": str(row["minimum_available"]),
+        "safety_stock": str(row["safety_stock"]), "enabled": row["enabled"], "updated_at": row["updated_at"],
+    }
+
+
+@router.get("/replenishment/recommendations")
+def replenishment_recommendations(
+    location_id: UUID | None = None,
+    include_covered: bool = False,
+    limit: int = Query(100, ge=1, le=500),
+    ctx=Depends(require_permission("inventory.read")),
+):
+    """Explain reorder suggestions from completed net unit demand and scoped inventory facts.
+
+    Suggestions are advisory only. This endpoint never creates a purchase order or stock movement.
+    Units returned are assigned to the location where the return was received.
+    """
+    from ..inventory_intelligence import build_replenishment_metrics
+
+    db, actor_id, tenant_id, _ = ctx
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
+    if location_id:
+        ensure_location_access(db, tenant_id=tenant_id, user_id=actor_id, location_id=location_id)
+    stmt = text("""
+        SELECT p.id AS policy_id, p.location_id, p.variant_id, p.lead_time_days, p.review_period_days,
+               p.lookback_days, p.minimum_available, p.safety_stock,
+               l.name AS location_name, pr.name AS product_name, pv.name AS variant_name, pv.sku,
+               COALESCE(b.on_hand, 0) AS on_hand, COALESCE(b.reserved, 0) AS reserved,
+               COALESCE(b.inbound, 0) AS inbound, COALESCE(b.average_cost, 0) AS average_cost,
+               COALESCE(sold.units_sold, 0) AS units_sold,
+               COALESCE(ret.units_returned, 0) AS units_returned
+          FROM public.inventory_replenishment_policies p
+          JOIN public.locations l ON l.tenant_id=p.tenant_id AND l.id=p.location_id
+          JOIN public.product_variants pv ON pv.tenant_id=p.tenant_id AND pv.id=p.variant_id
+          JOIN public.products pr ON pr.tenant_id=p.tenant_id AND pr.id=pv.product_id
+          LEFT JOIN public.inventory_balances b
+            ON b.tenant_id=p.tenant_id AND b.location_id=p.location_id AND b.variant_id=p.variant_id
+          LEFT JOIN LATERAL (
+            SELECT SUM(tl.quantity) AS units_sold
+              FROM public.sales s
+              JOIN public.business_transactions bt ON bt.tenant_id=s.tenant_id AND bt.id=s.transaction_id
+              JOIN public.transaction_lines tl ON tl.tenant_id=bt.tenant_id AND tl.transaction_id=bt.id
+             WHERE s.tenant_id=p.tenant_id AND s.location_id=p.location_id
+               AND s.status='COMPLETED' AND bt.status='COMPLETED' AND bt.transaction_type='SALE'
+               AND tl.line_type='PRODUCT' AND tl.product_variant_id=p.variant_id
+               AND COALESCE(s.completed_at, s.created_at) >= now() - make_interval(days => p.lookback_days)
+          ) sold ON true
+          LEFT JOIN LATERAL (
+            SELECT SUM(srl.quantity) AS units_returned
+              FROM public.sale_return_lines srl
+              JOIN public.sale_returns sr ON sr.tenant_id=srl.tenant_id AND sr.id=srl.return_id
+              JOIN public.sales source_sale ON source_sale.tenant_id=sr.tenant_id AND source_sale.id=sr.sale_id
+             WHERE sr.tenant_id=p.tenant_id AND sr.status='COMPLETED'
+               AND COALESCE(sr.inventory_location_id, source_sale.location_id)=p.location_id
+               AND srl.variant_id=p.variant_id
+               AND COALESCE(sr.completed_at, sr.created_at) >= now() - make_interval(days => p.lookback_days)
+          ) ret ON true
+         WHERE p.tenant_id=:tenant_id AND p.enabled=true AND p.location_id IN :allowed_location_ids
+           AND (:location_id IS NULL OR p.location_id=:location_id)
+         ORDER BY l.name, pr.name, pv.sku
+         LIMIT :limit
+    """).bindparams(bindparam("allowed_location_ids", expanding=True))
+    rows = db.execute(stmt, {
+        "tenant_id": str(tenant_id), "allowed_location_ids": list(allowed_locations),
+        "location_id": str(location_id) if location_id else None, "limit": limit,
+    }).mappings().all()
+    results = []
+    for row in rows:
+        metrics = build_replenishment_metrics(
+            on_hand=row["on_hand"], reserved=row["reserved"], inbound=row["inbound"],
+            units_sold=row["units_sold"], units_returned=row["units_returned"],
+            lookback_days=int(row["lookback_days"]), lead_time_days=int(row["lead_time_days"]),
+            review_period_days=int(row["review_period_days"]), safety_stock=row["safety_stock"],
+            minimum_available=row["minimum_available"],
+        )
+        if not include_covered and metrics["reorder_quantity"] <= 0:
+            continue
+        results.append({
+            "policy_id": str(row["policy_id"]), "location_id": str(row["location_id"]),
+            "variant_id": str(row["variant_id"]), "location_name": row["location_name"],
+            "product_name": row["product_name"], "variant_name": row["variant_name"], "sku": row["sku"],
+            **{key: (str(value) if value is not None else None) if key not in {"lookback_days", "recommended_action", "reason_code"} else value
+               for key, value in metrics.items()},
+            "average_cost": str(row["average_cost"]),
+            "estimated_reorder_value": str((metrics["reorder_quantity"] * Decimal(str(row["average_cost"]))).quantize(Decimal("0.000001"))),
+            "currency_note": "Valuation uses current average cost as an estimate, not a supplier quote.",
+            "methodology": "Completed SALE product units minus completed return units received at this location (or the original sale location when no return location was recorded), divided by the policy lookback days. Target = max(minimum available, safety stock + daily demand × (lead time + review period)); reserved stock and inbound are accounted for separately.",
+        })
+    return {"source": "posted_transactions_and_inventory_balances", "advisory_only": True, "count": len(results), "items": results}
 
 
 @router.post("/rebuild", response_model=dict)

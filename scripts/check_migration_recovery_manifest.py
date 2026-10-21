@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Validate LEXA reconstructed-source separation and content hashes.
+"""Validate reconstructed-source separation, hashes, and permanent replacement dispositions.
 
-Default success means only that the forensic manifest is internally consistent. It does not
-mean the six exact historical SQL sources have been recovered. --strict-exact intentionally
-fails until the exact bytes are recovered and independently verified.
+A permanent replacement closes repeated historical recovery work without claiming exact bytes
+were recovered. Semantic replay remains a separate release gate.
 """
 from __future__ import annotations
 import argparse, hashlib, json, sys
@@ -27,7 +26,7 @@ def sha256(path: Path) -> str:
 
 def main() -> int:
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--strict-exact", action="store_true", help="fail unless all six original source files exist and are verified")
+    parser.add_argument("--strict-exact", action="store_true", help="forensic-only check that intentionally returns non-zero when historical bytes are unavailable")
     args=parser.parse_args()
     try:
         gaps=json.loads(GAPS_PATH.read_text(encoding="utf-8"))["gaps"]
@@ -81,12 +80,31 @@ def main() -> int:
     if errors:
         for error in errors: print("ERROR: "+error,file=sys.stderr)
         return 2
-    print("PASS: manifest/hash/separation checks are internally consistent.")
-    print(f"EXACT HISTORICAL SOURCES STILL MISSING: {len(gap_map)}")
-    print("Versions: "+", ".join(sorted(gap_map)))
-    print("This check does not validate semantic schema parity or make the source-release gate pass.")
+    try:
+        dispositions = json.loads((MIGRATIONS / "migration_dispositions.json").read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"ERROR: permanent disposition register missing or unreadable: {exc}", file=sys.stderr)
+        return 2
+    permanent = {row.get("version"): row for row in dispositions.get("permanently_replaced_sources", [])}
+    if set(permanent) != set(EXPECTED):
+        print("ERROR: permanent disposition register must contain exactly the six Phase 3-approved source identities", file=sys.stderr)
+        return 2
+    for version, rel in EXPECTED.items():
+        if permanent[version].get("disposition") != "PERMANENTLY_REPLACED":
+            print(f"ERROR: {version}: permanent disposition is missing", file=sys.stderr)
+            return 2
+        if permanent[version].get("replacement_path") != rel:
+            print(f"ERROR: {version}: permanent register replacement path differs", file=sys.stderr)
+            return 2
+        if permanent[version].get("replacement_sha256") != sha256(ROOT / rel):
+            print(f"ERROR: {version}: permanent register replacement checksum drift", file=sys.stderr)
+            return 2
+    print("PASS: manifest/hash/separation/permanent-disposition checks are internally consistent.")
+    print(f"HISTORICAL BYTE SOURCES UNRECOVERED BY APPROVED DECISION: {len(gap_map)}")
+    print("PERMANENT REPLACEMENT DISPOSITION: PASS (not a claim of historical byte recovery).")
+    print("REPLACEMENT SEMANTIC VALIDATION: PENDING clean replay/schema/RLS/security tests.")
     if args.strict_exact:
-        print("STRICT EXACT-SOURCE GATE: BLOCKED (expected until original SQL bytes are recovered).",file=sys.stderr)
+        print("STRICT EXACT-BYTE PARITY: NOT POSSIBLE BY APPROVED DISPOSITION; THIS IS NOT A RELEASE GATE.", file=sys.stderr)
         return 1
     return 0
 if __name__=="__main__":

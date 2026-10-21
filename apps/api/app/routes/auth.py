@@ -67,9 +67,9 @@ class RefreshRequest(BaseModel):
 
 
 def _enforce_registration_rate_limit(request: Request) -> None:
-    client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     ip = request.client.host if request.client else "unknown"
     key = f"lexa:registration:{ip}"
+    client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     try:
         count = int(client.incr(key))
         if count == 1:
@@ -87,8 +87,8 @@ def _login_rate_key(request: Request, email: str) -> str:
 
 
 def _enforce_login_rate_limit(request: Request, email: str) -> None:
-    client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     key = _login_rate_key(request, email)
+    client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     try:
         count = int(client.incr(key))
         if count == 1:

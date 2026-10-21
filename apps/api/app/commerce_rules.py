@@ -1,5 +1,7 @@
 """Pure financial rules shared by commerce handlers and unit tests."""
 
+from collections.abc import Iterable
+from typing import Hashable
 from decimal import Decimal, ROUND_HALF_UP
 
 MONEY_QUANTUM = Decimal("0.0001")
@@ -9,6 +11,30 @@ ZERO_MONEY = Decimal("0.0000")
 def money(value: Decimal | int | str) -> Decimal:
     """Normalize an amount using the API's four-decimal money precision."""
     return Decimal(str(value)).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+
+
+def ensure_unique_return_line_ids(sale_line_ids: Iterable[Hashable]) -> None:
+    """Reject repeated source-line IDs in a single return request.
+
+    Duplicate IDs would validate each quantity independently against the same
+    available quantity and could over-return both inventory and financial value.
+    """
+    line_ids = list(sale_line_ids)
+    if len(line_ids) != len(set(line_ids)):
+        raise ValueError("Each sale line may appear only once per return; combine quantities for the same line")
+
+
+def original_sale_inventory_unit_cost(total_cost: Decimal | int | str, sold_quantity: Decimal | int | str) -> Decimal:
+    """Derive the original inventory cost/unit from immutable sale movements.
+
+    Return COGS must use the sale-time cost basis, not the current inventory
+    average cost, which may have changed after the sale.
+    """
+    cost = money(total_cost)
+    quantity = Decimal(str(sold_quantity))
+    if cost < ZERO_MONEY or quantity <= 0:
+        raise ValueError("Original inventory cost and sold quantity must be valid")
+    return money(cost / quantity)
 
 
 def remaining_refund_balance(amount_collected: Decimal | int | str, prior_refunds: Decimal | int | str) -> Decimal:

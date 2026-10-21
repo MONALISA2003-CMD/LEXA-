@@ -1,5 +1,6 @@
 from pathlib import Path
 
+ROOT = Path(__file__).parents[3]
 SOURCE = Path(__file__).parents[1] / "app" / "routes" / "commerce.py"
 
 
@@ -151,3 +152,23 @@ def test_no_refund_return_is_limited_to_open_receivable():
     assert "SUM(GREATEST(balance,0))" in block
     assert "status IN ('OPEN','PARTIALLY_PAID')" in block
     assert "choose REFUND or CUSTOMER_CREDIT settlement" in block
+
+
+def test_return_request_rejects_duplicate_sale_lines_before_ledger_writes():
+    source = SOURCE.read_text()
+    block = source.split("class ReturnCreate(Strict):", 1)[1].split('@router.get("/returns")', 1)[0]
+    assert '@field_validator("lines")' in block
+    assert "ensure_unique_return_line_ids(line.sale_line_id for line in lines)" in block
+    rules = (ROOT / "apps/api/app/commerce_rules.py").read_text()
+    assert "len(line_ids) != len(set(line_ids))" in rules
+    assert "combine quantities for the same line" in rules
+
+
+def test_return_stock_is_valued_from_original_sale_ledger_and_skips_nonstock_items():
+    source = SOURCE.read_text()
+    block = source.split('@router.post("/sales/{sale_id}/returns", status_code=201)', 1)[1]
+    assert "reference_type='sale' AND reference_id=:s" in block
+    assert "original_sale_inventory_unit_cost" in block
+    assert "Original sale stock movement is missing" in block
+    assert "if tracks_inventory:" in block
+    assert '"cost_basis":"original_sale_inventory_ledger"' in block

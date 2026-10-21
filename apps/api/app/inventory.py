@@ -119,6 +119,7 @@ def post_ledger(
     quantity_delta: Decimal, unit_cost: Decimal, transaction_type: str,
     reference_type: str, reference_id: UUID, metadata: dict[str, Any] | None = None,
     idempotency_key: str | None = None, source_transaction_id: UUID | None = None,
+    allow_zero_cost_receipt: bool = False,
 ) -> InventoryTransaction:
     quantity_delta = q(quantity_delta); unit_cost = q(unit_cost)
     if quantity_delta == 0:
@@ -144,7 +145,7 @@ def post_ledger(
         raise HTTPException(409, "Insufficient available stock")
 
     if quantity_delta > 0:
-        if unit_cost <= 0 and old_qty == 0:
+        if unit_cost <= 0 and old_qty == 0 and not allow_zero_cost_receipt:
             raise HTTPException(422, "A positive inventory receipt requires a unit cost when stock is zero")
         if old_qty > 0:
             new_avg = weighted_average_cost(old_qty, old_avg, quantity_delta, unit_cost)

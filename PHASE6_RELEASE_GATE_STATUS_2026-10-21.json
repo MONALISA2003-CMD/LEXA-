@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "project": "LEXA",
+  "phase": 6,
+  "increment": "6.1-inventory-intelligence",
+  "assessment_date": "2026-10-21",
+  "candidate_status": "LOCAL_SOURCE_CANDIDATE",
+  "production_release_accepted": false,
+  "phase3_six_source_recovery_gate": {
+    "status": "CLOSED_BY_PERMANENT_DISPOSITION",
+    "approved_in_phase": 3,
+    "historical_bytes_recovered": false,
+    "routine_recovery_search_required": false,
+    "authoritative_register": "migrations/migration_dispositions.json"
+  },
+  "source_reconciliation": {
+    "status": "PASS",
+    "observed_full_ledger_identity_count": 31,
+    "canonical_sources_present": 25,
+    "permanently_replaced_histories": 6,
+    "numeric_prefix_collisions": [
+      "023",
+      "029"
+    ],
+    "historical_byte_parity_claimed": false,
+    "semantic_replay_status": "PENDING_CI_DISPOSABLE_POSTGRES"
+  },
+  "phase6_increment_01": {
+    "feature": "Location/variant replenishment policies and explainable advisory reorder recommendations",
+    "migration": "036_phase6_inventory_intelligence.sql",
+    "production_migration_applied": false,
+    "purchase_orders_created_by_recommendations": false,
+    "stock_movements_created_by_recommendations": false
+  },
+  "local_validation": {
+    "python_compileall": "PASS",
+    "backend_tests": {
+      "passed": 182,
+      "failed": 0,
+      "skipped": 1,
+      "skip_reason": "Redis package unavailable in offline local environment; CI provisions Redis and must execute the test"
+    },
+    "frontend_contract_tests": {
+      "passed": 28,
+      "failed": 0,
+      "runtime": "Node 22.16.0",
+      "browser_e2e": false
+    },
+    "migration_recovery_manifest": "PASS",
+    "strict_migration_source_reconciliation": "PASS_HISTORICAL_RECOVERY_GATE_CLOSED_SEMANTIC_GATE_PENDING",
+    "clean_replay_plan_only": {
+      "status": "PASS",
+      "sql_input_count": 40,
+      "sql_executed": false,
+      "migration_bundle_sha256": "62c1589520a832973d620417c4a677b1a35f10d4359582c61dcb16df498b13a7"
+    },
+    "node24_install_typecheck_build": "NOT_VERIFIED_LOCAL_OFFLINE_ENVIRONMENT",
+    "authenticated_staging_e2e": "NOT_RUN_NO_SANITIZED_ISOLATED_STAGING"
+  },
+  "deployment_and_database": {
+    "observed_baseline_sha": "a6acc0eb53660ea938a314640bf28283ae2a98a8",
+    "candidate_committed": false,
+    "candidate_deployed": false,
+    "production_schema_mutated": false,
+    "candidate_migrations_033_036_applied": false,
+    "required_next_evidence": [
+      "Complete Redis-backed backend CI against candidate SHA",
+      "Node 24 npm ci, typecheck, frontend contracts and production build against candidate SHA",
+      "Successful 40-step disposable SQL replay with complete same-SHA evidence and runtime RLS probe",
+      "Authenticated browser E2E in sanitized isolated staging",
+      "Exact-SHA Render/Vercel deployment parity and readiness checks",
+      "Explicitly approved production migration rollout and rollback plan"
+    ]
+  }
+}

@@ -1,6 +1,14 @@
-## Phase 5 Increment 03 — review candidate (2026-10-21)
+# LEXA — Phase 6 Increment 01 inventory-intelligence source handoff (21 October 2026)
 
-The latest deployed baseline SHA `779f8fe5dc704411b9abab371a29311e7dbc844a` is live on Render and READY on Vercel. The full-source candidate now includes refund/return settlement reconciliation, no-refund receivable guarding, return accounting/COGS journals, store-credit liability, optional EFRIS credit notes and the related UI/tests. It is not yet committed or deployed. See `PHASE5_INCREMENT_03_IMPLEMENTATION_REPORT_2026-10-21.md` and `PHASE5_FINAL_GATE_REPORT_2026-10-21.md` for exact evidence and remaining gates.
+**Authoritative current status:** Phase 3 permanently approved replacements for six lost SQL source files. Historical recovery for those six is closed and must not return as a blocker. `scripts/check_migration_sources.py --strict` now passes with that disposition; clean semantic replay remains a separate CI gate. The current 31-entry read-only production ledger snapshot is `migrations/live_ledger_snapshot_2026-10-21.json`; two current applied sources (029 runtime privilege surface and 031 auth-surface RLS) have been recovered from GitHub and restored.
+
+Phase 6 is **Inventory Intelligence**. Increment 01 implements tenant/location-scoped replenishment policies and transparent, advisory reorder recommendations. It does not post stock movements or purchasing actions. See `PHASE6_IMPLEMENTATION_REPORT_2026-10-21.md`, `PHASE6_ACCEPTANCE_MATRIX.md`, and `PHASE6_ENTRY_POLICY.md`.
+
+**Candidate only:** Python compile/source integrity/strict source reconciliation/replay plan and local contract tests pass. The local backend suite is 182 passed / 1 skipped because Redis cannot be installed in this offline environment; frontend contracts are 28/28 under Node 22.16.0. Actual clean PostgreSQL replay, Node 24 install/typecheck/build, authenticated staging E2E, same-SHA deployments and approved production migrations still need CI/staging evidence. No production SQL or deploy was run for this candidate.
+
+> Older sections below are dated historical handoff snapshots. Any old statement that the six files must still be recovered before strict source reconciliation can pass is superseded by the Phase 3 permanent decision above and `migrations/migration_dispositions.json`.
+
+## LEXA — background and historical handoffs
 
 # LEXA — v2.9.0 Phase 1 UX Foundation Handoff
 
@@ -108,3 +116,9 @@ See `docs/PHASE1_SECURITY_STABILITY_RUNBOOK.md` and `docs/PHASE1_SECURITY_STABIL
 ## Phase 0–2 closure evidence (2026-10-20)
 
 See [`reports/LEXA_Phase0-2_Closure_Increment_08_2026-10-20.md`](reports/LEXA_Phase0-2_Closure_Increment_08_2026-10-20.md) for the historical ZIP scan, isolated replay results, CI/hosting access blockers and Phase 3 re-entry gates. The six missing SQL sources remain explicitly unresolved; reconstructed equivalents are isolated under `migrations/reconstructed/` and do not satisfy exact source recovery.
+
+
+## Historical Phase 5 core-hardening candidate (2026-10-21 — superseded)
+
+This section records a previous candidate snapshot only. Its test counts, version, and blocker language are historical and are not the current source of truth. The current candidate is **2.10.0+phase6.increment01**. Read `PHASE6_IMPLEMENTATION_REPORT_2026-10-21.md`, `PHASE6_RELEASE_GATE_STATUS_2026-10-21.json`, and `PHASE6_ENTRY_POLICY.md` for current evidence. In particular, the six Phase 3 source recovery tasks are permanently dispositioned as replacements; they must not be reopened. Clean semantic replay, Node 24 CI, authenticated isolated staging, candidate-specific deployment parity, and approved production migration rollout remain separate release gates.
+

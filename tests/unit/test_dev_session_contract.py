@@ -39,10 +39,15 @@ def test_browser_session_restoration_uses_refresh_cookie_not_persistent_access_t
 
 def test_authentication_surface_has_safe_refresh_and_rate_limits():
     auth = AUTH.read_text()
+    shared_auth = (ROOT / "apps/api/app/auth.py").read_text()
     assert "_enforce_login_rate_limit" in auth
     assert "_enforce_registration_rate_limit" in auth
     assert "_clear_login_rate_limit" in auth
-    assert 'httponly=True' in auth
-    assert 'samesite="lax"' in auth
+    # Cookie attributes are intentionally centralized in app.auth so login,
+    # refresh, and workspace-switch routes cannot drift. Assert the import and
+    # the shared helper instead of looking for its body in the route module.
+    assert "_set_refresh_cookie" in auth
+    assert 'httponly=True' in shared_auth
+    assert 'samesite="lax"' in shared_auth
     assert 'return {\n        "access_token"' in auth
     assert '"refresh_token": refresh' not in auth

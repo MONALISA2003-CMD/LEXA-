@@ -1,49 +1,89 @@
 {
-  "schema_version": 1,
-  "purpose": "Track the exact applied live migration SQL sources that remain unavailable from the supplied package and inspectable GitHub history. Never reconstruct missing historical migrations from schema inference.",
-  "status": "BLOCKS_REPRODUCIBLE_FROM_ZERO_MIGRATION_REPLAY",
+  "schema_version": 2,
+  "purpose": "Track permanent dispositions for historically unrecoverable SQL source bytes separately from semantic validation of forward replacement migrations.",
+  "status": "HISTORICAL_RECOVERY_CLOSED_BY_PERMANENT_REPLACEMENT; SEMANTIC_VALIDATION_SEPARATE",
   "gaps": [
     {
       "version": "010_phase2_catalog_intelligence",
       "expected_path": "migrations/010_phase2_catalog_intelligence.sql",
-      "reason": "Recorded in the live ledger and README, but exact SQL was absent from the ZIP and the inspected GitHub revision.",
-      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact; do not recreate from schema inference."
+      "reason": "Exact historical SQL bytes were not recovered after the Phase 3 recovery process; the project explicitly approved permanent replacement.",
+      "next_step": "Do not search for these historical bytes again as a release blocker. Validate the maintained equivalent in the canonical clean-replay and schema/security contract gates.",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "recovery_status": "CLOSED_NO_FURTHER_SEARCH",
+      "replacement_path": "migrations/reconstructed/010_phase2_catalog_intelligence.equivalent.sql",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "historical_bytes_recovered": false
     },
     {
       "version": "011_phase2_catalog_runtime_constraints",
       "expected_path": "migrations/011_phase2_catalog_runtime_constraints.sql",
-      "reason": "Recorded in the live ledger and README, but exact SQL was absent from the ZIP and the inspected GitHub revision.",
-      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact; do not recreate from schema inference."
+      "reason": "Exact historical SQL bytes were not recovered after the Phase 3 recovery process; the project explicitly approved permanent replacement.",
+      "next_step": "Do not search for these historical bytes again as a release blocker. Validate the maintained equivalent in the canonical clean-replay and schema/security contract gates.",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "recovery_status": "CLOSED_NO_FURTHER_SEARCH",
+      "replacement_path": "migrations/reconstructed/011_phase2_catalog_runtime_constraints.equivalent.sql",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "historical_bytes_recovered": false
     },
     {
       "version": "023_phase4_purchasing_core",
       "expected_path": "migrations/023_phase4_purchasing_core.sql",
-      "reason": "Present in the live ledger but absent from the source package; it shares numeric prefix 023 with a distinct identity migration.",
-      "next_step": "Recover the exact applied SQL, retain its full historical version string, and ensure tooling treats full version strings as identities."
+      "reason": "Exact historical SQL bytes were not recovered after the Phase 3 recovery process; the project explicitly approved permanent replacement.",
+      "next_step": "Do not search for these historical bytes again as a release blocker. Validate the maintained equivalent in the canonical clean-replay and schema/security contract gates.",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "recovery_status": "CLOSED_NO_FURTHER_SEARCH",
+      "replacement_path": "migrations/reconstructed/023_phase4_purchasing_core.equivalent.sql",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "historical_bytes_recovered": false
     },
     {
       "version": "024_phase4_purchasing_security",
       "expected_path": "migrations/024_phase4_purchasing_security.sql",
-      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
-      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+      "reason": "Exact historical SQL bytes were not recovered after the Phase 3 recovery process; the project explicitly approved permanent replacement.",
+      "next_step": "Do not search for these historical bytes again as a release blocker. Validate the maintained equivalent in the canonical clean-replay and schema/security contract gates.",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "recovery_status": "CLOSED_NO_FURTHER_SEARCH",
+      "replacement_path": "migrations/reconstructed/024_phase4_purchasing_security.equivalent.sql",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "historical_bytes_recovered": false
     },
     {
       "version": "025_phase4_purchasing_permissions",
       "expected_path": "migrations/025_phase4_purchasing_permissions.sql",
-      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
-      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+      "reason": "Exact historical SQL bytes were not recovered after the Phase 3 recovery process; the project explicitly approved permanent replacement.",
+      "next_step": "Do not search for these historical bytes again as a release blocker. Validate the maintained equivalent in the canonical clean-replay and schema/security contract gates.",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "recovery_status": "CLOSED_NO_FURTHER_SEARCH",
+      "replacement_path": "migrations/reconstructed/025_phase4_purchasing_permissions.equivalent.sql",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "historical_bytes_recovered": false
     },
     {
       "version": "026_phase4_membership_branch_integrity",
       "expected_path": "migrations/026_phase4_membership_branch_integrity.sql",
-      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
-      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+      "reason": "Exact historical SQL bytes were not recovered after the Phase 3 recovery process; the project explicitly approved permanent replacement.",
+      "next_step": "Do not search for these historical bytes again as a release blocker. Validate the maintained equivalent in the canonical clean-replay and schema/security contract gates.",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "recovery_status": "CLOSED_NO_FURTHER_SEARCH",
+      "replacement_path": "migrations/reconstructed/026_phase4_membership_branch_integrity.equivalent.sql",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "historical_bytes_recovered": false
     }
   ],
   "numeric_prefix_collisions": {
     "023": [
       "023_phase2_identity_tenancy_authorization_foundation",
       "023_phase4_purchasing_core"
+    ],
+    "029": [
+      "029_phase1_runtime_role_least_privilege",
+      "029_phase3_runtime_privilege_surface"
     ]
   },
   "recovered_sources": [
@@ -57,6 +97,26 @@
       "sha256": "404334dde3e34a80d3176b1ba38347eb1def3cc8793f6b52d3a663cbc05b19cd",
       "size_bytes": 16980,
       "verification": "Recovered source bytes recompute to the original Git blob SHA-1 and documented SHA-256. Database ledger records the full version but does not record a source checksum, so this proves artifact provenance, not an independent DB-side checksum of applied bytes."
+    },
+    {
+      "version": "029_phase3_runtime_privilege_surface",
+      "path": "migrations/029_phase3_runtime_privilege_surface.sql",
+      "source_repository": "MONALISA2003-CMD/LEXA-",
+      "source_ref": "main",
+      "git_blob_sha1": "43ed181f1c60722d4f14121f6743ebe994f018bf",
+      "sha256": "bd7677c11d008ea4b6fac95dbff374cdf9db7f49629c7edbe28a4250e70e6c59",
+      "size_bytes": 1536,
+      "verification": "Fetched from current GitHub main contents API; Git blob SHA-1 matches connector blob identifier."
+    },
+    {
+      "version": "031_phase3_auth_surface_rls",
+      "path": "migrations/031_phase3_auth_surface_rls.sql",
+      "source_repository": "MONALISA2003-CMD/LEXA-",
+      "source_ref": "main",
+      "git_blob_sha1": "835df668f49b684a66df781d561eb914f30cffc6",
+      "sha256": "0e887fd1f3b56c147d8658fc9f32a0f3804be2c8ffc283a28693ba6953abaa53",
+      "size_bytes": 4083,
+      "verification": "Fetched from current GitHub main contents API; Git blob SHA-1 matches connector blob identifier."
     }
   ]
 }
