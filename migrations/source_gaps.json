@@ -1,8 +1,45 @@
 {
   "schema_version": 1,
-  "purpose": "Track migration source availability and explicitly accepted replacements. Original historical bytes for listed replacements are declared lost and are not claimed to be recovered.",
-  "status": "ACCEPTED_REPLACEMENTS_REQUIRE_REPLAY_AND_SCHEMA_PARITY",
-  "gaps": [],
+  "purpose": "Track the exact applied live migration SQL sources that remain unavailable from the supplied package and inspectable GitHub history. Never reconstruct missing historical migrations from schema inference.",
+  "status": "BLOCKS_REPRODUCIBLE_FROM_ZERO_MIGRATION_REPLAY",
+  "gaps": [
+    {
+      "version": "010_phase2_catalog_intelligence",
+      "expected_path": "migrations/010_phase2_catalog_intelligence.sql",
+      "reason": "Recorded in the live ledger and README, but exact SQL was absent from the ZIP and the inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact; do not recreate from schema inference."
+    },
+    {
+      "version": "011_phase2_catalog_runtime_constraints",
+      "expected_path": "migrations/011_phase2_catalog_runtime_constraints.sql",
+      "reason": "Recorded in the live ledger and README, but exact SQL was absent from the ZIP and the inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact; do not recreate from schema inference."
+    },
+    {
+      "version": "023_phase4_purchasing_core",
+      "expected_path": "migrations/023_phase4_purchasing_core.sql",
+      "reason": "Present in the live ledger but absent from the source package; it shares numeric prefix 023 with a distinct identity migration.",
+      "next_step": "Recover the exact applied SQL, retain its full historical version string, and ensure tooling treats full version strings as identities."
+    },
+    {
+      "version": "024_phase4_purchasing_security",
+      "expected_path": "migrations/024_phase4_purchasing_security.sql",
+      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+    },
+    {
+      "version": "025_phase4_purchasing_permissions",
+      "expected_path": "migrations/025_phase4_purchasing_permissions.sql",
+      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+    },
+    {
+      "version": "026_phase4_membership_branch_integrity",
+      "expected_path": "migrations/026_phase4_membership_branch_integrity.sql",
+      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+    }
+  ],
   "numeric_prefix_collisions": {
     "023": [
       "023_phase2_identity_tenancy_authorization_foundation",
@@ -21,66 +58,5 @@
       "size_bytes": 16980,
       "verification": "Recovered source bytes recompute to the original Git blob SHA-1 and documented SHA-256. Database ledger records the full version but does not record a source checksum, so this proves artifact provenance, not an independent DB-side checksum of applied bytes."
     }
-  ],
-  "replacements": [
-    {
-      "version": "010_phase2_catalog_intelligence",
-      "expected_path": "migrations/010_phase2_catalog_intelligence.sql",
-      "replacement_sha256": "73acfe30a17d77a42a8b333e08b10c284663549002dd5c028d9b4cd668ee2ae5",
-      "original_source_status": "LOST_DECLARED",
-      "accepted_at": "2026-10-21",
-      "reason": "Historical source declared lost by project owner; accepted reconstructed equivalent is explicitly labelled and hash-pinned for future clean replay.",
-      "replay_gate": "Requires clean replay and live-schema parity before release."
-    },
-    {
-      "version": "011_phase2_catalog_runtime_constraints",
-      "expected_path": "migrations/011_phase2_catalog_runtime_constraints.sql",
-      "replacement_sha256": "b9068c277a3da9647e71d116cfd4035888c7f9c82823746deacd8fa9b3600c88",
-      "original_source_status": "LOST_DECLARED",
-      "accepted_at": "2026-10-21",
-      "reason": "Historical source declared lost by project owner; accepted reconstructed equivalent is explicitly labelled and hash-pinned for future clean replay.",
-      "replay_gate": "Requires clean replay and live-schema parity before release."
-    },
-    {
-      "version": "023_phase4_purchasing_core",
-      "expected_path": "migrations/023_phase4_purchasing_core.sql",
-      "replacement_sha256": "1436db2391d031661a550c27d3b579779e0eb0286e280816c43078de22572196",
-      "original_source_status": "LOST_DECLARED",
-      "accepted_at": "2026-10-21",
-      "reason": "Historical source declared lost by project owner; accepted reconstructed equivalent is explicitly labelled and hash-pinned for future clean replay.",
-      "replay_gate": "Requires clean replay and live-schema parity before release."
-    },
-    {
-      "version": "024_phase4_purchasing_security",
-      "expected_path": "migrations/024_phase4_purchasing_security.sql",
-      "replacement_sha256": "57cafda92ba4085095336738770011d4eb15a723cda80eeea9434900c2e7146a",
-      "original_source_status": "LOST_DECLARED",
-      "accepted_at": "2026-10-21",
-      "reason": "Historical source declared lost by project owner; accepted reconstructed equivalent is explicitly labelled and hash-pinned for future clean replay.",
-      "replay_gate": "Requires clean replay and live-schema parity before release."
-    },
-    {
-      "version": "025_phase4_purchasing_permissions",
-      "expected_path": "migrations/025_phase4_purchasing_permissions.sql",
-      "replacement_sha256": "e5f4639dd45470f803a8a66dba5a5301c560ebbfbd440027e577018fdcae7094",
-      "original_source_status": "LOST_DECLARED",
-      "accepted_at": "2026-10-21",
-      "reason": "Historical source declared lost by project owner; accepted reconstructed equivalent is explicitly labelled and hash-pinned for future clean replay.",
-      "replay_gate": "Requires clean replay and live-schema parity before release."
-    },
-    {
-      "version": "026_phase4_membership_branch_integrity",
-      "expected_path": "migrations/026_phase4_membership_branch_integrity.sql",
-      "replacement_sha256": "856582248c3b80518e20466215c847946d44be3d35d16e5505debc334af83011",
-      "original_source_status": "LOST_DECLARED",
-      "accepted_at": "2026-10-21",
-      "reason": "Historical source declared lost by project owner; accepted reconstructed equivalent is explicitly labelled and hash-pinned for future clean replay.",
-      "replay_gate": "Requires clean replay and live-schema parity before release."
-    }
-  ],
-  "decision": {
-    "date": "2026-10-21",
-    "decision": "The six original historical SQL files are declared lost. Their labelled, checksum-pinned equivalents are accepted as replacement source for reproducible replay; historical byte provenance remains unresolved by design.",
-    "approved_by": "project owner in conversation"
-  }
+  ]
 }

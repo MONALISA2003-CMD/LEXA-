@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from .config import settings
 from .health import check_database, check_redis
-from .routes import auth, organization, rbac, catalog, inventory, commerce, finance, analytics
+from .routes import auth, organization, rbac, catalog, inventory, commerce, finance, analytics, workspace_context, membership_admin
 from .kernel import router as kernel_router
 
 app = FastAPI(title="LEXA API", version="1.0.0")
@@ -53,6 +53,9 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(organization.router, prefix="/api/v1")
+app.include_router(workspace_context.router, prefix="/api/v1")
+app.include_router(membership_admin.members_router, prefix="/api/v1")
+app.include_router(membership_admin.invitations_router, prefix="/api/v1")
 app.include_router(rbac.router, prefix="/api/v1")
 app.include_router(catalog.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")

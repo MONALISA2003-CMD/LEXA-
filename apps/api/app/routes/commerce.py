@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..catalog import begin_idempotency, emit_event, finish_idempotency, write_audit
+from ..commerce_rules import remaining_refund_balance
 from ..branch_access import ensure_branch_access, ensure_location_access, require_full_branch_scope
 from ..dependencies import require_permission
 from ..inventory import post_ledger, tenant_location, tenant_variant
@@ -347,7 +348,39 @@ def get_sale(sale_id: UUID, ctx=Depends(require_permission("sales.read"))):
       FROM transaction_lines tl LEFT JOIN product_variants pv ON pv.id=tl.product_variant_id AND pv.tenant_id=tl.tenant_id
       WHERE tl.tenant_id=:t AND tl.transaction_id=:tx ORDER BY tl.line_no
     """),{"t":str(tenant_id),"tx":str(sale["transaction_id"])}).mappings().all()
-    result=out(sale); result["lines"]=[out(x) for x in lines]; return result
+    payments=db.execute(text("""
+      SELECT p.id,p.payment_channel_id,pc.name channel_name,p.amount AS payment_amount,pa.amount AS allocated_amount,
+             p.currency_code,p.method,p.reference,p.business_date,p.paid_at,p.status,
+             CASE WHEN pa.sale_id IS NOT NULL THEN 'SALE' ELSE 'RECEIVABLE' END allocation_type
+      FROM payment_allocations pa
+      JOIN payments p ON p.id=pa.payment_id AND p.tenant_id=pa.tenant_id
+      LEFT JOIN payment_channels pc ON pc.id=p.payment_channel_id AND pc.tenant_id=p.tenant_id
+      LEFT JOIN receivables r ON r.id=pa.receivable_id AND r.tenant_id=pa.tenant_id
+      WHERE pa.tenant_id=:t AND pa.status='RECORDED' AND p.status='RECORDED'
+        AND (pa.sale_id=:s OR r.sale_id=:s)
+      ORDER BY p.paid_at,p.id
+    """),{"t":str(tenant_id),"s":str(sale_id)}).mappings().all()
+    returns=db.execute(text("""
+      SELECT sr.id,sr.sale_id,sr.status,sr.reason,sr.total,sr.completed_at,sr.created_at,
+             COALESCE((SELECT SUM(rr.amount) FROM refund_records rr WHERE rr.return_id=sr.id AND rr.tenant_id=sr.tenant_id AND rr.status='RECORDED'),0) refunded,
+             COALESCE((SELECT MAX(cc.balance) FROM customer_credits cc WHERE cc.source_return_id=sr.id AND cc.tenant_id=sr.tenant_id),0) credit_balance
+      FROM sale_returns sr WHERE sr.tenant_id=:t AND sr.sale_id=:s
+      ORDER BY sr.created_at,sr.id
+    """),{"t":str(tenant_id),"s":str(sale_id)}).mappings().all()
+    refunds=db.execute(text("""
+      SELECT rr.id,rr.return_id,rr.payment_channel_id,pc.name channel_name,rr.amount,rr.currency_code,rr.reference,rr.business_date,rr.status,sr.reason
+      FROM refund_records rr
+      JOIN sale_returns sr ON sr.id=rr.return_id AND sr.tenant_id=rr.tenant_id
+      LEFT JOIN payment_channels pc ON pc.id=rr.payment_channel_id AND pc.tenant_id=rr.tenant_id
+      WHERE rr.tenant_id=:t AND sr.sale_id=:s
+      ORDER BY rr.business_date,rr.id
+    """),{"t":str(tenant_id),"s":str(sale_id)}).mappings().all()
+    result=out(sale)
+    result["lines"]=[out(x) for x in lines]
+    result["payments"]=[out(x) for x in payments]
+    result["returns"]=[out(x) for x in returns]
+    result["refunds"]=[out(x) for x in refunds]
+    return result
 
 
 @router.post("/sales", status_code=201)
@@ -582,14 +615,23 @@ class ReturnCreate(Strict):
 
 @router.get("/returns")
 def list_returns(ctx=Depends(require_permission("returns.manage"))):
-    db,_,tenant_id,_=ctx
+    db,actor_id,tenant_id,_=ctx
     rows=db.execute(text("""
       SELECT sr.id,sr.sale_id,sr.status,sr.reason,sr.total,sr.completed_at,sr.created_at,
              COALESCE((SELECT SUM(rr.amount) FROM refund_records rr WHERE rr.return_id=sr.id AND rr.tenant_id=sr.tenant_id AND rr.status='RECORDED'),0) refunded,
              COALESCE((SELECT MAX(cc.balance) FROM customer_credits cc WHERE cc.source_return_id=sr.id AND cc.tenant_id=sr.tenant_id),0) credit_balance
       FROM sale_returns sr
-      WHERE sr.tenant_id=:t ORDER BY sr.created_at DESC LIMIT 200
-    """),{"t":str(tenant_id)}).mappings().all()
+      JOIN sales s ON s.id=sr.sale_id AND s.tenant_id=sr.tenant_id
+      WHERE sr.tenant_id=:t AND EXISTS (
+        SELECT 1 FROM tenant_memberships tm
+        JOIN membership_branch_assignments mba ON mba.membership_id=tm.id AND mba.tenant_id=tm.tenant_id
+        JOIN branches b ON b.id=mba.branch_id AND b.tenant_id=mba.tenant_id
+        WHERE tm.tenant_id=sr.tenant_id AND tm.user_id=:u
+          AND tm.status='ACTIVE' AND mba.status='ACTIVE' AND b.status='ACTIVE'
+          AND b.id=s.branch_id
+      )
+      ORDER BY sr.created_at DESC LIMIT 200
+    """),{"t":str(tenant_id),"u":str(actor_id)}).mappings().all()
     return [out(x) for x in rows]
 
 @router.post("/sales/{sale_id}/returns", status_code=201)
@@ -625,7 +667,16 @@ def create_return(sale_id: UUID, body: ReturnCreate, idempotency_key: str | None
         total=q(total)
         remaining_sales_value=q(Decimal(str(sale["total"]))-Decimal(str(sale["return_adjustment_amount"])))
         if total<=0 or total>remaining_sales_value: raise HTTPException(422,"Return total is outside the remaining sale value")
-        if body.settlement_type=='REFUND' and total>Decimal(str(sale["amount_paid"])): raise HTTPException(422,"Refund cannot exceed the amount collected for this sale")
+        if body.settlement_type=='REFUND':
+            prior_refunds=db.execute(text("""
+              SELECT COALESCE(SUM(rr.amount),0)
+              FROM refund_records rr
+              JOIN sale_returns prior_return ON prior_return.id=rr.return_id AND prior_return.tenant_id=rr.tenant_id
+              WHERE rr.tenant_id=:t AND prior_return.sale_id=:s AND rr.status='RECORDED'
+            """),{"t":str(tenant_id),"s":str(sale_id)}).scalar_one()
+            refundable_balance=remaining_refund_balance(sale["amount_paid"],prior_refunds)
+            if total>refundable_balance:
+                raise HTTPException(422,"Refund exceeds the remaining collected amount after previous refunds")
         tx_ref=f"RET-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8].upper()}"
         tx=BusinessTransaction(tenant_id=tenant_id,transaction_type="SALE_RETURN",reference=tx_ref,status="DRAFT",party_id=sale["customer_party_id"],branch_id=sale["branch_id"],total_amount=total,currency_code=sale["currency_code"],occurred_at=datetime.now(timezone.utc),metadata_json={"source":"commerce","sale_id":str(sale_id)})
         db.add(tx); db.flush()

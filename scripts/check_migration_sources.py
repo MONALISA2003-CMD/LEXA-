@@ -1,75 +1,84 @@
 #!/usr/bin/env python3
-"""Verify live migration identities have canonical SQL or documented source loss."""
+"""Check that every observed live migration is sourced or an explicit tracked gap.
+
+This is a local source-integrity check; it does not connect to Neon. The JSON
+ledger is a dated read-only snapshot. Pass --strict to fail while gaps remain.
+"""
 from __future__ import annotations
-import argparse, hashlib, json, sys
+
+import argparse
+import json
+import sys
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "migrations"
-SNAPSHOT_PATH = MIGRATIONS / "live_ledger_snapshot_2026-10-21.json"
-MANIFEST_PATH = MIGRATIONS / "source_gaps.json"
-BANNER = "-- ACCEPTED REPLACEMENT — ORIGINAL HISTORICAL SOURCE LOST; NOT BYTE-IDENTICAL.\n"
+SNAPSHOT_PATH = MIGRATIONS / "live_ledger_snapshot_2026-10-15.json"
+GAPS_PATH = MIGRATIONS / "source_gaps.json"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--strict", action="store_true", help="fail on unresolved missing migration paths")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="return failure if any applied live migration source remains missing",
+    )
     args = parser.parse_args()
+
     snapshot = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
-    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    versions = [row["version"] for row in snapshot["migrations"]]
-    if len(versions) != len(set(versions)):
-        print("ERROR: duplicate full migration identities in live ledger snapshot", file=sys.stderr); return 2
-    gaps = manifest.get("gaps", [])
-    replacements = manifest.get("replacements", [])
-    gap_map = {row["version"]: row for row in gaps}
-    replacement_map = {row["version"]: row for row in replacements}
-    if len(gap_map) != len(gaps) or len(replacement_map) != len(replacements):
-        print("ERROR: duplicate source gap or replacement identity", file=sys.stderr); return 2
-    if set(gap_map) & set(replacement_map):
-        print("ERROR: a migration cannot be both a gap and accepted replacement", file=sys.stderr); return 2
-    ledger = set(versions)
-    if (set(gap_map) | set(replacement_map)) - ledger:
-        print("ERROR: manifest references migration identities absent from the live ledger snapshot", file=sys.stderr); return 2
-    missing = []
-    canonical = 0
-    checked = 0
-    for version in versions:
-        path = MIGRATIONS / f"{version}.sql"
-        if version in replacement_map:
-            entry = replacement_map[version]
-            if entry.get("expected_path") != str(path.relative_to(ROOT)):
-                print(f"ERROR: wrong replacement path for {version}", file=sys.stderr); return 2
-            if not path.is_file():
-                missing.append(version); continue
-            raw = path.read_bytes()
-            if not raw.startswith(BANNER.encode("utf-8")):
-                print(f"ERROR: accepted replacement banner missing for {version}", file=sys.stderr); return 2
-            if entry.get("original_source_status") != "LOST_DECLARED":
-                print(f"ERROR: replacement source-loss decision missing for {version}", file=sys.stderr); return 2
-            expected = entry.get("replacement_sha256")
-            actual = hashlib.sha256(raw).hexdigest()
-            if not expected or actual != expected:
-                print(f"ERROR: replacement checksum mismatch for {version}", file=sys.stderr); return 2
-            checked += 1
-        elif path.is_file():
-            if version in gap_map:
-                print(f"ERROR: {version} is marked as a gap but a file exists; reconcile manifest", file=sys.stderr); return 2
-            canonical += 1
-        else:
-            entry = gap_map.get(version)
-            if not entry or entry.get("expected_path") != str(path.relative_to(ROOT)) or not entry.get("reason"):
-                print(f"ERROR: undocumented missing migration source: {version}", file=sys.stderr); return 2
-            missing.append(version)
-    for prefix, listed in manifest.get("numeric_prefix_collisions", {}).items():
-        actual = sorted(v for v in versions if v.split("_", 1)[0] == prefix)
-        if sorted(listed) != actual:
-            print(f"ERROR: numeric-prefix collision manifest drift for {prefix}: {actual}", file=sys.stderr); return 2
-    print(f"Live migration identities checked: {len(versions)}; canonical sources: {canonical}; accepted replacements checksum-verified: {checked}; unresolved source paths: {len(missing)}.")
-    if checked:
-        print("Historical SQL bytes for accepted replacements are declared lost; replacements are not represented as byte-identical originals.")
+    gap_manifest = json.loads(GAPS_PATH.read_text(encoding="utf-8"))
+    ledger_versions = [row["version"] for row in snapshot["migrations"]]
+    if len(ledger_versions) != len(set(ledger_versions)):
+        print("ERROR: duplicate full migration version strings in the snapshot", file=sys.stderr)
+        return 2
+
+    gap_rows = gap_manifest["gaps"]
+    gap_by_version = {row["version"]: row for row in gap_rows}
+    if len(gap_by_version) != len(gap_rows):
+        print("ERROR: source_gaps.json contains duplicate versions", file=sys.stderr)
+        return 2
+
+    ledger_set = set(ledger_versions)
+    unknown_gaps = sorted(set(gap_by_version) - ledger_set)
+    if unknown_gaps:
+        print("ERROR: source gaps not present in observed ledger: " + ", ".join(unknown_gaps), file=sys.stderr)
+        return 2
+
+    missing: list[str] = []
+    for version in ledger_versions:
+        source_path = MIGRATIONS / f"{version}.sql"
+        if source_path.is_file():
+            if version in gap_by_version:
+                print(f"ERROR: {version} is still marked as a gap but source now exists: {source_path}", file=sys.stderr)
+                return 2
+            continue
+        entry = gap_by_version.get(version)
+        if not entry:
+            print(f"ERROR: missing source is not documented: {version} -> {source_path.relative_to(ROOT)}", file=sys.stderr)
+            return 2
+        if entry.get("expected_path") != str(source_path.relative_to(ROOT)) or not entry.get("reason") or not entry.get("next_step"):
+            print(f"ERROR: incomplete/wrong gap documentation for {version}", file=sys.stderr)
+            return 2
+        missing.append(version)
+
+    for prefix, versions in gap_manifest.get("numeric_prefix_collisions", {}).items():
+        actual = sorted(v for v in ledger_versions if v.split("_", 1)[0] == prefix)
+        if sorted(versions) != actual:
+            print(f"ERROR: numeric prefix collision manifest drift for {prefix}: expected {actual}, got {versions}", file=sys.stderr)
+            return 2
+
+    print(f"Observed ledger snapshot: {snapshot['snapshot_date']} ({len(ledger_versions)} migration rows).")
     if missing:
-        print("UNRESOLVED MIGRATION SOURCE PATHS: " + ", ".join(missing))
-        if args.strict:
-            print("Strict migration-source gate: BLOCKED."); return 1
-    print("Migration source availability gate: PASS. Clean replay and live-schema parity remain separate release gates.")
+        print(f"SOURCE GAPS ({len(missing)}):")
+        for version in missing:
+            print(f"  - {version}: {gap_by_version[version]['expected_path']}")
+        print("Strict replay is BLOCKED until the exact historical SQL sources are recovered.")
+        return 1 if args.strict else 0
+
+    print("All observed ledger versions have matching SQL source files.")
     return 0
+
+
 if __name__ == "__main__":
     raise SystemExit(main())

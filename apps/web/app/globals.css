@@ -845,3 +845,13 @@ input, select, textarea { accent-color: var(--blue); }
 @media (max-width: 900px) { .sales-history-filters { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 520px) { .sales-history-filters { grid-template-columns: minmax(0,1fr); } .sale-detail-totals { grid-template-columns: minmax(0,1fr); } .cart-line label { width: calc(50% - 8px); } .sale-detail-panel { padding: 12px; } }
 @media print { body * { visibility: hidden !important; } .sale-detail-panel, .sale-detail-panel * { visibility: visible !important; } .sale-detail-panel { position: absolute; inset: 0; width: 100%; border: 0; } .sale-detail-panel button { display: none !important; } }
+
+
+/* Phase 5 Increment 02 — auditable payment and return details. */
+.sale-audit-ledger { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+.sale-audit-section { min-width: 0; border: 1px solid var(--border, #d8dde6); border-radius: 0.75rem; padding: 1rem; }
+.sale-audit-section h4 { margin: 0 0 0.75rem; font-weight: 700; }
+.sale-audit-section .workflow-row { flex-wrap: wrap; gap: 0.5rem 0.75rem; }
+.refund-ledger { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border, #d8dde6); }
+@media (max-width: 700px) { .sale-audit-ledger { grid-template-columns: minmax(0, 1fr); } }
+@media print { .sale-audit-ledger { break-inside: avoid; } .sale-audit-section { break-inside: avoid; } }

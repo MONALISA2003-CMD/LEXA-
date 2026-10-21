@@ -11,6 +11,7 @@ from sqlalchemy import text
 
 from ..catalog import write_audit
 from ..dependencies import require_permission
+from ..branch_access import require_full_branch_scope
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 compliance = APIRouter(prefix="/compliance", tags=["compliance"])
@@ -61,6 +62,7 @@ def out(row: Any) -> dict[str, Any]:
 @router.get("/accounts")
 def accounts(ctx=Depends(require_permission("accounting.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("""
       SELECT id,code,name,account_type,normal_balance,system_key,currency_code,allow_posting,status,created_at,updated_at
       FROM accounting_accounts WHERE tenant_id=:t ORDER BY code
@@ -71,6 +73,7 @@ def accounts(ctx=Depends(require_permission("accounting.read"))):
 @router.post("/accounts", status_code=201)
 def create_account(body: AccountCreate, ctx=Depends(require_permission("accounting.manage"))):
     db, actor, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     try:
         account_id = db.execute(text("""
           INSERT INTO accounting_accounts(tenant_id,code,name,account_type,normal_balance,system_key,currency_code,allow_posting)
@@ -91,6 +94,7 @@ def create_account(body: AccountCreate, ctx=Depends(require_permission("accounti
 @router.get("/periods")
 def periods(ctx=Depends(require_permission("accounting.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("SELECT id,period_name,start_date,end_date,status,closed_at,closed_by,created_at,updated_at FROM accounting_periods WHERE tenant_id=:t ORDER BY start_date DESC"), {"t": str(tenant_id)}).mappings().all()
     return [out(r) for r in rows]
 
@@ -110,6 +114,7 @@ def close_period(period_id: UUID, ctx=Depends(require_permission("periods.manage
 @router.get("/trial-balance")
 def trial_balance(start_date: date, end_date: date, ctx=Depends(require_permission("accounting.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("SELECT * FROM trial_balance(:t,:f,:to)"), {"t": str(tenant_id), "f": start_date, "to": end_date}).mappings().all()
     return [out(r) for r in rows]
 
@@ -117,6 +122,7 @@ def trial_balance(start_date: date, end_date: date, ctx=Depends(require_permissi
 @router.get("/income-statement")
 def income_statement(start_date: date, end_date: date, ctx=Depends(require_permission("accounting.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("SELECT * FROM income_statement(:t,:f,:to)"), {"t": str(tenant_id), "f": start_date, "to": end_date}).mappings().all()
     return [out(r) for r in rows]
 
@@ -124,6 +130,7 @@ def income_statement(start_date: date, end_date: date, ctx=Depends(require_permi
 @router.get("/balance-sheet")
 def balance_sheet(as_of: date, ctx=Depends(require_permission("accounting.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("SELECT * FROM balance_sheet(:t,:d)"), {"t": str(tenant_id), "d": as_of}).mappings().all()
     return [out(r) for r in rows]
 
@@ -131,6 +138,10 @@ def balance_sheet(as_of: date, ctx=Depends(require_permission("accounting.read")
 @router.get("/journal-entries")
 def journal_entries(status: str | None = Query(default=None), ctx=Depends(require_permission("accounting.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
+    # Avoid a nullable placeholder in an ``IS NULL`` predicate: PostgreSQL may
+    # not infer its type for an unfiltered request (status=None). Add the
+    # filter only when the client supplied a status value.
     query = """
       SELECT id,entry_date,source_type,source_id,entry_role,reference,description,currency_code,status,posted_at,posted_by,created_at
       FROM journal_entries WHERE tenant_id=:t
@@ -147,6 +158,7 @@ def journal_entries(status: str | None = Query(default=None), ctx=Depends(requir
 @router.get("/journal-entries/{entry_id}")
 def journal_entry(entry_id: UUID, ctx=Depends(require_permission("accounting.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     header = db.execute(text("SELECT * FROM journal_entries WHERE tenant_id=:t AND id=:id"), {"t": str(tenant_id), "id": str(entry_id)}).mappings().first()
     if not header:
         raise HTTPException(404, "Journal entry not found")
@@ -230,6 +242,7 @@ class TaxConfigCreate(Strict):
 @router.get("/tax-rates")
 def tax_rates(ctx=Depends(require_permission("tax.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("SELECT id,code,name,rate_percent,inclusive,effective_from,effective_to,status,created_at,updated_at FROM tax_rates WHERE tenant_id=:t ORDER BY code"), {"t": str(tenant_id)}).mappings().all()
     return [out(r) for r in rows]
 
@@ -237,6 +250,7 @@ def tax_rates(ctx=Depends(require_permission("tax.read"))):
 @router.post("/tax-rates", status_code=201)
 def create_tax_rate(body: TaxRateCreate, ctx=Depends(require_permission("tax.manage"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     try:
         if body.effective_to and body.effective_to < body.effective_from:
             raise HTTPException(422, "Tax rate end date cannot precede start date")
@@ -255,6 +269,7 @@ def create_tax_rate(body: TaxRateCreate, ctx=Depends(require_permission("tax.man
 @router.get("/tax-configurations")
 def tax_configurations(ctx=Depends(require_permission("tax.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("""
       SELECT tc.id,tc.name,tc.tax_rate_id,tr.code tax_code,tr.rate_percent,tr.inclusive,tc.scope_type,tc.scope_id,tc.effective_from,tc.effective_to,tc.status
       FROM tax_configurations tc JOIN tax_rates tr ON tr.id=tc.tax_rate_id AND tr.tenant_id=tc.tenant_id
@@ -266,6 +281,7 @@ def tax_configurations(ctx=Depends(require_permission("tax.read"))):
 @router.post("/tax-configurations", status_code=201)
 def create_tax_configuration(body: TaxConfigCreate, ctx=Depends(require_permission("tax.manage"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     if body.scope_type == "DEFAULT" and body.scope_id is not None:
         raise HTTPException(422, "Default tax configuration cannot have a scope id")
     if body.scope_type != "DEFAULT" and body.scope_id is None:
@@ -284,6 +300,7 @@ def create_tax_configuration(body: TaxConfigCreate, ctx=Depends(require_permissi
 @router.get("/expenses")
 def expenses(ctx=Depends(require_permission("expenses.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("""
       SELECT er.id,er.expense_date,er.reference,er.description,er.expense_account_id,a.code expense_account_code,a.name expense_account_name,
              er.payment_channel_id,pc.name payment_channel_name,er.currency_code,er.subtotal,er.tax_amount,er.total,er.status,er.journal_entry_id,er.created_at,er.updated_at
@@ -297,6 +314,7 @@ def expenses(ctx=Depends(require_permission("expenses.read"))):
 @router.post("/expenses", status_code=201)
 def create_expense(body: ExpenseCreate, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), ctx=Depends(require_permission("expenses.manage"))):
     db, actor, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     total = body.subtotal + body.tax_amount
     try:
         expense_id = db.execute(text("""
@@ -325,6 +343,7 @@ def post_expense(expense_id: UUID, ctx=Depends(require_permission("expenses.mana
 @compliance.get("/efris/config")
 def efris_config(ctx=Depends(require_permission("efris.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     row = db.execute(text("SELECT id,enabled,integration_mode,registration_status,tin,legal_name,effective_date,created_at,updated_at FROM efris_configurations WHERE tenant_id=:t"), {"t": str(tenant_id)}).mappings().first()
     return out(row) if row else {}
 
@@ -332,6 +351,7 @@ def efris_config(ctx=Depends(require_permission("efris.read"))):
 @compliance.put("/efris/config")
 def update_efris_config(body: EfrisConfigPatch, ctx=Depends(require_permission("efris.manage"))):
     db, actor, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     try:
         row = db.execute(text("""
           INSERT INTO efris_configurations(tenant_id,enabled,integration_mode,registration_status,tin,legal_name,effective_date)
@@ -351,6 +371,9 @@ def update_efris_config(body: EfrisConfigPatch, ctx=Depends(require_permission("
 @compliance.get("/fiscal-documents")
 def fiscal_documents(status: str | None = Query(default=None), ctx=Depends(require_permission("efris.read"))):
     db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
+    # Use the same typed, optional-filter pattern as journal entries; don't
+    # place a null-only test on a bind parameter whose type PostgreSQL cannot infer.
     query = """
       SELECT id,source_type,source_id,document_type,currency_code,issue_date,status,document_number,fdn,verification_code,qr_code,
              efris_reference,response_code,response_message,submitted_at,accepted_at,voided_at,last_error,created_at,updated_at

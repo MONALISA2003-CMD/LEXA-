@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 import secrets
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -162,16 +162,6 @@ def register(
         raise HTTPException(503, f"LEXA database is not ready: {database_error}")
 
     try:
-        # Explicitly scope the pre-tenant registration transaction. Migration 031
-        # uses this flag to permit only the required registration read/write paths.
-        db.execute(
-            text(
-                "SELECT set_config('app.pre_tenant_access', 'registration', true), "
-                "set_config('app.pre_tenant_email', :email, true), "
-                "set_config('app.registration_key', :registration_key, true)"
-            ),
-            {"email": email, "registration_key": key},
-        )
         # Registration is pre-tenant, so its idempotency record intentionally lives
         # outside tenant RLS. The unique key makes retries and concurrent submits safe.
         stmt = insert(RegistrationRequest).values(
@@ -197,17 +187,13 @@ def register(
         if existing:
             raise HTTPException(409, "User already exists")
 
-        tenant = Tenant(id=uuid4(), name=tenant_name)
-        user = User(id=uuid4(), email=email, password_hash=hash_password(body.password))
-        # Assign the newly-created workspace/user context before INSERT ... RETURNING
-        # so forced RLS reveals only the rows being created by this registration.
-        db.execute(
-            text("SELECT set_config('app.tenant_id', :tenant_id, true), set_config('app.user_id', :user_id, true)"),
-            {"tenant_id": str(tenant.id), "user_id": str(user.id)},
-        )
+        tenant = Tenant(name=tenant_name)
+        user = User(email=email, password_hash=hash_password(body.password))
         db.add_all([tenant, user])
         db.flush()
 
+        # Set tenant context before any RLS-protected tenant-owned insert.
+        db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant.id)})
 
         profile = BusinessProfile(
             tenant_id=tenant.id,
@@ -304,29 +290,14 @@ def register(
 def login(body: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     email = body.email.lower().strip()
     _enforce_login_rate_limit(request, email)
-    # Login is the only non-registration route allowed to look up a user before
-    # tenant context is known. The flag is transaction-local and cleared immediately.
-    db.execute(
-        text(
-            "SELECT set_config('app.pre_tenant_access', 'login', true), "
-            "set_config('app.pre_tenant_email', :email, true)"
-        ),
-        {"email": email},
-    )
     user = db.scalar(select(User).where(User.email == email))
-    db.execute(
-        text(
-            "SELECT set_config('app.pre_tenant_access', '', true), "
-            "set_config('app.pre_tenant_email', '', true)"
-        )
-    )
     if not user or not user.is_active or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "Invalid credentials")
 
     tenant_id = body.tenant_id
     if tenant_id is None:
         rows = db.execute(
-            text("SELECT tenant_id, tenant_name, membership_id FROM public.lexa_list_user_workspaces(:user_id)"),
+            text("SELECT tenant_id, tenant_name, membership_id FROM public.lexa_list_active_user_workspaces(:user_id)"),
             {"user_id": str(user.id)},
         ).mappings().all()
         if len(rows) == 0:
@@ -343,14 +314,7 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
         tenant_id = UUID(str(rows[0]["tenant_id"]))
 
     request_id = getattr(request.state, "request_id", None) or "untracked"
-    # Retain tenant identity in Session.info so Session.after_begin restores
-    # transaction-local RLS context after db.commit() before the tenant lookup.
-    db.info["lexa_tenant_id"] = str(tenant_id)
-    db.info["lexa_user_id"] = str(user.id)
-    db.execute(
-        text("SELECT set_config('app.tenant_id', :tenant_id, true), set_config('app.user_id', :user_id, true)"),
-        {"tenant_id": str(tenant_id), "user_id": str(user.id)},
-    )
+    db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant_id)})
     membership = db.scalar(
         select(TenantMembership).where(
             TenantMembership.user_id == user.id,
@@ -358,7 +322,8 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
             TenantMembership.status == "ACTIVE",
         )
     )
-    if not membership:
+    active_tenant = db.scalar(select(Tenant).where(Tenant.id == tenant_id, Tenant.status == "ACTIVE"))
+    if not membership or not active_tenant:
         raise HTTPException(401, "Invalid credentials")
 
     device = None

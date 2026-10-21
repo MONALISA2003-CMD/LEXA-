@@ -1,5 +1,6 @@
--- Replay-only equivalent derived from the reviewed root migration.
--- Adds the composite key required by the tenant-scoped products->brands FK.
+-- REPLAY-ONLY EQUIVALENT, NOT THE HISTORICAL 004 SOURCE BYTES.
+-- Original Git blob SHA-1 verified by builder: a5b65091c2f31697ecd2caf5fdd235ceba468a66
+-- Moves necessary composite unique keys ahead of constraints that reference them.
 -- LEXA Phase 2, Slice 1: Catalog + real role-permission binding.
 -- Additive, non-destructive, and designed for version-controlled execution.
 
@@ -191,10 +192,16 @@ CREATE INDEX IF NOT EXISTS idx_outbox_unpublished ON outbox_events(tenant_id, pu
 
 -- Tenant-consistency checks through composite FKs where practical.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_categories_tenant_id ON categories(tenant_id, id);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_brands_tenant_id ON brands(tenant_id, id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_products_tenant_id ON products(tenant_id, id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_variants_tenant_id ON product_variants(tenant_id, id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_units_tenant_id ON units(tenant_id, id);
+-- Replay-only prerequisite keys: the historical 004 source adds these too late for its own composite FKs.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_categories_tenant_id ON categories(tenant_id,id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_brands_tenant_id ON brands(tenant_id,id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_products_tenant_id ON products(tenant_id,id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_variants_tenant_id ON product_variants(tenant_id,id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_barcodes_tenant_id ON barcodes(tenant_id,id);
+
 ALTER TABLE products DROP CONSTRAINT IF EXISTS fk_products_category_tenant;
 ALTER TABLE products ADD CONSTRAINT fk_products_category_tenant FOREIGN KEY (tenant_id, category_id) REFERENCES categories(tenant_id, id) DEFERRABLE INITIALLY IMMEDIATE;
 ALTER TABLE products DROP CONSTRAINT IF EXISTS fk_products_brand_tenant;

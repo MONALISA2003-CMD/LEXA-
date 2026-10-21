@@ -20,6 +20,9 @@ const moreWorkspaces = [
   ["/compliance", "Compliance", "✓"],
   ["/intelligence", "Ask LEXA", "✦"],
   ["/administration", "Administration", "⚙"],
+  ["/administration/members", "Team and access", "♙"],
+  ["/workspace", "Switch workspace", "↔"],
+  ["/onboarding", "Workspace setup", "✓"],
   ["/settings", "Settings", "◌"],
 ];
 
@@ -121,7 +124,7 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
   return <div className="app-shell">
     <aside className={`app-sidebar ${open ? "open" : ""}`} aria-label="Main navigation">
       <div className="app-brand"><span className="app-brand-mark" aria-hidden="true">L</span><div><strong>LEXA</strong><small>Business workspace</small></div></div>
-      <div className="workspace-switch"><small>WORKSPACE</small><strong>{session?.tenant_name || "Your business"}</strong><span aria-hidden="true">⌄</span></div>
+      <Link className="workspace-switch" href="/workspace" aria-label="Switch workspace"><small>WORKSPACE</small><strong>{session?.tenant_name || "Your business"}</strong><span aria-hidden="true">⌄</span></Link>
       <nav className="app-nav" aria-label="Primary workspaces">
         {nav(primary)}
         <div className="nav-divider" />

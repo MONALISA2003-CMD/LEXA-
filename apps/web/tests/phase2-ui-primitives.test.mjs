@@ -46,13 +46,15 @@ test('design tokens style buttons, badges, skeletons, forms and dialogs consiste
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*\.lexa-badge/);
 });
 
-test('Phase 2 primitives are adopted by real loading and product-status branches', () => {
+test('shared primitives are adopted by dashboard loading and product-status branches', () => {
   const dashboard = readFileSync(resolve(webRoot, 'app/page.tsx'), 'utf8');
+  const chart = readFileSync(resolve(webRoot, 'components/dashboard-charts.tsx'), 'utf8');
   const products = readFileSync(resolve(webRoot, 'app/products/page.tsx'), 'utf8');
   assert.match(dashboard, /import \{ Skeleton \} from "\.\.\/components\/ui"/);
   assert.match(dashboard, /function LoadingPlaceholder\(/);
   assert.match(dashboard, /<LoadingPlaceholder label="Loading operational exceptions…"/);
-  assert.match(dashboard, /<LoadingPlaceholder label="Loading business movement…"/);
+  assert.match(dashboard, /<LoadingPlaceholder label="Loading daily business metrics…"/);
+  assert.match(chart, /View the underlying daily data/);
   assert.match(products, /import \{ Badge, ResponsiveDataTable \} from "\.\.\/\.\.\/components\/ui"/);
   assert.match(products, /<Badge variant=\{product\.status === "ACTIVE" \? "success" : "neutral"\}>/);
 });

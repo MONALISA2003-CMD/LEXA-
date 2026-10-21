@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Phase 1 Security & Stability",
-  "version": "2.9.1",
+  "package": "LEXA Phase 5 Increment 02 — Full Source Candidate",
+  "version": "2.9.1+phase5.increment02",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -81,7 +81,11 @@
     "Phase 1: validate DATABASE_LOGIN_ROLE against pooled Neon DATABASE_URL username and require TLS",
     "Phase 1: add guarded migration 029 for a separate non-inheriting lexa_runtime_safe login with SET-only membership in lexa_app",
     "Phase 1: add runtime-role security regression tests and scripts/verify-phase1.sh",
-    "Phase 1: document isolated Neon test-branch validation and gated production rollout procedure"
+    "Phase 1: document isolated Neon test-branch validation and gated production rollout procedure",
+    "Phase 5 Increment 01: multi-line sales cart, checkout idempotency key, branch-scoped sales history, sale detail and print view.",
+    "Phase 5 Increment 02: cumulative refund cap evaluated against original collections minus all recorded prior refunds while locking the source sale.",
+    "Phase 5 Increment 02: branch-scoped returns list and payment/return/refund ledger details on sale detail.",
+    "Phase 5 Increment 02: staging-only Playwright cases for split tender, partial payment, idempotent retry, stock ledger read-after-write, cumulative refund limit, cashier permission denial, manager positive price/discount, and optional cross-branch denial."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -139,5 +143,17 @@
     "production": "no production schema/role/settings/deployments changed; GitHub branch creation denied with 403; Render/Vercel deployments not triggered"
   },
   "release": "phase1-security-stability-source-candidate-2.9.1-2026-10-19",
-  "release_name": "phase-1-security-stability-isolated-test-verified-production-cutover-not-authorized"
+  "release_name": "phase-1-security-stability-isolated-test-verified-production-cutover-not-authorized",
+  "source_baseline": "Reconstructed from preserved Phase 4 UX reset source archive plus the Phase 5 Increment 01 overlay and Increment 02 checkout-integrity changes.",
+  "canonical_source_parity": false,
+  "release_status": "candidate only; not merged or deployed; do not promote until source reconciliation, Node 24 build, and authenticated staging acceptance pass",
+  "validation_summary": {
+    "backend_tests": "41 passed, 1 skipped (Redis-dependent auth-refresh test)",
+    "frontend_contract_tests": "25 passed",
+    "typescript_tsx_syntax_scan": "34 files scanned; 0 syntax diagnostics; not a full typecheck",
+    "node24_clean_install_typecheck_production_build": "not completed: only Node 22.16 available and required dependency tarball missing from offline npm cache",
+    "authenticated_staging_playwright": "tests authored; not run (staging host and disposable QA fixtures required)",
+    "production_database_mutation": "none",
+    "deployment": "none"
+  }
 }

@@ -42,3 +42,35 @@ def test_checkout_enforces_server_side_price_and_discount_capabilities():
     assert "Price override permission required" in block
     assert "Discount permission required" in block
     assert "No catalogue price is configured" in block
+
+
+def test_cumulative_refund_balance_is_checked_inside_locked_sale_transaction():
+    source = SOURCE.read_text()
+    block = source.split('@router.post("/sales/{sale_id}/returns", status_code=201)', 1)[1]
+    assert 'SELECT * FROM sales WHERE tenant_id=:t AND id=:s FOR UPDATE' in block
+    assert 'JOIN sale_returns prior_return ON prior_return.id=rr.return_id AND prior_return.tenant_id=rr.tenant_id' in block
+    assert "prior_return.sale_id=:s AND rr.status='RECORDED'" in block
+    assert 'remaining_refund_balance(sale["amount_paid"],prior_refunds)' in block
+    assert 'Refund exceeds the remaining collected amount after previous refunds' in block
+
+
+def test_returns_list_is_limited_to_active_assigned_branches():
+    source = SOURCE.read_text()
+    block = source.split('@router.get("/returns")', 1)[1].split('@router.post("/sales/{sale_id}/returns", status_code=201)', 1)[0]
+    assert 'JOIN sales s ON s.id=sr.sale_id AND s.tenant_id=sr.tenant_id' in block
+    assert 'membership_branch_assignments' in block
+    assert "tm.status='ACTIVE'" in block
+    assert "mba.status='ACTIVE'" in block
+    assert 'b.id=s.branch_id' in block
+
+
+def test_sale_detail_includes_payment_return_and_refund_ledger_rows():
+    source = SOURCE.read_text()
+    block = source.split('@router.get("/sales/{sale_id}")', 1)[1].split('@router.post("/sales", status_code=201)', 1)[0]
+    assert 'FROM payment_allocations pa' in block
+    assert 'LEFT JOIN receivables r ON r.id=pa.receivable_id' in block
+    assert 'FROM sale_returns sr WHERE sr.tenant_id=:t AND sr.sale_id=:s' in block
+    assert 'FROM refund_records rr' in block
+    assert 'result["payments"]' in block
+    assert 'result["returns"]' in block
+    assert 'result["refunds"]' in block

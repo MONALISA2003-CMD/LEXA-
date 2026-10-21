@@ -1,0 +1,38 @@
+{
+  "environment": "staging",
+  "actor_role": "cashier",
+  "branch_id": "00000000-0000-4000-8000-000000000101",
+  "location_id": "00000000-0000-4000-8000-000000000102",
+  "customer_party_id": "00000000-0000-4000-8000-000000000103",
+  "currency_code": "UGX",
+  "business_date": "2026-10-21",
+  "expected_total": "15000",
+  "expected_paid": "10000",
+  "lines": [
+    {
+      "variant_id": "00000000-0000-4000-8000-000000000201",
+      "quantity": "1",
+      "unit_price": "8000"
+    },
+    {
+      "variant_id": "00000000-0000-4000-8000-000000000202",
+      "quantity": "1",
+      "unit_price": "3000"
+    },
+    {
+      "variant_id": "00000000-0000-4000-8000-000000000203",
+      "quantity": "1",
+      "unit_price": "4000"
+    }
+  ],
+  "payments": [
+    {
+      "payment_channel_id": "00000000-0000-4000-8000-000000000301",
+      "amount": "6000"
+    },
+    {
+      "payment_channel_id": "00000000-0000-4000-8000-000000000302",
+      "amount": "4000"
+    }
+  ]
+}

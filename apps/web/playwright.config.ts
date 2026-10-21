@@ -8,7 +8,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
   use: {
     baseURL: process.env.LEXA_BROWSER_BASE_URL || 'http://127.0.0.1:3000',
-    storageState: process.env.LEXA_PHASE4_STORAGE_STATE || undefined,
+    storageState: process.env.LEXA_PHASE5_STORAGE_STATE || process.env.LEXA_PHASE4_STORAGE_STATE || undefined,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

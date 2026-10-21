@@ -33,8 +33,10 @@ assert.doesNotMatch(page, /BUILD PREVIEW/);
 assert.match(proxy, /LEXA_API_URL \|\| process\.env\.NEXT_PUBLIC_API_URL/);
 assert.match(proxy, /DEFAULT_API_ORIGIN/);
 assert.match(proxy, /authorization/);
-assert.doesNotMatch(invite, /acceptInvitation/);
-assert.match(invite, /Invitation acceptance is not enabled in this deployment/);
+assert.match(invite, /acceptWorkspaceInvitation/);
+assert.match(invite, /previewWorkspaceInvitation/);
+assert.match(invite, /window\.history\.replaceState/);
+assert.doesNotMatch(invite, /Invitation acceptance is not enabled in this deployment/);
 assert.match(invite, /href="\/login"/);
 console.log('visible product contract: PASS');
 
