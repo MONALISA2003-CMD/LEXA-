@@ -1,34 +1,38 @@
-# LEXA — Phase 4–6 Completeness Candidate (v2.11.0, 21 October 2026)
+# LEXA — Phase 7 Purchasing & Supplier Management (v2.12.0, 21 October 2026)
 
-**Current status:** local full-source candidate. Phase 3 recovery for the six approved lost SQL originals is permanently closed and is not a future blocker. Their replacements still require semantic replay, which is a separate database correctness gate.
+**Current status:** local full-source Phase 7 candidate; not production-accepted. The product-strategy document remains the governing roadmap. Phase 7 implements supplier terms, supplier-specific pricing, purchase orders, partial receiving, landed costs, supplier returns, invoice matching, supplier payments and currency-separated supplier balances.
 
-## What this candidate adds
+## Phase 7 implementation
 
-- Phase 4 reports apply a validated reporting period, use business-profile currency where verified, and distinguish unavailable source data from confirmed empty periods. Inventory/product cost amounts also avoid silently assuming UGX if workspace currency is unavailable.
-- Phase 5 supports multi-line returns and carries the return/refund/settlement accounting guards from the previous candidate.
-- Phase 6 includes per-location replenishment policy/recommendations, ledger-derived 30/60/90-day stock ageing with unknown provenance and reconciliation gaps, and a Stock Health exception view for stockouts/no-sale periods based on completed sales/returns.
-- The CI workflow has Redis-backed backend jobs, Node 24 frontend install/typecheck/contracts/build, guarded disposable PostgreSQL replay, same-commit/checksum evidence, and an AST action/form/link audit.
-- Migrations 037 and 038 add candidate indexes for inventory ageing and movement-health queries.
+- **Supplier register:** trading/legal identity, contact and tax details, default receiving location, payment terms, default currency, status/archive guards and effective-dated supplier cost tiers.
+- **Purchase commitments:** draft → submit → approve → receive/close/cancel, scoped branch/location checks, audit/status history and idempotent transition writes.
+- **Partial goods receiving:** quantity and cost-variance checks, receipt drafts, landed-cost allocation by value/quantity/equal share, deterministic rounding, inventory ledger posting only after explicit receipt posting.
+- **Supplier returns:** only posted receipt quantities can be requested; quantity reservations cover requested/approved/posted returns; approval is separate; posting reverses stock at landed cost and grants supplier credit at original goods cost.
+- **Supplier bills/payments:** receipt-match status, `WAITING_RECEIPT` for PO-linked invoices without a posted receipt, reviewed/justified variance exceptions, posted payable ledger entries, bill-specific payment allocations, duplicate/over-allocation checks, draft voids, and currency-separated payable/credit balances.
+- **Database security:** forward migration 039 creates landed cost and supplier ledger tables with forced tenant RLS. Runtime privileges are append-only for landed-cost/allocation/ledger tables; supplier bills/payments are mutable only for their draft/post/void lifecycle.
+- **Release gates:** CI has a guarded clean replay, Node 24 frontend build, Redis-backed backend test, and an optional manually triggered authenticated Phase 7 E2E job. The E2E job requires an explicit HTTPS staging-host allow-list, disposable tenant/reset fixture and QA storage state; known production hosts are denied.
 
-## Current local evidence
+## Local validation evidence
 
-- Backend tests: **188 passed, 1 skipped, 0 failed**. The single local skip is the Redis-dependent auth-refresh test because this offline runner has no Redis Python package; CI is configured to provision Redis.
-- Frontend contracts: **33 passed, 0 failed** on local Node 22.16.0.
-- AST audit: **PASS** on 29 TS/TSX files; 117 button-like controls, 27 forms and 33 links.
-- Python compilation, permanent-disposition checks and strict source reconciliation: PASS.
-- Clean replay plan: 42 migration paths and hashes verified; **plan-only**, no SQL executed locally.
+- Backend: **206 passed, 1 skipped, 0 failed**. The only skip is auth-refresh integration because the offline runner has no Redis Python package; CI provisions Redis.
+- Frontend contracts: **36 passed, 0 failed** under local Node 22.16.0.
+- Syntax audit: **38 `.ts`/`.tsx` sources, zero parser diagnostics**. This is a syntax check, not a complete TypeScript typecheck.
+- Static control audit: **PASS** across 29 TS/TSX files; 153 button-like controls, 35 forms and 33 links.
+- Python compilation, strict source reconciliation, permanent migration disposition checks and checksums: **PASS**.
+- Clean replay plan: **43 SQL inputs and hashes verified in plan-only mode**. No SQL was executed by that check.
 
 ## Release boundary
 
-This ZIP is not a production acceptance certificate. Node 24 dependency install/typecheck/build, actual clean PostgreSQL replay, authenticated E2E in sanitized isolated staging, same-SHA Render/Vercel readiness verification, and an approved production migration rollout remain pending. No production SQL mutation or deployment was performed while building this candidate. Migrations 033–038 are not production-applied by this work.
+This archive is a review candidate, not a production release certificate. Node 24 `npm ci`/typecheck/build, actual clean PostgreSQL replay, authenticated disposable-staging E2E, same-candidate-SHA Render/Vercel readiness and approved production migration rollout remain pending. Migration 039 and the Phase 5/6 forward candidates are **not production-applied by this work**. No production database mutation or deployment was performed.
 
-## Current source-of-truth documents
+## Authoritative documents
 
 - [`FRESH_NEW_PRODUCT_STRATEGY.md`](FRESH_NEW_PRODUCT_STRATEGY.md)
-- [`PHASE4_6_COMPLETENESS_IMPLEMENTATION_REPORT_2026-10-21.md`](PHASE4_6_COMPLETENESS_IMPLEMENTATION_REPORT_2026-10-21.md)
-- [`PHASE4_6_COMPLETENESS_ACCEPTANCE_MATRIX_2026-10-21.md`](PHASE4_6_COMPLETENESS_ACCEPTANCE_MATRIX_2026-10-21.md)
-- [`docs/PHASE4_6_STRATEGY_COVERAGE_2026-10-21.md`](docs/PHASE4_6_STRATEGY_COVERAGE_2026-10-21.md)
-- [`PHASE6_RELEASE_GATE_STATUS_2026-10-21.json`](PHASE6_RELEASE_GATE_STATUS_2026-10-21.json)
+- [`PHASE7_IMPLEMENTATION_REPORT_2026-10-21.md`](PHASE7_IMPLEMENTATION_REPORT_2026-10-21.md)
+- [`PHASE7_ACCEPTANCE_MATRIX.md`](PHASE7_ACCEPTANCE_MATRIX.md)
+- [`PHASE7_RELEASE_GATE_STATUS_2026-10-21.json`](PHASE7_RELEASE_GATE_STATUS_2026-10-21.json)
+- [`RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_01.md`](RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_01.md)
+- [`docs/decisions/ADR-DB-001-permanent-replacement-of-lost-migrations.md`](docs/decisions/ADR-DB-001-permanent-replacement-of-lost-migrations.md)
 - [`migrations/migration_dispositions.json`](migrations/migration_dispositions.json)
 - [`migrations/reconstructed/clean_replay_order.json`](migrations/reconstructed/clean_replay_order.json)
 

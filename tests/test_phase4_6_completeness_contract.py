@@ -20,15 +20,15 @@ def test_inventory_ageing_is_tenant_and_location_scoped_and_labels_unknown_prove
 
 def test_clean_replay_contains_ageing_migration_and_evidence_gate_checks_it():
     order = json.loads((ROOT / "migrations/reconstructed/clean_replay_order.json").read_text())
-    assert order["steps"][-1]["path"] == "migrations/038_phase6_movement_health_indexes.sql"
-    assert len(order["steps"]) == 42
+    assert order["steps"][-1]["path"] == "migrations/039_phase7_supplier_ledger_landed_costs.sql"
+    assert len(order["steps"]) == 43
     replay = (ROOT / "scripts/run_clean_migration_replay.py").read_text()
     verifier = (ROOT / "scripts/check_phase6_replay_evidence.py").read_text()
     assert "037_phase6_inventory_ageing_index" in replay
     assert "idx_inventory_transactions_age_analysis" in replay
     assert "phase6_inventory_age_index_count" in verifier
     assert "phase6_inventory_health_index_count" in verifier
-    assert order["steps"][-1]["path"] == "migrations/038_phase6_movement_health_indexes.sql"
+    assert order["steps"][-1]["path"] == "migrations/039_phase7_supplier_ledger_landed_costs.sql"
 
 
 def test_phase3_six_lost_sources_remain_permanently_dispositioned_not_reopened():

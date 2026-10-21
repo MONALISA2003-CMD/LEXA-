@@ -17,7 +17,8 @@ test('Phase 5 authenticated acceptance has a pinned Playwright runner and lockfi
   assert.equal(lock.packages['node_modules/playwright'].version, '1.64.1');
   assert.equal(lock.packages['node_modules/playwright-core'].version, '1.64.1');
   assert.match(pkg.scripts['test:e2e:phase5'], /playwright test/);
-  assert.match(config, /testMatch: 'phase5-sales-acceptance.spec.ts'/);
+  assert.match(config, /phase\(5-sales\|7-purchasing\)-acceptance/);
+  assert.match(config, /LEXA_PHASE7_STORAGE_STATE/);
 });
 
 test('Phase 5 browser writes fail closed without explicit staging safeguards', () => {

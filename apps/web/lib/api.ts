@@ -457,3 +457,104 @@ export function replaceWorkspaceRolePermissions(roleId: string, permissionIds: s
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ permission_ids: permissionIds }),
   });
 }
+
+// Phase 7 — supplier, purchasing, receiving, returns and payables.
+export type PurchasingSupplier = {
+  supplier_party_id: string; supplier_id?: string | null; name: string; legal_name?: string | null;
+  email?: string | null; phone?: string | null; currency_code: string; payment_terms_days: number;
+  default_receiving_location_id?: string | null; tax_number?: string | null; notes?: string | null;
+  party_status?: string; profile_status?: string; status?: string; code?: string | null;
+  net_balance?: string | number; created_at?: string; updated_at?: string;
+};
+export type PurchasingSupplierCost = {
+  id: string; supplier_party_id: string; variant_id: string; currency_code: string; unit_cost: string;
+  minimum_quantity: string; effective_from: string; effective_to?: string | null; lead_time_days?: number | null;
+  sku?: string; variant_name?: string; product_name?: string;
+};
+export type PurchaseOrderLine = {
+  id: string; purchase_order_id: string; line_number: number; variant_id: string; ordered_quantity: string;
+  received_quantity: string; unit_cost: string; tax_rate: string; tax_amount: string; line_subtotal: string;
+  line_total: string; sku?: string; variant_name?: string; product_name?: string; description?: string | null;
+};
+export type PurchaseOrder = {
+  id: string; po_number: string; supplier_party_id: string; supplier_name?: string; branch_id: string;
+  branch_name?: string; receiving_location_id: string; receiving_location_name?: string; status: string;
+  order_date: string; expected_date?: string | null; currency_code: string; notes?: string | null;
+  subtotal: string; tax_amount: string; total: string; line_count?: number; received_units?: string;
+  lines?: PurchaseOrderLine[]; status_history?: Array<Record<string, unknown>>;
+};
+export type PurchaseReceiptLine = {
+  id: string; receipt_id: string; purchase_order_line_id: string; variant_id: string; received_quantity: string;
+  unit_cost: string; base_unit_cost: string; landed_cost_amount: string; variance_reason?: string | null;
+  sku?: string; variant_name?: string; product_name?: string; ordered_quantity?: string; already_received?: string;
+};
+export type PurchaseReceipt = {
+  id: string; receipt_number: string; purchase_order_id: string; po_number?: string; supplier_name?: string;
+  supplier_party_id?: string; receiving_location_id: string; location_name?: string; status: string; currency_code?: string;
+  received_at: string; posted_at?: string | null; landed_cost_total: string; line_count?: number;
+  lines?: PurchaseReceiptLine[]; landed_costs?: Array<Record<string, unknown>>; allocations?: Array<Record<string, unknown>>;
+};
+export type PurchaseReturn = {
+  id: string; return_number: string; purchase_receipt_id: string; receipt_number?: string; po_number?: string;
+  supplier_name?: string; supplier_party_id?: string; status: string; reason: string; currency_code?: string;
+  return_value?: string; value?: string; lines?: Array<{id:string; purchase_receipt_line_id:string; variant_id:string; quantity:string; unit_cost:string; supplier_credit_unit_cost?:string; sku?:string; product_name?:string; variant_name?:string; reason?:string|null}>;
+};
+export type SupplierBill = {
+  id: string; supplier_party_id: string; supplier_name?: string; bill_number: string; bill_date: string; due_date: string;
+  currency_code: string; subtotal: string; tax_amount: string; other_charges: string; total: string; status: string;
+  purchase_order_id?: string | null; purchase_receipt_id?: string | null; paid_amount?: string; allocated_outstanding?: string;
+  match_status?: 'NOT_LINKED'|'WAITING_RECEIPT'|'MATCHED'|'VARIANCE'|'OVERRIDDEN'; match_variance?: string; match_reason?: string | null; match_checked_at?: string | null;
+};
+export type SupplierPayment = {
+  id: string; supplier_party_id: string; supplier_name?: string; payment_number: string; payment_date: string;
+  currency_code: string; amount: string; payment_method: string; reference?: string | null; status: string;
+  allocated_amount?: string; unallocated_amount?: string;
+};
+export type SupplierBalance = {
+  supplier_party_id: string; supplier_name: string; payment_terms_days: number; currency_code: string;
+  debits: string; credits: string; net_balance: string; payable: string; supplier_credit: string;
+  last_activity?: string; entry_count: number; overdue_bills: number;
+};
+export type SupplierLedgerEntry = {
+  id: string; supplier_party_id: string; currency_code: string; entry_type: string; source_type: string;
+  source_id: string; reference?: string | null; debit_amount: string; credit_amount: string;
+  occurred_at: string; running_balance?: string; metadata?: Record<string, unknown>;
+};
+function purchasingPost<T>(path: string, body?: unknown) {
+  return getJson<T>(path, { method: "POST", headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), "Idempotency-Key": key() }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+}
+export function getPurchasingSummary() { return getJson<Record<string, string | number>>('/api/v1/purchasing/summary'); }
+export function getPurchasingSuppliers(params: { q?: string; status?: string } = {}) { const p=new URLSearchParams(); Object.entries(params).forEach(([k,v])=>v&&p.set(k,v)); return getJson<PurchasingSupplier[]>(`/api/v1/purchasing/suppliers${p.size?`?${p}`:''}`); }
+export function createPurchasingSupplier(body: {name:string;code?:string;legal_name?:string|null;email?:string|null;phone?:string|null;currency_code:string;payment_terms_days:number;default_receiving_location_id?:string|null;tax_number?:string|null;notes?:string|null}) { return purchasingPost<PurchasingSupplier>('/api/v1/purchasing/suppliers', body); }
+export function updatePurchasingSupplier(id:string, body:Partial<{name:string;legal_name:string|null;email:string|null;phone:string|null;currency_code:string;payment_terms_days:number;default_receiving_location_id:string|null;tax_number:string|null;notes:string|null;status:'ACTIVE'|'INACTIVE'|'ARCHIVED'}>) { return getJson<PurchasingSupplier>(`/api/v1/purchasing/suppliers/${encodeURIComponent(id)}`, { method:'PATCH', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify(body) }); }
+export function getSupplierCosts(id:string) { return getJson<PurchasingSupplierCost[]>(`/api/v1/purchasing/suppliers/${encodeURIComponent(id)}/costs`); }
+export function setSupplierCost(id:string, body:{variant_id:string;unit_cost:string;minimum_quantity:string;currency_code:string;lead_time_days?:number|null}) { return purchasingPost<PurchasingSupplierCost>(`/api/v1/purchasing/suppliers/${encodeURIComponent(id)}/costs`, body); }
+export function getPurchaseOrders(params:{status?:string;supplier_party_id?:string}={}) { const p=new URLSearchParams(); Object.entries(params).forEach(([k,v])=>v&&p.set(k,v)); return getJson<PurchaseOrder[]>(`/api/v1/purchasing/purchase-orders${p.size?`?${p}`:''}`); }
+export function getPurchaseOrder(id:string) { return getJson<PurchaseOrder>(`/api/v1/purchasing/purchase-orders/${encodeURIComponent(id)}`); }
+export function createPurchaseOrder(body:{supplier_party_id:string;branch_id:string;receiving_location_id:string;order_date:string;expected_date?:string|null;currency_code:string;notes?:string|null;lines:Array<{variant_id:string;ordered_quantity:string;unit_cost:string;tax_rate:string;description?:string|null}>}) { return purchasingPost<{id:string;po_number:string;status:string;currency_code:string;subtotal:string;tax_amount:string;total:string}>('/api/v1/purchasing/purchase-orders', body); }
+export function submitPurchaseOrder(id:string, reason?:string) { return purchasingPost<{id:string;status:string}>(`/api/v1/purchasing/purchase-orders/${encodeURIComponent(id)}/submit`, {reason}); }
+export function approvePurchaseOrder(id:string, reason?:string) { return purchasingPost<{id:string;status:string}>(`/api/v1/purchasing/purchase-orders/${encodeURIComponent(id)}/approve`, {reason}); }
+export function cancelPurchaseOrder(id:string, reason?:string) { return purchasingPost<{id:string;status:string}>(`/api/v1/purchasing/purchase-orders/${encodeURIComponent(id)}/cancel`, {reason}); }
+export function closePurchaseOrder(id:string, reason?:string) { return purchasingPost<{id:string;status:string}>(`/api/v1/purchasing/purchase-orders/${encodeURIComponent(id)}/close`, {reason}); }
+export function getPurchaseReceipts(status?:string) { return getJson<PurchaseReceipt[]>(`/api/v1/purchasing/receipts${status?`?status=${encodeURIComponent(status)}`:''}`); }
+export function getPurchaseReceipt(id:string) { return getJson<PurchaseReceipt>(`/api/v1/purchasing/receipts/${encodeURIComponent(id)}`); }
+export function createPurchaseReceipt(id:string, body:{received_at?:string;notes?:string|null;lines:Array<{purchase_order_line_id:string;received_quantity:string;unit_cost?:string|null;variance_reason?:string|null;notes?:string|null}>;landed_costs:Array<{cost_code:string;description:string;amount:string;currency_code:string;allocation_method:'BY_VALUE'|'BY_QUANTITY'|'EQUALLY';reference?:string|null}>}) { return purchasingPost<{id:string;receipt_number:string;status:string;purchase_order_id:string;line_count:number;landed_cost_total:string}>(`/api/v1/purchasing/purchase-orders/${encodeURIComponent(id)}/receipts`, body); }
+export function postPurchaseReceipt(id:string) { return purchasingPost<Record<string,string|number>>(`/api/v1/purchasing/receipts/${encodeURIComponent(id)}/post`); }
+export function cancelPurchaseReceipt(id:string,reason?:string) { return purchasingPost<{id:string;status:string}>(`/api/v1/purchasing/receipts/${encodeURIComponent(id)}/cancel`,{reason}); }
+export function getPurchaseReturns(status?:string) { return getJson<PurchaseReturn[]>(`/api/v1/purchasing/returns${status?`?status=${encodeURIComponent(status)}`:''}`); }
+export function getPurchaseReturn(id:string) { return getJson<PurchaseReturn>(`/api/v1/purchasing/returns/${encodeURIComponent(id)}`); }
+export function createPurchaseReturn(body:{purchase_receipt_id:string;reason:string;notes?:string|null;lines:Array<{purchase_receipt_line_id:string;quantity:string;reason?:string|null}>}) { return purchasingPost<PurchaseReturn>('/api/v1/purchasing/returns',body); }
+export function approvePurchaseReturn(id:string) { return purchasingPost<{id:string;status:string}>(`/api/v1/purchasing/returns/${encodeURIComponent(id)}/approve`); }
+export function cancelPurchaseReturn(id:string,reason?:string) { return purchasingPost<{id:string;status:string}>(`/api/v1/purchasing/returns/${encodeURIComponent(id)}/cancel`,{reason}); }
+export function postPurchaseReturn(id:string) { return purchasingPost<{id:string;status:string;supplier_credit:string;currency_code:string}>(`/api/v1/purchasing/returns/${encodeURIComponent(id)}/post`); }
+export function getSupplierBills(params:{status?:string;supplier_party_id?:string;due_before?:string}={}) { const p=new URLSearchParams(); Object.entries(params).forEach(([k,v])=>v&&p.set(k,v)); return getJson<SupplierBill[]>(`/api/v1/purchasing/supplier-bills${p.size?`?${p}`:''}`); }
+export function createSupplierBill(body:{supplier_party_id:string;bill_number:string;bill_date:string;due_date?:string|null;currency_code:string;subtotal:string;tax_amount:string;other_charges:string;purchase_order_id?:string|null;purchase_receipt_id?:string|null;supplier_reference?:string|null;notes?:string|null}) { return purchasingPost<{id:string;bill_number:string;status:string;total:string;currency_code:string;due_date:string}>('/api/v1/purchasing/supplier-bills',body); }
+export function postSupplierBill(id:string) { return purchasingPost<{id:string;status:string;payable_added:string;currency_code:string}>(`/api/v1/purchasing/supplier-bills/${encodeURIComponent(id)}/post`); }
+export function acceptSupplierBillVariance(id:string,reason:string) { return purchasingPost<{id:string;match_status:string;match_variance:string;reason:string}>(`/api/v1/purchasing/supplier-bills/${encodeURIComponent(id)}/accept-variance`,{reason}); }
+export function voidSupplierBill(id:string,reason?:string) { return purchasingPost<{id:string;status:string}>(`/api/v1/purchasing/supplier-bills/${encodeURIComponent(id)}/void`,{reason}); }
+export function getSupplierPayments(params:{status?:string;supplier_party_id?:string}={}) { const p=new URLSearchParams(); Object.entries(params).forEach(([k,v])=>v&&p.set(k,v)); return getJson<SupplierPayment[]>(`/api/v1/purchasing/supplier-payments${p.size?`?${p}`:''}`); }
+export function createSupplierPayment(body:{supplier_party_id:string;payment_number:string;payment_date:string;currency_code:string;amount:string;payment_method:string;reference?:string|null;notes?:string|null;allocations:Array<{bill_id:string;amount:string}>}) { return purchasingPost<{id:string;payment_number:string;status:string;amount:string;allocated_amount:string;unallocated_amount:string;currency_code:string}>('/api/v1/purchasing/supplier-payments',body); }
+export function postSupplierPayment(id:string) { return purchasingPost<{id:string;status:string;supplier_balance_credit:string;allocated_amount:string;advance_amount:string;currency_code:string}>(`/api/v1/purchasing/supplier-payments/${encodeURIComponent(id)}/post`); }
+export function voidSupplierPayment(id:string,reason?:string) { return purchasingPost<{id:string;status:string}>(`/api/v1/purchasing/supplier-payments/${encodeURIComponent(id)}/void`,{reason}); }
+export function getSupplierBalances(params:{supplier_party_id?:string;currency_code?:string;include_zero?:boolean}={}) { const p=new URLSearchParams(); Object.entries(params).forEach(([k,v])=>v!==undefined&&v!==null&&v!==''&&p.set(k,String(v))); return getJson<SupplierBalance[]>(`/api/v1/purchasing/supplier-balances${p.size?`?${p}`:''}`); }
+export function getSupplierLedger(id:string,currencyCode?:string) { return getJson<SupplierLedgerEntry[]>(`/api/v1/purchasing/supplier-ledger/${encodeURIComponent(id)}${currencyCode?`?currency_code=${encodeURIComponent(currencyCode)}`:''}`); }

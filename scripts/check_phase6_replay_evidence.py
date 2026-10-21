@@ -50,6 +50,14 @@ def main() -> int:
         errors.append("evidence lacks the Phase 6 inventory age-analysis index")
     if evidence.get("phase6_inventory_health_index_count") != 4:
         errors.append("evidence lacks all four valid Phase 6 stock-movement health indexes")
+    if evidence.get("phase7_supplier_ledger_tables") != 6 or evidence.get("phase7_supplier_ledger_rls_forced") != 6 or evidence.get("phase7_supplier_ledger_tenant_policy_count") != 6:
+        errors.append("evidence lacks all six Phase 7 supplier/landed-cost tables with forced tenant RLS and policies")
+    if evidence.get("phase7_active_supplier_cost_tier_index") is not True:
+        errors.append("evidence lacks the Phase 7 active supplier cost tier uniqueness index")
+    if evidence.get("phase7_purchase_order_updated_at") is not True or evidence.get("phase7_supplier_bill_match_contract") is not True or evidence.get("phase7_supplier_return_credit_cost_contract") is not True:
+        errors.append("evidence lacks Phase 7 PO, invoice-match or supplier-return cost correctness contracts")
+    if evidence.get("phase7_append_only_runtime_grants") is not True or evidence.get("phase7_bill_payment_lifecycle_grants") is not True:
+        errors.append("evidence lacks Phase 7 append-only ledger/allocation and least-privilege bill/payment lifecycle grant assertions")
     if evidence.get("required_phase5_return_routines_found") != 4:
         errors.append("evidence is missing one or more required Phase 5 return/accounting routines")
     if evidence.get("migration_bundle_sha256") != expected_bundle:

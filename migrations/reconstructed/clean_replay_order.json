@@ -196,6 +196,10 @@
     {
       "path": "migrations/038_phase6_movement_health_indexes.sql",
       "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/039_phase7_supplier_ledger_landed_costs.sql",
+      "mode": "additive-forward-migration-candidate"
     }
   ],
   "replay_only_notice": "Runs only on a fresh local/CI disposable PostgreSQL database after explicit environment opt-in. Never execute against production. A successful replay validates the selected replacement chain, not original historical-byte parity.",

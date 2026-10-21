@@ -162,7 +162,7 @@ def main() -> int:
                        '030_phase3_workspace_memberships','031_phase3_auth_surface_rls',
                        '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                        '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
-                       '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes')
+                       '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs')
                 """)
                 migration_rows = sorted(row[0] for row in cur.fetchall())
                 expected_migrations = sorted([
@@ -170,7 +170,7 @@ def main() -> int:
                     '030_phase3_workspace_memberships','031_phase3_auth_surface_rls',
                     '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                     '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
-                    '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes',
+                    '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs',
                 ])
                 cur.execute("""
                     SELECT to_regclass('public.inventory_replenishment_policies') IS NOT NULL,
@@ -205,6 +205,28 @@ def main() -> int:
                        )
                 """)
                 health_index_count = cur.fetchone()[0]
+                cur.execute("""
+                    SELECT
+                      count(*) FILTER (WHERE t.relname IN ('purchase_landed_costs','purchase_landed_cost_allocations','supplier_bills','supplier_payments','supplier_payment_allocations','supplier_ledger_entries') AND t.relrowsecurity AND t.relforcerowsecurity),
+                      count(*) FILTER (WHERE t.relname IN ('purchase_landed_costs','purchase_landed_cost_allocations','supplier_bills','supplier_payments','supplier_payment_allocations','supplier_ledger_entries')),
+                      count(*) FILTER (WHERE t.relname IN ('purchase_landed_costs','purchase_landed_cost_allocations','supplier_bills','supplier_payments','supplier_payment_allocations','supplier_ledger_entries') AND EXISTS (
+                        SELECT 1 FROM pg_policies p WHERE p.schemaname='public' AND p.tablename=t.relname AND p.policyname=t.relname || '_tenant_isolation'
+                      )),
+                      (SELECT to_regclass('public.uq_supplier_variant_cost_active_tier') IS NOT NULL),
+                      (SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='purchase_orders' AND column_name='updated_at')),
+                      (SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='supplier_bills' AND column_name='match_status')),
+                      (SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='purchase_return_lines' AND column_name='supplier_credit_unit_cost')),
+                      (NOT has_table_privilege('lexa_app','public.purchase_landed_costs','UPDATE') AND NOT has_table_privilege('lexa_app','public.purchase_landed_costs','DELETE')
+                       AND NOT has_table_privilege('lexa_app','public.purchase_landed_cost_allocations','UPDATE') AND NOT has_table_privilege('lexa_app','public.purchase_landed_cost_allocations','DELETE')
+                       AND NOT has_table_privilege('lexa_app','public.supplier_payment_allocations','UPDATE') AND NOT has_table_privilege('lexa_app','public.supplier_payment_allocations','DELETE')
+                       AND NOT has_table_privilege('lexa_app','public.supplier_ledger_entries','UPDATE') AND NOT has_table_privilege('lexa_app','public.supplier_ledger_entries','DELETE')),
+                      (has_table_privilege('lexa_app','public.supplier_bills','UPDATE') AND has_table_privilege('lexa_app','public.supplier_payments','UPDATE')
+                       AND NOT has_table_privilege('lexa_app','public.supplier_bills','DELETE') AND NOT has_table_privilege('lexa_app','public.supplier_payments','DELETE'))
+                    FROM pg_class t JOIN pg_namespace n ON n.oid=t.relnamespace
+                    WHERE n.nspname='public' AND t.relkind='r'
+                """)
+                (phase7_rls_forced, phase7_table_count, phase7_policy_count, phase7_cost_index, po_updated_at,
+                 bill_match_column, return_supplier_cost, phase7_append_only_grants, phase7_bill_payment_lifecycle_grants) = cur.fetchone()
                 cur.execute("""
                     SELECT count(*) FROM information_schema.tables
                      WHERE table_schema='public' AND table_type='BASE TABLE'
@@ -255,6 +277,14 @@ def main() -> int:
         if routine_count != 4: failures.append(f"expected four required return/accounting routines, found {routine_count}")
         if age_index_count != 1: failures.append("Phase 6 stock-age analysis index is missing")
         if health_index_count != 4: failures.append(f"Phase 6 movement-health indexes are incomplete or invalid: found {health_index_count}/4")
+        if phase7_table_count != 6 or phase7_rls_forced != 6 or phase7_policy_count != 6:
+            failures.append(f"Phase 7 supplier/landed-cost tables must all exist with forced RLS and tenant policies: tables={phase7_table_count}/6, forced={phase7_rls_forced}/6, policies={phase7_policy_count}/6")
+        if not phase7_cost_index: failures.append("Phase 7 active supplier cost tier uniqueness index is missing")
+        if not po_updated_at: failures.append("Phase 7 purchase-order updated_at contract is missing")
+        if not bill_match_column: failures.append("Phase 7 supplier bill receipt-match contract is missing")
+        if not return_supplier_cost: failures.append("Phase 7 supplier-return credit unit-cost separation is missing")
+        if not phase7_append_only_grants: failures.append("Phase 7 landed-cost/allocation/supplier-ledger rows are not protected by append-only runtime grants")
+        if not phase7_bill_payment_lifecycle_grants: failures.append("Phase 7 bills/payments lifecycle grants are broader than required or do not permit updates")
 
         evidence = {
             "schema_version": 1,
@@ -277,6 +307,15 @@ def main() -> int:
             "phase6_replenishment_tenant_policy_count": policy_count,
             "phase6_inventory_age_index_count": age_index_count,
             "phase6_inventory_health_index_count": health_index_count,
+            "phase7_supplier_ledger_tables": phase7_table_count,
+            "phase7_supplier_ledger_rls_forced": phase7_rls_forced,
+            "phase7_supplier_ledger_tenant_policy_count": phase7_policy_count,
+            "phase7_active_supplier_cost_tier_index": bool(phase7_cost_index),
+            "phase7_purchase_order_updated_at": bool(po_updated_at),
+            "phase7_supplier_bill_match_contract": bool(bill_match_column),
+            "phase7_supplier_return_credit_cost_contract": bool(return_supplier_cost),
+            "phase7_append_only_runtime_grants": bool(phase7_append_only_grants),
+            "phase7_bill_payment_lifecycle_grants": bool(phase7_bill_payment_lifecycle_grants),
             "lexa_app_can_write_permissions_reference": bool(can_write_permissions),
             "lexa_app_can_write_schema_migrations": bool(can_write_migrations),
             "required_phase5_return_routines_found": routine_count,

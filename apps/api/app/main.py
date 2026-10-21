@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from .config import settings
 from .health import check_database, check_redis
-from .routes import auth, organization, rbac, catalog, inventory, commerce, finance, analytics, workspace_context, membership_admin
+from .routes import auth, organization, rbac, catalog, inventory, commerce, finance, analytics, workspace_context, membership_admin, purchasing
 from .kernel import router as kernel_router
 
 app = FastAPI(title="LEXA API", version="1.0.0")
@@ -64,6 +64,7 @@ app.include_router(commerce.router, prefix="/api/v1")
 app.include_router(finance.router, prefix="/api/v1")
 app.include_router(finance.compliance, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(purchasing.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["system"])
