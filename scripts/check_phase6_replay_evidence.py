@@ -46,6 +46,10 @@ def main() -> int:
         errors.append("evidence lacks the Phase 6 table/forced-RLS/tenant-policy contract")
     if evidence.get("lexa_app_can_write_permissions_reference") is not False or evidence.get("lexa_app_can_write_schema_migrations") is not False:
         errors.append("evidence does not prove least-privilege protection for permission and migration reference data")
+    if evidence.get("phase6_inventory_age_index_count") != 1:
+        errors.append("evidence lacks the Phase 6 inventory age-analysis index")
+    if evidence.get("phase6_inventory_health_index_count") != 4:
+        errors.append("evidence lacks all four valid Phase 6 stock-movement health indexes")
     if evidence.get("required_phase5_return_routines_found") != 4:
         errors.append("evidence is missing one or more required Phase 5 return/accounting routines")
     if evidence.get("migration_bundle_sha256") != expected_bundle:

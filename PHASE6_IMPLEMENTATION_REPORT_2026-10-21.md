@@ -1,3 +1,5 @@
+> **Superseded candidate snapshot.** Use `PHASE4_6_COMPLETENESS_IMPLEMENTATION_REPORT_2026-10-21.md` and `PHASE4_6_COMPLETENESS_ACCEPTANCE_MATRIX_2026-10-21.md` for the current Phase 4–6 candidate. This file is retained as the Increment 01 record and its earlier test counts/replay input count are historical.
+
 # LEXA Phase 6 Increment 01 — implementation and gate report
 
 **Assessment date:** 21 October 2026  
@@ -25,7 +27,7 @@ This increment implements both sides of the Phase 6 request: (1) it makes the pr
 
 ## Release-gate engineering
 
-- The replay plan validates all 40 SQL inputs and computes a canonical bundle SHA without opening a database.
+- The replay plan validates all 41 SQL inputs and computes a canonical bundle SHA without opening a database.
 - Actual replay is guarded to empty loopback databases explicitly named `replay`, `test` or `ci`; remote hosts are forbidden.
 - The CI replay job applies migrations against disposable `pgvector/pgvector:pg16`, checks exact current input hashes/source SHA, all public-table RLS enabled/forced status, required Phase 5 routines, Phase 6 policy/RLS, `lexa_app` inability to mutate permissions or the ledger, and adversarial runtime-role cross-tenant read/write behavior with rollback-only fixtures.
 - CI is set to use Node 24 with `npm ci`, typecheck, 28 frontend contract tests and production build. Python CI installs the declared API dev/test dependencies and provisions Redis so the auth-refresh integration cannot be skipped merely because Redis is missing.
@@ -35,7 +37,7 @@ This increment implements both sides of the Phase 6 request: (1) it makes the pr
 - `python -m compileall -q apps/api/app apps/api/tests scripts`: PASS.
 - `python scripts/check_migration_recovery_manifest.py`: PASS.
 - `python scripts/check_migration_sources.py --strict`: PASS; 31 ledger identities, 25 canonical SQL sources, six permanent replacement decisions.
-- `python scripts/run_clean_migration_replay.py --plan-only`: PASS; 40 migration input paths exist and hash cleanly; bundle SHA-256 is computed by the runner.
+- `python scripts/run_clean_migration_replay.py --plan-only`: PASS; 41 migration input paths exist and hash cleanly; bundle SHA-256 is computed by the runner.
 - Python test suites (`../../tests` and `apps/api/tests` from `apps/api`): **182 passed, 1 skipped**. The local skip is auth-refresh test collection because this offline environment lacks the installed `redis` Python package; CI provisions/install Redis and must run it.
 - Frontend contract tests: **28 passed, 0 failed** under Node 22.16.0.
 - `npm run typecheck`/production build not verified locally: `node_modules` and the Node 24 dependency tree are absent and npm registry DNS is unavailable. CI is required to establish Node 24 proof.

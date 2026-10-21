@@ -1,12 +1,41 @@
-# LEXA — Phase 6 Increment 01 inventory-intelligence source handoff (21 October 2026)
+# LEXA — Phase 4–6 Completeness Candidate (v2.11.0, 21 October 2026)
 
-**Authoritative current status:** Phase 3 permanently approved replacements for six lost SQL source files. Historical recovery for those six is closed and must not return as a blocker. `scripts/check_migration_sources.py --strict` now passes with that disposition; clean semantic replay remains a separate CI gate. The current 31-entry read-only production ledger snapshot is `migrations/live_ledger_snapshot_2026-10-21.json`; two current applied sources (029 runtime privilege surface and 031 auth-surface RLS) have been recovered from GitHub and restored.
+**Current status:** local full-source candidate. Phase 3 recovery for the six approved lost SQL originals is permanently closed and is not a future blocker. Their replacements still require semantic replay, which is a separate database correctness gate.
 
-Phase 6 is **Inventory Intelligence**. Increment 01 implements tenant/location-scoped replenishment policies and transparent, advisory reorder recommendations. It does not post stock movements or purchasing actions. See `PHASE6_IMPLEMENTATION_REPORT_2026-10-21.md`, `PHASE6_ACCEPTANCE_MATRIX.md`, and `PHASE6_ENTRY_POLICY.md`.
+## What this candidate adds
 
-**Candidate only:** Python compile/source integrity/strict source reconciliation/replay plan and local contract tests pass. The local backend suite is 182 passed / 1 skipped because Redis cannot be installed in this offline environment; frontend contracts are 28/28 under Node 22.16.0. Actual clean PostgreSQL replay, Node 24 install/typecheck/build, authenticated staging E2E, same-SHA deployments and approved production migrations still need CI/staging evidence. No production SQL or deploy was run for this candidate.
+- Phase 4 reports apply a validated reporting period, use business-profile currency where verified, and distinguish unavailable source data from confirmed empty periods. Inventory/product cost amounts also avoid silently assuming UGX if workspace currency is unavailable.
+- Phase 5 supports multi-line returns and carries the return/refund/settlement accounting guards from the previous candidate.
+- Phase 6 includes per-location replenishment policy/recommendations, ledger-derived 30/60/90-day stock ageing with unknown provenance and reconciliation gaps, and a Stock Health exception view for stockouts/no-sale periods based on completed sales/returns.
+- The CI workflow has Redis-backed backend jobs, Node 24 frontend install/typecheck/contracts/build, guarded disposable PostgreSQL replay, same-commit/checksum evidence, and an AST action/form/link audit.
+- Migrations 037 and 038 add candidate indexes for inventory ageing and movement-health queries.
 
-> Older sections below are dated historical handoff snapshots. Any old statement that the six files must still be recovered before strict source reconciliation can pass is superseded by the Phase 3 permanent decision above and `migrations/migration_dispositions.json`.
+## Current local evidence
+
+- Backend tests: **188 passed, 1 skipped, 0 failed**. The single local skip is the Redis-dependent auth-refresh test because this offline runner has no Redis Python package; CI is configured to provision Redis.
+- Frontend contracts: **33 passed, 0 failed** on local Node 22.16.0.
+- AST audit: **PASS** on 29 TS/TSX files; 117 button-like controls, 27 forms and 33 links.
+- Python compilation, permanent-disposition checks and strict source reconciliation: PASS.
+- Clean replay plan: 42 migration paths and hashes verified; **plan-only**, no SQL executed locally.
+
+## Release boundary
+
+This ZIP is not a production acceptance certificate. Node 24 dependency install/typecheck/build, actual clean PostgreSQL replay, authenticated E2E in sanitized isolated staging, same-SHA Render/Vercel readiness verification, and an approved production migration rollout remain pending. No production SQL mutation or deployment was performed while building this candidate. Migrations 033–038 are not production-applied by this work.
+
+## Current source-of-truth documents
+
+- [`FRESH_NEW_PRODUCT_STRATEGY.md`](FRESH_NEW_PRODUCT_STRATEGY.md)
+- [`PHASE4_6_COMPLETENESS_IMPLEMENTATION_REPORT_2026-10-21.md`](PHASE4_6_COMPLETENESS_IMPLEMENTATION_REPORT_2026-10-21.md)
+- [`PHASE4_6_COMPLETENESS_ACCEPTANCE_MATRIX_2026-10-21.md`](PHASE4_6_COMPLETENESS_ACCEPTANCE_MATRIX_2026-10-21.md)
+- [`docs/PHASE4_6_STRATEGY_COVERAGE_2026-10-21.md`](docs/PHASE4_6_STRATEGY_COVERAGE_2026-10-21.md)
+- [`PHASE6_RELEASE_GATE_STATUS_2026-10-21.json`](PHASE6_RELEASE_GATE_STATUS_2026-10-21.json)
+- [`migrations/migration_dispositions.json`](migrations/migration_dispositions.json)
+- [`migrations/reconstructed/clean_replay_order.json`](migrations/reconstructed/clean_replay_order.json)
+
+---
+
+> **Historical documentation note:** the following handoff sections are retained for audit context. Their test counts, deployment observations and migration-blocker language describe earlier snapshots; they are not current release state if they conflict with the files listed above. In particular, the Phase 3 six-file recovery decision must not be reopened.
+
 
 ## LEXA — background and historical handoffs
 

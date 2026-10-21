@@ -8,7 +8,7 @@ const source = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf
 for (const state of ["dashboardState", "analyticsState", "productsState", "inventorySummaryState", "adjustmentsState", "countsState", "transfersState", "readinessState"]) {
   assert.match(source, new RegExp(`\\[${state}, set${state[0].toUpperCase()}${state.slice(1)}\\] = useState<LoadState>`));
 }
-assert.equal((source.match(/\.catch\(\(\) =>/g) || []).length, 8, "all eight loaders must handle failures independently");
+assert.equal((source.match(/\.catch\(\(\) =>/g) || []).length, 9, "all eight dashboard resources plus the currency source must handle failures independently");
 assert.match(source, /Exception list is incomplete/);
 assert.match(source, /inventorySummaryState === "error" \|\| adjustmentsState === "error"/);
 assert.match(source, /analyticsState === "error" \|\| !analytics/);

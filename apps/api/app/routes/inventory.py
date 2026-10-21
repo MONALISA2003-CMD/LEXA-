@@ -693,6 +693,241 @@ def replenishment_recommendations(
     return {"source": "posted_transactions_and_inventory_balances", "advisory_only": True, "count": len(results), "items": results}
 
 
+@router.get("/movement-health")
+def inventory_movement_health(
+    location_id: UUID | None = None,
+    limit: int = Query(200, ge=1, le=500),
+    ctx=Depends(require_permission("inventory.read")),
+):
+    """Show stockout and low-movement risks using completed sales and returns.
+
+    This is an operational exception view, not a demand forecast. “No sale” means no
+    completed sale is present in LEXA's available history for that tenant/location/SKU.
+    """
+    db, actor_id, tenant_id, _ = ctx
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
+    if location_id:
+        ensure_location_access(db, tenant_id=tenant_id, user_id=actor_id, location_id=location_id)
+
+    stmt = text(r"""
+      WITH scoped_locations AS (
+        SELECT id FROM public.locations
+         WHERE tenant_id=:tenant_id AND id IN :allowed_location_ids
+           AND (:location_id IS NULL OR id=:location_id)
+      ), stock_keys AS (
+        SELECT b.tenant_id,b.location_id,b.variant_id FROM public.inventory_balances b
+         WHERE b.tenant_id=:tenant_id AND b.location_id IN (SELECT id FROM scoped_locations)
+        UNION
+        SELECT p.tenant_id,p.location_id,p.variant_id FROM public.inventory_replenishment_policies p
+         WHERE p.tenant_id=:tenant_id AND p.enabled=true AND p.location_id IN (SELECT id FROM scoped_locations)
+      ), sales_activity AS (
+        SELECT s.tenant_id,s.location_id,tl.product_variant_id AS variant_id,
+               MAX(COALESCE(s.completed_at,s.created_at)) AS last_sale_at,
+               COALESCE(SUM(tl.quantity) FILTER (
+                 WHERE COALESCE(s.completed_at,s.created_at) >= now()-interval '30 days'),0) AS units_sold_30d,
+               COALESCE(SUM(tl.quantity) FILTER (
+                 WHERE COALESCE(s.completed_at,s.created_at) >= now()-interval '90 days'),0) AS units_sold_90d
+          FROM public.sales s
+          JOIN public.business_transactions bt ON bt.tenant_id=s.tenant_id AND bt.id=s.transaction_id
+          JOIN public.transaction_lines tl ON tl.tenant_id=bt.tenant_id AND tl.transaction_id=bt.id
+         WHERE s.tenant_id=:tenant_id AND s.status='COMPLETED'
+           AND bt.status='COMPLETED' AND bt.transaction_type='SALE'
+           AND tl.line_type='PRODUCT' AND tl.product_variant_id IS NOT NULL
+         GROUP BY s.tenant_id,s.location_id,tl.product_variant_id
+      ), returns_activity AS (
+        SELECT sr.tenant_id,COALESCE(sr.inventory_location_id,source_sale.location_id) AS location_id,
+               srl.variant_id,
+               COALESCE(SUM(srl.quantity) FILTER (
+                 WHERE COALESCE(sr.completed_at,sr.created_at) >= now()-interval '30 days'),0) AS units_returned_30d,
+               COALESCE(SUM(srl.quantity) FILTER (
+                 WHERE COALESCE(sr.completed_at,sr.created_at) >= now()-interval '90 days'),0) AS units_returned_90d
+          FROM public.sale_returns sr
+          JOIN public.sales source_sale ON source_sale.tenant_id=sr.tenant_id AND source_sale.id=sr.sale_id
+          JOIN public.sale_return_lines srl ON srl.tenant_id=sr.tenant_id AND srl.return_id=sr.id
+         WHERE sr.tenant_id=:tenant_id AND sr.status='COMPLETED'
+         GROUP BY sr.tenant_id,COALESCE(sr.inventory_location_id,source_sale.location_id),srl.variant_id
+      )
+      SELECT k.location_id,l.name AS location_name,k.variant_id,pr.name AS product_name,
+             pv.name AS variant_name,pv.sku,COALESCE(b.on_hand,0) AS on_hand,
+             COALESCE(b.reserved,0) AS reserved,
+             COALESCE(b.on_hand,0)-COALESCE(b.reserved,0) AS available,
+             COALESCE(b.inbound,0) AS inbound,COALESCE(b.stock_value,0) AS stock_value,
+             sa.last_sale_at,
+             CASE WHEN sa.last_sale_at IS NULL THEN NULL
+                  ELSE CURRENT_DATE-sa.last_sale_at::date END AS days_since_last_sale,
+             COALESCE(sa.units_sold_30d,0) AS units_sold_30d,
+             COALESCE(ra.units_returned_30d,0) AS units_returned_30d,
+             GREATEST(COALESCE(sa.units_sold_30d,0)-COALESCE(ra.units_returned_30d,0),0) AS net_units_sold_30d,
+             COALESCE(sa.units_sold_90d,0) AS units_sold_90d,
+             COALESCE(ra.units_returned_90d,0) AS units_returned_90d,
+             GREATEST(COALESCE(sa.units_sold_90d,0)-COALESCE(ra.units_returned_90d,0),0) AS net_units_sold_90d,
+             p.minimum_available,
+             CASE
+               WHEN COALESCE(b.on_hand,0)-COALESCE(b.reserved,0) <= 0
+                    AND GREATEST(COALESCE(sa.units_sold_90d,0)-COALESCE(ra.units_returned_90d,0),0)>0
+                 THEN 'OUT_OF_STOCK_WITH_RECENT_DEMAND'
+               WHEN COALESCE(b.on_hand,0)-COALESCE(b.reserved,0) <= 0 THEN 'OUT_OF_STOCK'
+               WHEN p.id IS NOT NULL AND COALESCE(b.on_hand,0)-COALESCE(b.reserved,0) <= p.minimum_available
+                 THEN 'AT_OR_BELOW_CONFIGURED_MINIMUM'
+               WHEN sa.last_sale_at IS NULL THEN 'NO_COMPLETED_SALE_HISTORY'
+               WHEN sa.last_sale_at < now()-interval '90 days' THEN 'NO_SALE_90D'
+               WHEN sa.last_sale_at < now()-interval '60 days' THEN 'NO_SALE_60D'
+               WHEN sa.last_sale_at < now()-interval '30 days' THEN 'NO_SALE_30D'
+               ELSE 'ACTIVE'
+             END AS health_status
+        FROM stock_keys k
+        JOIN scoped_locations sl ON sl.id=k.location_id
+        JOIN public.locations l ON l.tenant_id=k.tenant_id AND l.id=k.location_id
+        JOIN public.product_variants pv ON pv.tenant_id=k.tenant_id AND pv.id=k.variant_id
+        JOIN public.products pr ON pr.tenant_id=pv.tenant_id AND pr.id=pv.product_id
+        LEFT JOIN public.inventory_balances b ON b.tenant_id=k.tenant_id AND b.location_id=k.location_id AND b.variant_id=k.variant_id
+        LEFT JOIN sales_activity sa ON sa.tenant_id=k.tenant_id AND sa.location_id=k.location_id AND sa.variant_id=k.variant_id
+        LEFT JOIN returns_activity ra ON ra.tenant_id=k.tenant_id AND ra.location_id=k.location_id AND ra.variant_id=k.variant_id
+        LEFT JOIN public.inventory_replenishment_policies p
+          ON p.tenant_id=k.tenant_id AND p.location_id=k.location_id AND p.variant_id=k.variant_id AND p.enabled=true
+       WHERE k.tenant_id=:tenant_id
+       ORDER BY CASE
+         WHEN COALESCE(b.on_hand,0)-COALESCE(b.reserved,0)<=0 AND COALESCE(sa.units_sold_90d,0)>0 THEN 0
+         WHEN COALESCE(b.on_hand,0)-COALESCE(b.reserved,0)<=0 THEN 1
+         WHEN p.id IS NOT NULL AND COALESCE(b.on_hand,0)-COALESCE(b.reserved,0)<=p.minimum_available THEN 2
+         WHEN sa.last_sale_at IS NULL THEN 3
+         WHEN sa.last_sale_at < now()-interval '90 days' THEN 4
+         WHEN sa.last_sale_at < now()-interval '60 days' THEN 5
+         WHEN sa.last_sale_at < now()-interval '30 days' THEN 6 ELSE 7 END,
+         COALESCE(CURRENT_DATE-sa.last_sale_at::date,-1) DESC,
+         COALESCE(b.stock_value,0) DESC,l.name,pr.name,pv.sku
+       LIMIT :limit
+    """).bindparams(bindparam("allowed_location_ids", expanding=True))
+    rows = db.execute(stmt, {
+        "tenant_id": str(tenant_id), "allowed_location_ids": list(allowed_locations),
+        "location_id": str(location_id) if location_id else None, "limit": limit,
+    }).mappings().all()
+    return {
+        "source": "completed_sales_returns_and_inventory_balances",
+        "counts_as_completed_sale_only": True,
+        "count": len(rows),
+        "items": [{
+            **{key: (str(value) if isinstance(value, Decimal) else value) for key, value in row.items()},
+            "currency_note": "Stock value is current cost valuation; units and movement recency are operational indicators, not a profitability measure.",
+        } for row in rows],
+    }
+
+
+@router.get("/ageing")
+def inventory_ageing(
+    location_id: UUID | None = None,
+    limit: int = Query(200, ge=1, le=500),
+    ctx=Depends(require_permission("inventory.read")),
+):
+    """Return ledger-derived remaining-stock age signals for accessible locations.
+
+    Positive opening/count-correction/transfer-in quantities have unknown provenance and
+    are reported separately. The bucket allocator consumes those unknown-age quantities
+    first as an explicitly analytical convention; it is not an accounting FIFO valuation.
+    """
+    db, actor_id, tenant_id, _ = ctx
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
+    if location_id:
+        ensure_location_access(db, tenant_id=tenant_id, user_id=actor_id, location_id=location_id)
+
+    stmt = text(r"""
+      WITH ledger AS (
+        SELECT t.tenant_id, t.location_id, t.variant_id, t.id, t.occurred_at,
+               t.transaction_type, t.quantity_delta,
+               CASE WHEN t.quantity_delta > 0 AND upper(t.transaction_type) IN
+                    ('OPENING_BALANCE','OPENING_STOCK','ADJUSTMENT','COUNT_CORRECTION',
+                     'COUNT_RECONCILIATION','STOCK_COUNT_ADJUSTMENT','STOCK_COUNT_VARIANCE',
+                     'TRANSFER_IN','LEGACY_RECONCILIATION')
+                    THEN t.quantity_delta ELSE 0::numeric END AS unknown_in,
+               CASE WHEN t.quantity_delta > 0 AND upper(t.transaction_type) NOT IN
+                    ('OPENING_BALANCE','OPENING_STOCK','ADJUSTMENT','COUNT_CORRECTION',
+                     'COUNT_RECONCILIATION','STOCK_COUNT_ADJUSTMENT','STOCK_COUNT_VARIANCE',
+                     'TRANSFER_IN','LEGACY_RECONCILIATION')
+                    THEN t.quantity_delta ELSE 0::numeric END AS traceable_in,
+               CASE WHEN t.quantity_delta < 0 THEN -t.quantity_delta ELSE 0::numeric END AS outflow
+          FROM public.inventory_transactions t
+         WHERE t.tenant_id=:tenant_id AND t.location_id IN :allowed_location_ids
+           AND (:location_id IS NULL OR t.location_id=:location_id)
+      ), totals AS (
+        SELECT tenant_id, location_id, variant_id,
+               SUM(quantity_delta) AS ledger_quantity,
+               SUM(unknown_in) AS unknown_in,
+               SUM(traceable_in) AS traceable_in,
+               SUM(outflow) AS total_outflow,
+               MAX(occurred_at) AS last_movement_at
+          FROM ledger GROUP BY tenant_id,location_id,variant_id
+      ), inventory_keys AS (
+        SELECT tenant_id,location_id,variant_id FROM totals
+        UNION
+        SELECT b.tenant_id,b.location_id,b.variant_id
+          FROM public.inventory_balances b
+         WHERE b.tenant_id=:tenant_id AND b.location_id IN :allowed_location_ids
+           AND (:location_id IS NULL OR b.location_id=:location_id)
+      ), layer_running AS (
+        SELECT l.tenant_id,l.location_id,l.variant_id,l.id,l.occurred_at,l.traceable_in,
+               SUM(l.traceable_in) OVER (
+                 PARTITION BY l.tenant_id,l.location_id,l.variant_id
+                 ORDER BY l.occurred_at,l.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+               ) AS cumulative_in
+          FROM ledger l WHERE l.traceable_in > 0
+      ), remaining_layers AS (
+        SELECT r.tenant_id,r.location_id,r.variant_id,r.occurred_at,
+               GREATEST(r.cumulative_in-GREATEST(t.total_outflow-t.unknown_in,0),0)
+               - GREATEST(r.cumulative_in-r.traceable_in-GREATEST(t.total_outflow-t.unknown_in,0),0)
+                 AS remaining_quantity
+          FROM layer_running r JOIN totals t USING (tenant_id,location_id,variant_id)
+      ), age_aggregate AS (
+        SELECT tenant_id,location_id,variant_id,
+               SUM(remaining_quantity) AS traceable_remaining,
+               SUM(remaining_quantity) FILTER (WHERE CURRENT_DATE-occurred_at::date >= 30) AS aged_over_30,
+               SUM(remaining_quantity) FILTER (WHERE CURRENT_DATE-occurred_at::date >= 60) AS aged_over_60,
+               SUM(remaining_quantity) FILTER (WHERE CURRENT_DATE-occurred_at::date >= 90) AS aged_over_90,
+               MAX(CURRENT_DATE-occurred_at::date) FILTER (WHERE remaining_quantity > 0) AS oldest_remaining_age_days
+          FROM remaining_layers GROUP BY tenant_id,location_id,variant_id
+      )
+      SELECT k.location_id,l.name AS location_name,k.variant_id,pv.sku,p.name AS product_name,pv.name AS variant_name,
+             COALESCE(b.on_hand,0) AS on_hand,COALESCE(b.reserved,0) AS reserved,
+             COALESCE(b.on_hand,0)-COALESCE(b.reserved,0) AS available,
+             COALESCE(b.stock_value,0) AS stock_value,COALESCE(b.average_cost,0) AS average_cost,
+             COALESCE(a.aged_over_30,0) AS aged_over_30,
+             COALESCE(a.aged_over_60,0) AS aged_over_60,
+             COALESCE(a.aged_over_90,0) AS aged_over_90,
+             COALESCE(a.traceable_remaining,0) AS traceable_remaining,
+             GREATEST(COALESCE(t.unknown_in,0)-COALESCE(t.total_outflow,0),0) AS unknown_age_quantity,
+             a.oldest_remaining_age_days,t.last_movement_at,
+             (ABS(COALESCE(t.ledger_quantity,0)-COALESCE(b.on_hand,0)) > 0.000001
+               OR ABS(COALESCE(a.traceable_remaining,0)
+                    + GREATEST(COALESCE(t.unknown_in,0)-COALESCE(t.total_outflow,0),0)
+                    - COALESCE(b.on_hand,0)) > 0.000001) AS reconciliation_gap
+        FROM inventory_keys k
+        JOIN public.locations l ON l.tenant_id=k.tenant_id AND l.id=k.location_id
+        JOIN public.product_variants pv ON pv.tenant_id=k.tenant_id AND pv.id=k.variant_id
+        JOIN public.products p ON p.tenant_id=pv.tenant_id AND p.id=pv.product_id
+        LEFT JOIN public.inventory_balances b ON b.tenant_id=k.tenant_id AND b.location_id=k.location_id AND b.variant_id=k.variant_id
+        LEFT JOIN totals t USING (tenant_id,location_id,variant_id)
+        LEFT JOIN age_aggregate a USING (tenant_id,location_id,variant_id)
+       WHERE k.tenant_id=:tenant_id
+       ORDER BY reconciliation_gap DESC, aged_over_90 DESC, aged_over_60 DESC, aged_over_30 DESC,
+                l.name,p.name,pv.sku
+       LIMIT :limit
+    """).bindparams(bindparam("allowed_location_ids", expanding=True))
+    rows = db.execute(stmt, {
+        "tenant_id": str(tenant_id), "allowed_location_ids": list(allowed_locations),
+        "location_id": str(location_id) if location_id else None, "limit": limit,
+    }).mappings().all()
+    return {
+        "source": "inventory_ledger_and_balance_projection",
+        "age_method": "Unknown-provenance receipts are kept outside dated age bands and consumed first for this advisory age estimate. Traceable remaining positive ledger layers use oldest-first depletion. This is not batch/serial tracking or FIFO accounting valuation.",
+        "count": len(rows),
+        "items": [
+            {**{key: (str(value) if isinstance(value, Decimal) else value) for key, value in row.items()},
+             "age_status": "RECONCILIATION_GAP" if row["reconciliation_gap"] else ("UNKNOWN_AGE_PRESENT" if Decimal(str(row["unknown_age_quantity"])) > 0 else "TRACEABLE"),
+             "currency_note": "Stock value is the current ledger balance valuation; age bands are quantities, not a separate valuation method."}
+            for row in rows
+        ],
+    }
+
+
 @router.post("/rebuild", response_model=dict)
 def rebuild_inventory_balances(ctx=Depends(require_permission("inventory.rebuild"))):
     """Replay the immutable ledger and rebuild materialized on-hand/WAC projections."""

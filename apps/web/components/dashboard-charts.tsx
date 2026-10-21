@@ -3,11 +3,11 @@
 import { useId } from "react";
 import type { AnalyticsDailyMetric } from "../lib/api";
 
-const money = (value: string | number, currencyCode = "UGX") => new Intl.NumberFormat("en-UG", {
-  style: "currency",
-  currency: currencyCode,
-  maximumFractionDigits: 0,
-}).format(Number(value));
+const money = (value: string | number, currencyCode?: string | null) => {
+  if (!currencyCode || !/^[A-Z]{3}$/.test(currencyCode)) return "Currency unavailable";
+  try { return new Intl.NumberFormat("en-UG", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(Number(value)); }
+  catch { return `${currencyCode} ${Number(value).toLocaleString("en-UG", { maximumFractionDigits: 0 })}`; }
+};
 
 const compactMoney = (value: number) => new Intl.NumberFormat("en-UG", {
   notation: "compact",
@@ -47,11 +47,11 @@ function contiguousSegments(points: Point[]) {
 }
 
 /** An accessible, dependency-free time-series chart sourced only from API records. */
-export function SalesTrendChart({ daily, startDate, endDate, currencyCode = "UGX" }: {
+export function SalesTrendChart({ daily, startDate, endDate, currencyCode }: {
   daily: AnalyticsDailyMetric[];
   startDate: string;
   endDate: string;
-  currencyCode?: string;
+  currencyCode?: string | null;
 }) {
   const titleId = useId();
   const descriptionId = useId();

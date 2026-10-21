@@ -13,6 +13,7 @@ import {
   createSaleReturn,
   getCommerceCustomers,
   getCommerceDashboard,
+  getBusinessProfile,
   getCommerceProducts,
   getCommerceSale,
   getCommerceSales,
@@ -39,7 +40,8 @@ import {
   type SaleReturn,
 } from "../../lib/api";
 
-function money(v: string | number, currencyCode = "UGX") {
+function money(v: string | number, currencyCode?: string | null) {
+  if (!currencyCode || !/^[A-Z]{3}$/.test(currencyCode)) return "Currency unavailable";
   try {
     return new Intl.NumberFormat("en-UG", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(Number(v));
   } catch {
@@ -63,6 +65,7 @@ export default function CommercePage() {
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<CommerceDashboard | null>(null);
+  const [businessCurrency, setBusinessCurrency] = useState<string | null>(null);
   const [customers, setCustomers] = useState<CommerceCustomer[]>([]);
   const [channels, setChannels] = useState<PaymentChannel[]>([]);
   const [products, setProducts] = useState<CommerceProduct[]>([]);
@@ -105,8 +108,7 @@ export default function CommercePage() {
 
   const [returnSaleId, setReturnSaleId] = useState("");
   const [returnSale, setReturnSale] = useState<CommerceSaleDetail | null>(null);
-  const [returnLineId, setReturnLineId] = useState("");
-  const [returnQty, setReturnQty] = useState("1");
+  const [returnQuantities, setReturnQuantities] = useState<Record<string, string>>({});
   const [returnReason, setReturnReason] = useState("");
   const [returnSettlement, setReturnSettlement] = useState<"NONE" | "REFUND" | "CUSTOMER_CREDIT">("NONE");
   const [refundChannelId, setRefundChannelId] = useState("");
@@ -119,15 +121,15 @@ export default function CommercePage() {
   }, [products, productSearch]);
   const cartTotal = useMemo(() => cart.reduce((sum, line) => sum + Math.max(0, Number(line.quantity) || 0) * Math.max(0, Number(line.unitPrice) || 0), 0), [cart]);
   const selectedReconData = useMemo(() => reconciliations.find((x) => x.id === selectedRecon), [reconciliations, selectedRecon]);
-  const currencyCode = dashboard?.currency_code || channels.find((x) => x.active)?.currency_code || "UGX";
+  const currencyCode = businessCurrency ?? "";
   const moneyInWorkspace = (value: string | number) => money(value, currencyCode);
   const activeCurrencyChannels = useMemo(() => channels.filter((x) => x.active && x.currency_code === currencyCode), [channels, currencyCode]);
-  const selectedReturnLine = useMemo(() => returnSale?.lines.find((x) => x.sale_line_id === returnLineId), [returnSale, returnLineId]);
+  const selectedReturnLines = useMemo(() => (returnSale?.lines || []).filter((line) => Number(returnQuantities[line.sale_line_id] || 0) > 0), [returnSale, returnQuantities]);
 
   async function refresh() {
     setBusy(true);
     try {
-      const [d, c, ch, p, l, s, r, re, rr] = await Promise.all([
+      const [d, c, ch, p, l, s, r, re, rr, profile] = await Promise.all([
         getCommerceDashboard(),
         getCommerceCustomers(),
         getPaymentChannels(),
@@ -137,7 +139,10 @@ export default function CommercePage() {
         getReceivables(),
         getReconciliations(),
         getSaleReturns(),
+        getBusinessProfile().catch(() => null),
       ]);
+      const profileCurrency = profile?.currency_code && /^[A-Z]{3}$/i.test(profile.currency_code) ? profile.currency_code.toUpperCase() : (d.currency_code && /^[A-Z]{3}$/i.test(d.currency_code) ? d.currency_code.toUpperCase() : null);
+      setBusinessCurrency(profileCurrency);
       setDashboard(d);
       setCustomers(c);
       setChannels(ch);
@@ -152,7 +157,8 @@ export default function CommercePage() {
       // have organization.read; the server still enforces assigned-branch scope.
       void getBranches().then(setBranches).catch(() => setBranches([]));
       if (!locationId && l[0]) setLocationId(l[0].id);
-      const usableChannels = ch.filter((x) => x.active && x.currency_code === currencyCode);
+      const usableChannels = profileCurrency ? ch.filter((x) => x.active && x.currency_code === profileCurrency) : [];
+      if (!profileCurrency) setMessage("Business currency unavailable. Configure the workspace currency before recording money movements.");
       if (!paymentRows[0]?.channelId && usableChannels[0]) setPaymentRows([{ channelId: usableChannels[0].id, amount: "0" }]);
       if (!refundChannelId && usableChannels[0]) setRefundChannelId(usableChannels[0].id);
       if (!variantId && p[0]) {
@@ -164,7 +170,7 @@ export default function CommercePage() {
         setReturnSaleId(s[0].id);
         const detail = await getCommerceSale(s[0].id);
         setReturnSale(detail);
-        if (detail.lines[0]) setReturnLineId(detail.lines[0].sale_line_id);
+        setReturnQuantities(Object.fromEntries(detail.lines.map((line) => [line.sale_line_id, ""])));
       }
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Unable to load commerce workspace");
@@ -203,6 +209,7 @@ export default function CommercePage() {
 
   async function submitChannel(e: FormEvent) {
     e.preventDefault();
+    if (!currencyCode) { setMessage("Business currency unavailable. Configure the workspace currency first."); return; }
     try {
       await createPaymentChannel({ name: channelName, channel_type: channelType, provider: provider || undefined, currency_code: currencyCode });
       setChannelName("");
@@ -269,6 +276,7 @@ export default function CommercePage() {
     e.preventDefault();
     if (submittingSale) return;
     try {
+      if (!currencyCode) throw new Error("Business currency unavailable. Configure the workspace currency first.");
       if (!locationId || cart.length === 0) throw new Error("Select a location and add at least one cart item.");
       const payments = paymentRows
         .filter((x) => Number(x.amount) > 0)
@@ -308,7 +316,8 @@ export default function CommercePage() {
   }
 
   async function submitReceivablePayment(id: string) {
-    const amount = window.prompt(`Amount received (${currencyCode})`);
+    if (!currencyCode) { setMessage("Business currency unavailable. Configure the workspace currency first."); return; }
+    const amount = window.prompt(`Amount received (${currencyCode || "currency unavailable"})`);
     if (!amount) return;
     const ch = paymentRows[0]?.channelId || activeCurrencyChannels[0]?.id;
     if (!ch) {
@@ -371,15 +380,14 @@ export default function CommercePage() {
   async function loadReturnSale(id: string) {
     setReturnSaleId(id);
     setReturnSale(null);
-    setReturnLineId("");
+    setReturnQuantities({});
     if (!id) return;
     try {
       const detail = await getCommerceSale(id);
       setReturnSale(detail);
-      if (detail.lines[0]) setReturnLineId(detail.lines[0].sale_line_id);
+      setReturnQuantities(Object.fromEntries(detail.lines.map((line) => [line.sale_line_id, ""])));
       setReturnSettlement("NONE");
       setReturnReason("");
-      setReturnQty("1");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Could not load sale");
     }
@@ -387,8 +395,22 @@ export default function CommercePage() {
 
   async function submitReturn(e: FormEvent) {
     e.preventDefault();
-    if (!returnSale || !returnLineId) {
-      setMessage("Select a completed sale and sale line.");
+    if (!currencyCode) { setMessage("Business currency unavailable. Configure the workspace currency first."); return; }
+    if (!returnSale) {
+      setMessage("Select a completed sale first.");
+      return;
+    }
+    const enteredLines = returnSale.lines.filter((line) => (returnQuantities[line.sale_line_id] || "").trim() !== "");
+    if (!enteredLines.length) {
+      setMessage("Enter a return quantity for at least one sale line.");
+      return;
+    }
+    const invalidLine = enteredLines.find((line) => {
+      const quantity = Number(returnQuantities[line.sale_line_id]);
+      return !Number.isFinite(quantity) || quantity <= 0 || quantity > Number(line.quantity);
+    });
+    if (invalidLine) {
+      setMessage(`Enter a positive quantity no greater than the original sale quantity for ${invalidLine.variant_name || invalidLine.sku || short(invalidLine.sale_line_id)}. Previously returned quantity is also checked by the server.`);
       return;
     }
     try {
@@ -398,7 +420,7 @@ export default function CommercePage() {
         business_date: today(),
         settlement_type: returnSettlement,
         refund_channel_id: returnSettlement === "REFUND" ? refundChannelId : null,
-        lines: [{ sale_line_id: returnLineId, quantity: returnQty }],
+        lines: enteredLines.map((line) => ({ sale_line_id: line.sale_line_id, quantity: returnQuantities[line.sale_line_id] })),
       });
       setMessage(`Return ${short(result.id)} completed for ${moneyInWorkspace(result.total)}.`);
       await refresh();
@@ -502,14 +524,14 @@ export default function CommercePage() {
 
           {tab === "Customers" && (
             <div className="split-panel">
-              <form className="command-form" onSubmit={submitCustomer}><div><p className="eyebrow">CUSTOMER</p><h3>Add a customer</h3><p>Customer records do not require bank or mobile-money credentials.</p></div><label>Display name<input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required /></label><label>Phone<input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} /></label><button className="primary">Save customer</button></form>
+              <form className="command-form" onSubmit={submitCustomer}><div><p className="eyebrow">CUSTOMER</p><h3>Add a customer</h3><p>Customer records do not require bank or mobile-money credentials.</p></div><label>Display name<input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required /></label><label>Phone<input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} /></label><button type="submit" className="primary">Save customer</button></form>
               <div className="workflow-list">{customers.map((c) => <div className="workflow-row" key={c.party_id}><div><strong>{c.display_name}</strong><small>{c.phone || c.email || "No contact"}</small></div><span className="status neutral">{c.status}</span><span>{moneyInWorkspace(c.credit_limit)}</span></div>)}</div>
             </div>
           )}
 
           {tab === "Payment Channels" && (
             <div className="split-panel">
-              <form className="command-form" onSubmit={submitChannel}><div><p className="eyebrow">PAYMENT CHANNEL</p><h3>Configure where money is received</h3><p>No account numbers, PINs, OTPs, passwords, API keys or access tokens are stored here.</p></div><label>Name<input value={channelName} onChange={(e) => setChannelName(e.target.value)} placeholder="MTN Line 2" required /></label><div className="form-grid"><label>Type<select value={channelType} onChange={(e) => setChannelType(e.target.value)}><option>CASH</option><option>MOBILE_MONEY</option><option>BANK</option><option>CARD</option><option>CHEQUE</option><option>OTHER</option></select></label><label>Provider<input value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="MTN" /></label></div><button className="primary">Save channel</button></form>
+              <form className="command-form" onSubmit={submitChannel}><div><p className="eyebrow">PAYMENT CHANNEL</p><h3>Configure where money is received</h3><p>No account numbers, PINs, OTPs, passwords, API keys or access tokens are stored here.</p></div><label>Name<input value={channelName} onChange={(e) => setChannelName(e.target.value)} placeholder="MTN Line 2" required /></label><div className="form-grid"><label>Type<select value={channelType} onChange={(e) => setChannelType(e.target.value)}><option>CASH</option><option>MOBILE_MONEY</option><option>BANK</option><option>CARD</option><option>CHEQUE</option><option>OTHER</option></select></label><label>Provider<input value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="MTN" /></label></div><button type="submit" className="primary">Save channel</button></form>
               <div className="workflow-list">{channels.map((c) => <div className="workflow-row" key={c.id}><div><strong>{c.name}</strong><small>{c.channel_type} · {c.provider || ""} · {c.currency_code}</small></div><span className={c.active ? "status good" : "status neutral"}>{c.active ? "ACTIVE" : "INACTIVE"}</span></div>)}</div>
             </div>
           )}
@@ -525,7 +547,7 @@ export default function CommercePage() {
 
           {tab === "Returns" && (
             <div className="split-panel">
-              <form className="command-form" onSubmit={submitReturn}><div><p className="eyebrow">RETURNS</p><h3>Record a sale return</h3><p>LEXA restores stock, reduces the sale value and records a refund or customer credit without deleting the original sale.</p></div><label>Completed sale<select value={returnSaleId} onChange={(e) => void loadReturnSale(e.target.value)} required><option value="">Select sale</option>{sales.filter((s) => s.status === "COMPLETED").map((s) => <option key={s.id} value={s.id}>{short(s.id)} · {s.customer_name || "Walk-in"} · {moneyInWorkspace(s.total)}</option>)}</select></label><label>Sale line<select value={returnLineId} onChange={(e) => setReturnLineId(e.target.value)} required><option value="">Select line</option>{returnSale?.lines.map((line) => <option key={line.sale_line_id} value={line.sale_line_id}>{line.variant_name || line.sku || short(line.sale_line_id)} · Qty {line.quantity}</option>)}</select></label><div className="form-grid"><label>Quantity<input type="number" min="0.001" step="0.001" value={returnQty} onChange={(e) => setReturnQty(e.target.value)} required /></label><label>Reason<input value={returnReason} onChange={(e) => setReturnReason(e.target.value)} required placeholder="Customer return" /></label></div><label>Settlement<select value={returnSettlement} onChange={(e) => setReturnSettlement(e.target.value as "NONE" | "REFUND" | "CUSTOMER_CREDIT")}><option value="NONE">No immediate settlement</option><option value="REFUND">Refund</option><option value="CUSTOMER_CREDIT" disabled={!returnSale?.customer_party_id}>Customer credit</option></select></label>{returnSettlement === "REFUND" && <label>Refund channel<select value={refundChannelId} onChange={(e) => setRefundChannelId(e.target.value)} required><option value="">Select refund channel</option>{activeCurrencyChannels.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.channel_type}</option>)}</select></label>}<div className="inline-message">Selected line {selectedReturnLine ? `${selectedReturnLine.variant_name || selectedReturnLine.sku || short(selectedReturnLine.sale_line_id)} · ${moneyInWorkspace(selectedReturnLine.line_total)}` : "not selected"}</div><button className="primary" type="submit">Complete return</button></form>
+              <form className="command-form" onSubmit={submitReturn}><div><p className="eyebrow">RETURNS</p><h3>Record a sale return</h3><p>LEXA restores stock, reduces the sale value and records a refund or customer credit without deleting the original sale.</p></div><label>Completed sale<select value={returnSaleId} onChange={(e) => void loadReturnSale(e.target.value)} required><option value="">Select sale</option>{sales.filter((s) => s.status === "COMPLETED").map((s) => <option key={s.id} value={s.id}>{short(s.id)} · {s.customer_name || "Walk-in"} · {moneyInWorkspace(s.total)}</option>)}</select></label><fieldset className="return-line-list"><legend>Items and return quantities</legend><p className="muted">Leave items at zero/blank if they are not being returned. The server checks the remaining returnable quantity against previous completed returns.</p>{returnSale?.lines.map((line) => <div className="return-line-row" key={line.sale_line_id}><label>{line.variant_name || line.sku || short(line.sale_line_id)}<small>Sold {Number(line.quantity).toLocaleString()} · {moneyInWorkspace(line.unit_price)} per unit</small><input type="number" min="0" max={line.quantity} step="0.001" value={returnQuantities[line.sale_line_id] ?? ""} onChange={(e) => setReturnQuantities((current) => ({ ...current, [line.sale_line_id]: e.target.value }))} aria-label={`Return quantity for ${line.variant_name || line.sku || short(line.sale_line_id)}`} /></label></div>)}</fieldset><div className="form-grid"><label>Reason<input value={returnReason} onChange={(e) => setReturnReason(e.target.value)} required placeholder="Customer return" /></label></div><label>Settlement<select value={returnSettlement} onChange={(e) => setReturnSettlement(e.target.value as "NONE" | "REFUND" | "CUSTOMER_CREDIT")}><option value="NONE">No immediate settlement</option><option value="REFUND">Refund</option><option value="CUSTOMER_CREDIT" disabled={!returnSale?.customer_party_id}>Customer credit</option></select></label>{returnSettlement === "REFUND" && <label>Refund channel<select value={refundChannelId} onChange={(e) => setRefundChannelId(e.target.value)} required><option value="">Select refund channel</option>{activeCurrencyChannels.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.channel_type}</option>)}</select></label>}<div className="inline-message">{selectedReturnLines.length ? `${selectedReturnLines.length} line${selectedReturnLines.length === 1 ? "" : "s"} selected for return.` : "No return quantities entered yet."}</div><button className="primary" type="submit" disabled={!returnSale || selectedReturnLines.length === 0}>Complete return</button></form>
               <div className="workflow-list">{returns.length ? returns.map((r) => <div className="workflow-row" key={r.id}><div><strong>{short(r.id)} · Sale {short(r.sale_id)}</strong><small>{r.status} · {r.reason}</small></div><span>{moneyInWorkspace(r.total)}</span><span className="status neutral">Refund {moneyInWorkspace(r.refunded)}</span><small>{r.journal_entry_id ? `Journal ${short(r.journal_entry_id)}` : "Journal pending"}{r.fiscal_document_id ? ` · Credit note ${r.fiscal_document_status || "PENDING"}` : ""}</small></div>) : <div className="empty-inline">No returns recorded yet.</div>}</div>
             </div>
           )}

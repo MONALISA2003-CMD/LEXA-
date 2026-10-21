@@ -8,14 +8,18 @@ import { SalesTrendChart } from "../components/dashboard-charts";
 import { localDateISO } from "../lib/date.mjs";
 import {
   getAnalyticsOverview, getAnalyticsProductSummary, getCommerceDashboard, getInventorySummary, getAdjustments, getStockCounts, getTransfers,
-  getReadiness, type AnalyticsOverview, type AnalyticsProductSummary, type CommerceDashboard, type InventoryAdjustment, type InventorySummary,
+  getReadiness, getBusinessProfile, type AnalyticsOverview, type AnalyticsProductSummary, type CommerceDashboard, type InventoryAdjustment, type InventorySummary,
   type StockCount, type Transfer,
 } from "../lib/api";
 
 type LoadState = "loading" | "success" | "error";
 type DashboardPeriod = "7d" | "30d" | "90d";
 const today = () => localDateISO();
-const money = (value: string | number, currencyCode = "UGX") => new Intl.NumberFormat("en-UG", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(Number(value));
+const money = (value: string | number, currencyCode?: string | null) => {
+  if (!currencyCode || !/^[A-Z]{3}$/.test(currencyCode)) return "Currency unavailable";
+  try { return new Intl.NumberFormat("en-UG", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(Number(value)); }
+  catch { return `${currencyCode} ${Number(value).toLocaleString("en-UG", { maximumFractionDigits: 0 })}`; }
+};
 const short = (id: string) => `${id.slice(0, 8)}…`;
 const periodDays: Record<DashboardPeriod, number> = { "7d": 7, "30d": 30, "90d": 90 };
 const periodLabels: Record<DashboardPeriod, string> = { "7d": "Last 7 days", "30d": "Last 30 days", "90d": "Last 90 days" };
@@ -53,6 +57,7 @@ function LoadError({ title, retry }: { title: string; retry: () => void }) {
 
 export default function HomePage() {
   const [dashboard, setDashboard] = useState<CommerceDashboard | null>(null);
+  const [businessCurrency, setBusinessCurrency] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsOverview | null>(null);
   const [productMetrics, setProductMetrics] = useState<AnalyticsProductSummary[]>([]);
   const [inventorySummary, setInventorySummary] = useState<InventorySummary | null>(null);
@@ -81,13 +86,19 @@ export default function HomePage() {
     const range = rangeFor(period, businessDate);
     setAnalyticsState("loading");
     setProductsState("loading");
+    const currencyCode = businessCurrency;
+    if (!currencyCode || !/^[A-Z]{3}$/.test(currencyCode)) {
+      setAnalytics(null); setAnalyticsState("error");
+      setProductMetrics([]); setProductsState("error");
+      return;
+    }
     const tasks = [
-      getAnalyticsOverview(range.start, range.end, dashboard?.currency_code ?? "UGX").then(value => {
+      getAnalyticsOverview(range.start, range.end, currencyCode).then(value => {
         if (requestId === analyticsRequest.current) { setAnalytics(value); setAnalyticsState("success"); }
       }).catch(() => {
         if (requestId === analyticsRequest.current) { setAnalytics(null); setAnalyticsState("error"); }
       }),
-      getAnalyticsProductSummary(range.start, range.end, dashboard?.currency_code ?? "UGX").then(value => {
+      getAnalyticsProductSummary(range.start, range.end, currencyCode).then(value => {
         if (requestId === analyticsRequest.current) { setProductMetrics(value); setProductsState("success"); }
       }).catch(() => {
         if (requestId === analyticsRequest.current) { setProductMetrics([]); setProductsState("error"); }
@@ -100,7 +111,15 @@ export default function HomePage() {
     setDashboardState("loading"); setInventorySummaryState("loading"); setAdjustmentsState("loading");
     setCountsState("loading"); setTransfersState("loading"); setReadinessState("loading");
     const tasks = [
-      getCommerceDashboard().then(value => { setDashboard(value); setDashboardState("success"); }).catch(() => { setDashboard(null); setDashboardState("error"); }),
+      getCommerceDashboard().then(value => {
+        setDashboard(value); setDashboardState("success");
+        const reported = value.currency_code && /^[A-Z]{3}$/i.test(value.currency_code) ? value.currency_code.toUpperCase() : null;
+        setBusinessCurrency(current => current || reported);
+      }).catch(() => { setDashboard(null); setDashboardState("error"); }),
+      getBusinessProfile().then(profile => {
+        const code = profile?.currency_code && /^[A-Z]{3}$/i.test(profile.currency_code) ? profile.currency_code.toUpperCase() : null;
+        if (code) setBusinessCurrency(code);
+      }).catch(() => { /* Fall back to the currency explicitly reported by the authorized dashboard API. */ }),
       getInventorySummary().then(value => { setInventorySummary(value); setInventorySummaryState("success"); }).catch(() => { setInventorySummary(null); setInventorySummaryState("error"); }),
       getAdjustments().then(value => { setAdjustments(value); setAdjustmentsState("success"); }).catch(() => { setAdjustments([]); setAdjustmentsState("error"); }),
       getStockCounts().then(value => { setCounts(value); setCountsState("success"); }).catch(() => { setCounts([]); setCountsState("error"); }),
@@ -120,8 +139,8 @@ export default function HomePage() {
     void loadAnalyticsRange(analyticsPeriod);
   }, [analyticsPeriod]);
   useEffect(() => {
-    if (dashboard?.business_date) void loadAnalyticsRange(analyticsPeriod, dashboard.business_date);
-  }, [dashboard?.business_date, dashboard?.currency_code]);
+    if (dashboard?.business_date || businessCurrency) void loadAnalyticsRange(analyticsPeriod, dashboard?.business_date ?? today());
+  }, [dashboard?.business_date, dashboard?.currency_code, businessCurrency]);
   useEffect(() => {
     const query = new URLSearchParams(window.location.search).get("q");
     if (query) setMessage(`Search context: ${query}`);
@@ -150,7 +169,7 @@ export default function HomePage() {
   const openWork = [
     { label: "Stock counts in progress", value: counts.filter(x => x.status === "COUNTING").length, state: countsState, href: "/inventory" },
     { label: "Transfers awaiting action", value: transfers.filter(x => ["DRAFT", "APPROVED", "DISPATCHED", "PARTIALLY_RECEIVED"].includes(x.status)).length, state: transfersState, href: "/inventory" },
-    { label: "Open receivables", value: dashboard ? money(dashboard.outstanding_receivables, dashboard.currency_code) : "—", state: dashboardState, href: "/sales" },
+    { label: "Open receivables", value: dashboard ? money(dashboard.outstanding_receivables, businessCurrency) : "—", state: dashboardState, href: "/sales" },
   ];
 
   return <AppShell title="Command Centre" eyebrow="Business overview">
@@ -165,8 +184,8 @@ export default function HomePage() {
     <section className="command-kpis" aria-label="Key business indicators">
       <div className="command-kpi"><span>Today's sales</span><strong>{dashboardState === "loading" ? "—" : dashboardState === "error" || !dashboard ? "Unavailable" : money(dashboard.sales.sales, dashboard.currency_code)}</strong><small>{dashboardState === "loading" ? "Loading authoritative state" : dashboardState === "error" || !dashboard ? "Sales data could not be loaded" : dashboard.sales.credit ? `Credit recorded ${money(dashboard.sales.credit, dashboard.currency_code)}` : "Completed sales"}</small></div>
       <div className="command-kpi"><span>Collected today</span><strong>{dashboardState === "loading" ? "—" : dashboardState === "error" || !dashboard ? "Unavailable" : money(dashboard.sales.collected, dashboard.currency_code)}</strong><small>{dashboardState === "loading" ? "Loading payment state" : dashboardState === "error" || !dashboard ? "Payment data could not be loaded" : "Recorded payments, not total sales"}</small></div>
-      <div className="command-kpi"><span>Net sales · {periodLabels[analyticsPeriod].toLowerCase()}</span><strong>{analyticsState === "loading" ? "—" : analyticsState === "error" || !analytics ? "Unavailable" : money(analytics.totals.net_sales, analytics.currency_code || dashboard?.currency_code || "UGX")}</strong><small>{analyticsState === "loading" ? "Loading reporting data" : analyticsState === "error" || !analytics ? "Reporting data could not be loaded" : `${analytics.totals.sale_count} recorded sales · ${dateLabel(selectedRange.start)} – ${dateLabel(selectedRange.end)}`}</small></div>
-      <div className="command-kpi"><span>Inventory value</span><strong>{inventorySummaryState === "loading" ? "—" : inventorySummaryState === "error" || !inventorySummary ? "Unavailable" : money(inventorySummary.stock_value, dashboard?.currency_code || "UGX")}</strong><small>{inventorySummaryState === "loading" ? "Calculating authorized stock value" : inventorySummaryState === "error" || !inventorySummary ? "Stock valuation could not be verified" : `${inventorySummary.balance_rows} balance rows · ${inventorySummary.out_of_stock_rows} out · ${inventorySummary.low_stock_rows} low`}</small></div>
+      <div className="command-kpi"><span>Net sales · {periodLabels[analyticsPeriod].toLowerCase()}</span><strong>{analyticsState === "loading" ? "—" : analyticsState === "error" || !analytics ? "Unavailable" : money(analytics.totals.net_sales, analytics.currency_code || businessCurrency)}</strong><small>{analyticsState === "loading" ? "Loading reporting data" : analyticsState === "error" || !analytics ? "Reporting data could not be loaded" : `${analytics.totals.sale_count} recorded sales · ${dateLabel(selectedRange.start)} – ${dateLabel(selectedRange.end)}`}</small></div>
+      <div className="command-kpi"><span>Inventory value</span><strong>{inventorySummaryState === "loading" ? "—" : inventorySummaryState === "error" || !inventorySummary ? "Unavailable" : money(inventorySummary.stock_value, businessCurrency)}</strong><small>{inventorySummaryState === "loading" ? "Calculating authorized stock value" : inventorySummaryState === "error" || !inventorySummary ? "Stock valuation could not be verified" : `${inventorySummary.balance_rows} balance rows · ${inventorySummary.out_of_stock_rows} out · ${inventorySummary.low_stock_rows} low`}</small></div>
     </section>
 
     <section className="phase4-analytics-grid" aria-label="Sales analytics">
@@ -174,12 +193,12 @@ export default function HomePage() {
         <div className="panel-head phase4-panel-head"><div><p className="eyebrow">SALES PERFORMANCE</p><h2>Net sales vs money collected</h2><p className="panel-subtitle">Different business measures, shown together without treating them as interchangeable.</p></div>
           <div className="period-control" role="group" aria-label="Analytics date range">{(["7d", "30d", "90d"] as DashboardPeriod[]).map(period => <button key={period} type="button" className={`period-button ${analyticsPeriod === period ? "active" : ""}`} aria-pressed={analyticsPeriod === period} onClick={() => setAnalyticsPeriod(period)} disabled={analyticsState === "loading"}>{period}</button>)}</div>
         </div>
-        {analyticsState === "loading" ? <LoadingPlaceholder label="Loading daily business metrics…" /> : analyticsState === "error" || !analytics ? <LoadError title="Sales trend" retry={() => void loadAnalyticsRange(analyticsPeriod)} /> : <SalesTrendChart daily={analytics.daily} startDate={analytics.from_date} endDate={analytics.to_date} currencyCode={analytics.currency_code || dashboard?.currency_code || "UGX"} />}
+        {analyticsState === "loading" ? <LoadingPlaceholder label="Loading daily business metrics…" /> : analyticsState === "error" || !analytics ? <LoadError title="Sales trend" retry={() => void loadAnalyticsRange(analyticsPeriod)} /> : <SalesTrendChart daily={analytics.daily} startDate={analytics.from_date} endDate={analytics.to_date} currencyCode={analytics.currency_code || businessCurrency} />}
       </div>
       <div className="panel command-panel top-products-panel">
         <div className="panel-head"><div><p className="eyebrow">PRODUCT PERFORMANCE</p><h2>Top products</h2><p className="panel-subtitle">Ranked by aggregated net sales across {periodLabels[analyticsPeriod].toLowerCase()}.</p></div><Link href="/reports" className="panel-link">Explore reports →</Link></div>
         {productsState === "loading" ? <LoadingPlaceholder label="Loading product performance…" /> : productsState === "error" ? <LoadError title="Product performance" retry={() => void loadAnalyticsRange(analyticsPeriod)} /> : topProducts.length ? <div className="top-product-list">{topProducts.map((product, index) => <div className="top-product-row" key={product.id}>
-          <div className="top-product-rank">{index + 1}</div><div className="top-product-info"><div className="top-product-name"><strong>{product.name}</strong><small>{product.sku} · {product.units.toLocaleString("en-UG", { maximumFractionDigits: 2 })} units</small></div><div className="product-bar-track" aria-hidden="true"><span style={{ width: `${Math.max(3, (product.netSales / maxProductSales) * 100)}%` }} /></div></div><div className="top-product-value">{money(product.netSales, analytics?.currency_code || dashboard?.currency_code || "UGX")}<small>Gross margin {money(product.grossMargin, analytics?.currency_code || dashboard?.currency_code || "UGX")}</small></div>
+          <div className="top-product-rank">{index + 1}</div><div className="top-product-info"><div className="top-product-name"><strong>{product.name}</strong><small>{product.sku} · {product.units.toLocaleString("en-UG", { maximumFractionDigits: 2 })} units</small></div><div className="product-bar-track" aria-hidden="true"><span style={{ width: `${Math.max(3, (product.netSales / maxProductSales) * 100)}%` }} /></div></div><div className="top-product-value">{money(product.netSales, analytics?.currency_code || businessCurrency)}<small>Gross margin {money(product.grossMargin, analytics?.currency_code || businessCurrency)}</small></div>
         </div>)}</div> : <div className="empty-state compact"><strong>No product metrics yet</strong><span>Completed, reported sales will appear here after analytics metrics are available.</span><Link href="/sales" className="button button-soft">Open sales</Link></div>}
       </div>
     </section>

@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Phase 6 Increment 01 — Inventory Intelligence and permanent migration gate automation",
-  "version": "2.10.0+phase6.increment01",
+  "package": "LEXA Phase 4\u20136 Completeness Increment 03 \u2014 strategy coverage and permanent gate closure",
+  "version": "2.11.0+phase4-6.completeness.increment03",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -19,7 +19,7 @@
     "Moved refresh credentials to HttpOnly cookie rotation and access tokens to memory-only browser state",
     "Added Redis-backed authentication rate limits",
     "Added fail-closed production configuration checks",
-    "Applied lexа_app role per transaction for PgBouncer-safe RLS enforcement",
+    "Applied lex\u0430_app role per transaction for PgBouncer-safe RLS enforcement",
     "Added bounded SQLAlchemy pooling and PostgreSQL statement/lock/idle transaction timeouts",
     "Added migration 022 for the live Brain foundation schema",
     "Added CI and direct Neon backup automation",
@@ -109,7 +109,15 @@
     "Recovered exact current GitHub sources for migrations 029_phase3_runtime_privilege_surface and 031_phase3_auth_surface_rls with Git blob and SHA-256 verification.",
     "Refreshed read-only canonical ledger snapshot to 31 unique full migration identities and declared 023/029 numeric prefix collisions.",
     "Added guarded disposable PostgreSQL replay, commit/bundle/hash-bound evidence, RLS and least-privilege assertions, and rollback-only cross-tenant runtime probes.",
-    "Phase 6 Increment 01 adds tenant/location/variant replenishment policies and explainable advisory recommendations with forced RLS, API permissions, audit events and frontend workspace."
+    "Phase 6 Increment 01 adds tenant/location/variant replenishment policies and explainable advisory recommendations with forced RLS, API permissions, audit events and frontend workspace.",
+    "Phase 4 reports apply an explicitly validated period and distinguish unavailable source data from confirmed no-records results.",
+    "Inventory and product cost-value labels use verified business-profile currency instead of silently assuming UGX.",
+    "Phase 5 return form supports multiple sale lines while preserving server-side cumulative return validation.",
+    "Added Phase 6 stock movement health endpoint/UI for stockouts, configured minimums, sale recency and sales/returns separately.",
+    "Added Phase 6 30/60/90-day stock-age bands with unknown provenance and ledger-to-balance reconciliation flags.",
+    "Added migrations 037/038 for age analysis and idempotent concurrent movement-health indexes.",
+    "Added AST static audit for TSX action handlers, explicit form submission handlers and link destinations to CI.",
+    "Extended clean replay and evidence verifier to 42 ordered migration inputs, movement-health index validity, and exact-commit source checks."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -119,10 +127,10 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Full-source LEXA candidate with permanent Phase 3 SQL replacement dispositions, refreshed 31-entry ledger snapshot and recovered live sources 029/031; guarded clean replay with commit-bound evidence; Phase 6 inventory replenishment policy and advisory recommendation API/UI.",
-  "package_version": "2.10.0",
-  "phase": "6.1 inventory intelligence and permanent gate repair",
-  "phase_name": "Phase 6 — Inventory Intelligence (Increment 01: Replenishment Intelligence)",
-  "phase_status": "IMPLEMENTED_LOCAL_CANDIDATE_SOURCE_CHECKS_PASS_CLEAN_REPLAY_NODE24_E2E_DEPLOYMENT_PENDING",
+  "package_version": "2.11.0",
+  "phase": "4\u20136 product completeness and release-gate hardening",
+  "phase_name": "Phases 4\u20136 \u2014 UX/reporting, sales returns, inventory intelligence",
+  "phase_status": "LOCAL_SOURCE_CANDIDATE_LOCAL_CHECKS_PASS_CLOUD_RELEASE_GATES_PENDING",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -158,35 +166,53 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": "182 passed, 0 failed, 1 skipped locally on 2026-10-21; the declared Redis package could not be installed in the offline runner. The CI Redis service and full dependency install are required to prove the skipped integration suite.",
-    "python_compileall": "Passed for apps/api/app, apps/api/tests, tests and scripts.",
-    "frontend_contract_tests": "28 passed, 0 failed under Node 22.16.0 including Phase 6 inventory-intelligence contract. Not browser E2E and not Node 24 build proof.",
-    "migration_recovery_manifest": "PASS; six permanent replacement decisions and replacement hashes are internally consistent.",
-    "migration_source_replay": "PASS for strict reconciliation: 31 full live ledger identities, 25 canonical SQL sources and six permanent dispositions; exact historical bytes are not asserted.",
-    "clean_replay_plan": "PASS; 40 SQL inputs exist, declared trusted Git blob hashes are checked, SHA-256 bundle generated. SQL was not executed locally because local PostgreSQL/psql and a disposable server are unavailable.",
-    "node24_clean_install_typecheck_production_build": "NOT_VERIFIED_LOCALLY; Node 24 dependency tree unavailable and npm registry DNS failed. Required CI job is configured.",
-    "authenticated_staging_e2e": "NOT_RUN; no sanitized isolated staging provisioned. Production was not used for writes.",
-    "current_baseline_deployment": "Latest observed Render and Vercel baseline shared SHA a6acc0eb53660ea938a314640bf28283ae2a98a8. This candidate is not that deployed source and is not deployed.",
-    "production_migrations": "No production SQL changes. Candidate migrations 033–036 are unapplied.",
-    "canonical_source_parity": "False by design: six approved replacements are not historical bytes; 021 remains repair candidate, and clean replay is independently pending."
+    "python_tests": "188 passed, 1 skipped, 0 failed; local skip is Redis-dependent auth-refresh because Redis Python package unavailable offline",
+    "python_compileall": true,
+    "frontend_contract_tests": {
+      "passed": 33,
+      "failed": 0,
+      "runtime": "Node 22.16.0"
+    },
+    "frontend_action_audit": {
+      "status": "PASS",
+      "tsx_files": 29,
+      "button_like_controls": 117,
+      "forms": 27,
+      "links": 33
+    },
+    "migration_recovery_manifest": "PASS",
+    "migration_source_reconciliation": "PASS; six Phase 3 permanent replacements; exact historical byte parity not asserted",
+    "clean_replay_plan": {
+      "status": "PASS",
+      "sql_input_count": 42,
+      "sql_executed": false,
+      "migration_bundle_sha256": "ca3d402f58650ba4acf9ede4493ec3960b7d546fccb806ee96e02f6e93282864"
+    },
+    "node24_clean_install_typecheck_production_build": "NOT_VERIFIED_LOCAL_OFFLINE_ENVIRONMENT",
+    "clean_disposable_postgres_replay": "PENDING_CI",
+    "authenticated_staging_e2e": "NOT_RUN_NO_SANITIZED_ISOLATED_STAGING",
+    "candidate_deployment": "NOT_COMMITTED_OR_DEPLOYED",
+    "production_migrations_033_038": "NOT_APPLIED"
   },
-  "release": "phase6-increment-01-2026-10-21",
-  "release_name": "phase-6-increment-01-review-candidate-not-production-accepted",
-  "source_baseline": "Read-only live baseline observed at SHA a6acc0eb53660ea938a314640bf28283ae2a98a8 on Render and Vercel. Candidate includes local Phase 6 work and is not yet committed/deployed.",
+  "release": "phase4-6-completeness-increment03-2026-10-21",
+  "release_name": "phase-4-6-completeness-increment-03-review-candidate-not-production-accepted",
+  "source_baseline": "Last externally observed healthy baseline SHA a6acc0eb53660ea938a314640bf28283ae2a98a8 on Render/Vercel; this candidate is local and not committed/deployed.",
   "canonical_source_parity": false,
-  "release_status": "LOCAL SOURCE CANDIDATE ONLY. Historical recovery for the six Phase 3-approved lost sources is permanently closed. Strict reconciliation passes; semantic replay has not run locally. 182 backend tests passed / 1 Redis-dependent local skip; 28 frontend contracts passed under Node 22. Node 24 clean install/typecheck/build, clean PostgreSQL replay, authenticated staging E2E, candidate deployment parity, and approved production migrations remain pending. No production mutations or deployment were made.",
+  "release_status": "Local full-source candidate. Six Phase 3 historical source recovery decisions are permanently closed. 186 backend tests passed / 1 skipped locally; 33 frontend contracts passed; static UI action audit and source checks pass. 42-step replay plan only; cloud replay, Node 24 build, authenticated staging E2E, candidate deployment parity and approved production migration rollout pending.",
   "validation_summary": {
-    "source_ledger": "31 distinct full migration identities in read-only snapshot 2026-10-21; restored exact GitHub sources 029 and 031.",
-    "historical_source_decision": "Phase 3 approval permanently replaced six exact historical source files; recovery gate closed and no further source retrieval is required for them.",
-    "strict_reconciliation": "PASS without asserting original bytes; semantic clean replay is a separate gate.",
-    "backend_tests": "182 passed / 1 skipped locally, with skip limited to missing Redis test dependency in offline runner.",
-    "frontend_tests": "28 passed under Node 22.16.0.",
-    "replay": "40 inputs pass plan-only integrity checks; bundle SHA will be regenerated per candidate. Actual replay pending CI.",
-    "phase6_product": "Migration 036 and deterministic replenishment logic/API/UI implemented; recommendations are advisory only.",
-    "release_acceptance": "Pending Node 24 CI, clean PostgreSQL replay, authenticated isolated staging acceptance, exact-SHA Render/Vercel deployments and explicit production migration approval.",
+    "strategy_basis": "FRESH_NEW_PRODUCT_STRATEGY.md, Phases 4\u20136",
+    "phase4": "Source changes for report period/currency/error truth and static control audit; browser accessibility/device acceptance pending",
+    "phase5": "Multi-line returns and prior settlement/accounting guards; clean replay and authenticated E2E pending",
+    "phase6": "Replenishment recommendations, inventory ageing, stock movement health; migrations 036\u2013038 candidate only",
+    "historical_source_decision": "Phase 3 six lost sources permanently replaced; recovery gate closed, no byte-recovery claim",
+    "strict_reconciliation": "PASS without asserting exact original-byte parity",
+    "backend_tests": "188 passed / 1 skipped locally; skipped auth-refresh integration requires Redis and is configured in CI",
+    "frontend_tests": "33 passed under Node 22.16.0; Node 24 build pending CI",
+    "replay": "42 input paths/hashes pass plan-only; actual SQL execution pending disposable PostgreSQL CI",
+    "release_acceptance": "Pending Node 24 CI, actual clean replay, authenticated isolated staging E2E, exact-SHA Render/Vercel verification and approved production migration rollout",
     "canonical_source_parity": false
   },
-  "final_gate_report": "PHASE6_IMPLEMENTATION_REPORT_2026-10-21.md",
+  "final_gate_report": "PHASE4_6_COMPLETENESS_IMPLEMENTATION_REPORT_2026-10-21.md",
   "local_repair_readme": "PHASE5_INCREMENT_03_README_2026-10-21.md",
   "phase5_increment_03_validation": {
     "neon_project_id": "wispy-mud-75323042",
@@ -204,12 +230,29 @@
   "increment_03_readme": "PHASE5_INCREMENT_03_README_2026-10-21.md",
   "phase6_increment_01_validation": {
     "migration": "036_phase6_inventory_intelligence",
-    "feature": "tenant/location/variant replenishment policies and explainable advisory reorder recommendations",
+    "feature": "tenant/location/variant replenishment policy and explainable advisory recommendations, plus movement-health and stock-age views",
     "production_migration_applied": false,
     "database_replay": "PENDING_CI_DISPOSABLE_POSTGRES",
     "api_ui": "IMPLEMENTED_LOCAL_CANDIDATE",
     "recommendations_post_inventory_or_purchase_actions": false,
-    "release_gate_report": "PHASE6_IMPLEMENTATION_REPORT_2026-10-21.md",
-    "acceptance_matrix": "PHASE6_ACCEPTANCE_MATRIX.md"
+    "release_gate_report": "PHASE4_6_COMPLETENESS_IMPLEMENTATION_REPORT_2026-10-21.md",
+    "acceptance_matrix": "PHASE4_6_COMPLETENESS_ACCEPTANCE_MATRIX_2026-10-21.md"
+  },
+  "phase4_6_completeness_increment_03": {
+    "report": "PHASE4_6_COMPLETENESS_IMPLEMENTATION_REPORT_2026-10-21.md",
+    "acceptance_matrix": "PHASE4_6_COMPLETENESS_ACCEPTANCE_MATRIX_2026-10-21.md",
+    "strategy_coverage": "docs/PHASE4_6_STRATEGY_COVERAGE_2026-10-21.md",
+    "migrations_candidate": [
+      "033_phase5_refund_settlement_consistency",
+      "034_phase5_return_accounting_journals",
+      "035_phase5_none_return_receivable_guard",
+      "036_phase6_inventory_intelligence",
+      "037_phase6_inventory_ageing_index",
+      "038_phase6_movement_health_indexes"
+    ],
+    "production_schema_mutated": false,
+    "candidate_committed": false,
+    "candidate_deployed": false,
+    "migration_bundle_sha256": "ca3d402f58650ba4acf9ede4493ec3960b7d546fccb806ee96e02f6e93282864"
   }
 }

@@ -15,7 +15,7 @@ The first three commands validate source integrity and the Phase 3 permanent dis
 
 ## Required CI flow
 
-On the exact candidate commit, CI installs Python test dependencies and Redis, runs all backend tests, validates source disposition and input hashes, installs Node 24 dependencies with `npm ci`, runs typecheck/frontend contracts/build, and applies the 40-step candidate replay against the workflow's disposable `pgvector/pgvector:pg16` database. The replay emits `artifacts/phase6-replay-evidence.json` plus a SHA-256 sidecar. `check_phase6_replay_evidence.py` rejects evidence from a different commit, changed SQL bundle, incomplete step list, missing RLS/permission checks or missing rollback-only runtime tenant-isolation assertions.
+On the exact candidate commit, CI installs Python test dependencies and Redis, runs all backend tests, validates source disposition and input hashes, installs Node 24 dependencies with `npm ci`, runs typecheck/frontend contracts/build, and applies the 42-step candidate replay against the workflow's disposable `pgvector/pgvector:pg16` database. The replay emits `artifacts/phase6-replay-evidence.json` plus a SHA-256 sidecar. `check_phase6_replay_evidence.py` rejects evidence from a different commit, changed SQL bundle, incomplete step list, missing RLS/permission checks or missing rollback-only runtime tenant-isolation assertions.
 
 The `ci-gate-evidence` job emits a second exact-SHA CI summary. Even a `PASS_CI_CANDIDATE_GATES` record explicitly leaves production release acceptance false; it does not cover authenticated staging E2E, deployment parity or production rollout approval.
 

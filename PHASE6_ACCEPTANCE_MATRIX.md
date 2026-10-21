@@ -1,3 +1,5 @@
+> **Superseded candidate snapshot.** Use `PHASE4_6_COMPLETENESS_IMPLEMENTATION_REPORT_2026-10-21.md` and `PHASE4_6_COMPLETENESS_ACCEPTANCE_MATRIX_2026-10-21.md` for the current Phase 4–6 candidate. This file is retained as the Increment 01 record and its earlier test counts/replay input count are historical.
+
 # Phase 6 Increment 01 acceptance matrix — 21 October 2026
 
 ## Implemented in candidate source

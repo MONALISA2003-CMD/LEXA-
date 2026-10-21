@@ -17,7 +17,7 @@ def out(row: Any) -> dict[str, Any]:
     return {k: (str(v) if isinstance(v, Decimal) else v) for k, v in d.items()}
 
 @router.get("/overview")
-def overview(start_date: date, end_date: date, currency_code: str = Query(default="UGX", min_length=3, max_length=3), ctx=Depends(require_permission("analytics.read"))):
+def overview(start_date: date, end_date: date, currency_code: str = Query(..., min_length=3, max_length=3), ctx=Depends(require_permission("analytics.read"))):
     db, _, tenant_id, _ = ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("""SELECT * FROM analytics_daily_business_metrics WHERE tenant_id=:t AND business_date BETWEEN :f AND :to AND currency_code=:c ORDER BY business_date"""), {"t":str(tenant_id),"f":start_date,"to":end_date,"c":currency_code.upper()}).mappings().all()
@@ -35,14 +35,14 @@ def overview(start_date: date, end_date: date, currency_code: str = Query(defaul
     return {"from_date":str(start_date),"to_date":str(end_date),"currency_code":currency_code.upper(),"totals":{k:(str(v) if isinstance(v,Decimal) else v) for k,v in totals.items()},"daily":[out(r) for r in rows]}
 
 @router.get("/daily")
-def daily(start_date: date, end_date: date, currency_code: str = Query(default="UGX", min_length=3, max_length=3), ctx=Depends(require_permission("analytics.read"))):
+def daily(start_date: date, end_date: date, currency_code: str = Query(..., min_length=3, max_length=3), ctx=Depends(require_permission("analytics.read"))):
     db, _, tenant_id, _ = ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows=db.execute(text("SELECT business_date,currency_code,sales_total,returns_total,net_sales,payments_collected,refunds_total,credit_created,expenses_total,net_cash_movement,sale_count,return_count,payment_count,expense_count FROM analytics_daily_business_metrics WHERE tenant_id=:t AND business_date BETWEEN :f AND :to AND currency_code=:c ORDER BY business_date"),{"t":str(tenant_id),"f":start_date,"to":end_date,"c":currency_code.upper()}).mappings().all()
     return [out(r) for r in rows]
 
 @router.get("/products")
-def products(start_date: date, end_date: date, currency_code: str = Query(default="UGX", min_length=3, max_length=3), limit: int = Query(default=100, ge=1, le=500), ctx=Depends(require_permission("analytics.read"))):
+def products(start_date: date, end_date: date, currency_code: str = Query(..., min_length=3, max_length=3), limit: int = Query(default=100, ge=1, le=500), ctx=Depends(require_permission("analytics.read"))):
     db, _, tenant_id, _ = ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows=db.execute(text("""SELECT a.business_date,a.variant_id,a.product_id,pv.sku,p.name product_name,pv.name variant_name,a.units_sold,a.sales_amount,a.discount_amount,a.tax_amount,a.returns_units,a.returns_amount,a.net_sales,a.cogs,a.gross_margin,a.currency_code FROM analytics_product_daily_metrics a JOIN product_variants pv ON pv.tenant_id=a.tenant_id AND pv.id=a.variant_id JOIN products p ON p.tenant_id=a.tenant_id AND p.id=a.product_id WHERE a.tenant_id=:t AND a.business_date BETWEEN :f AND :to AND a.currency_code=:c ORDER BY a.net_sales DESC LIMIT :limit"""),{"t":str(tenant_id),"f":start_date,"to":end_date,"c":currency_code.upper(),"limit":limit}).mappings().all()
@@ -52,7 +52,7 @@ def products(start_date: date, end_date: date, currency_code: str = Query(defaul
 def product_summary(
     start_date: date,
     end_date: date,
-    currency_code: str = Query(default="UGX", min_length=3, max_length=3),
+    currency_code: str = Query(..., min_length=3, max_length=3),
     limit: int = Query(default=5, ge=1, le=100),
     ctx=Depends(require_permission("analytics.read")),
 ):
@@ -109,7 +109,7 @@ def inventory_health(limit: int = Query(default=100, ge=1, le=500), ctx=Depends(
     return [out(r) for r in rows]
 
 @router.get("/branches")
-def branches(start_date: date, end_date: date, currency_code: str = Query(default="UGX", min_length=3, max_length=3), ctx=Depends(require_permission("analytics.read"))):
+def branches(start_date: date, end_date: date, currency_code: str = Query(..., min_length=3, max_length=3), ctx=Depends(require_permission("analytics.read"))):
     db, actor_id, tenant_id, _ = ctx
     rows=db.execute(text("""SELECT a.branch_id,b.name branch_name,a.business_date,a.currency_code,a.sales_total,a.returns_total,a.net_sales,a.payments_collected,a.credit_created,a.sale_count FROM analytics_branch_daily_metrics a JOIN branches b ON b.tenant_id=a.tenant_id AND b.id=a.branch_id WHERE a.tenant_id=:t AND a.business_date BETWEEN :f AND :to AND a.currency_code=:c AND EXISTS (SELECT 1 FROM membership_branch_assignments mba JOIN tenant_memberships tm ON tm.id=mba.membership_id AND tm.tenant_id=mba.tenant_id WHERE mba.tenant_id=a.tenant_id AND mba.branch_id=a.branch_id AND mba.status='ACTIVE' AND tm.user_id=:u AND tm.status='ACTIVE' AND b.status='ACTIVE') ORDER BY a.business_date DESC,a.net_sales DESC"""),{"t":str(tenant_id),"u":str(actor_id),"f":start_date,"to":end_date,"c":currency_code.upper()}).mappings().all()
     return [out(r) for r in rows]

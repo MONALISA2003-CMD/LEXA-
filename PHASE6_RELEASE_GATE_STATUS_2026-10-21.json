@@ -1,58 +1,96 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "project": "LEXA",
-  "phase": 6,
-  "increment": "6.1-inventory-intelligence",
+  "phases": [
+    4,
+    5,
+    6
+  ],
+  "increment": "phase4-6-completeness-increment03",
   "assessment_date": "2026-10-21",
+  "candidate_version": "2.11.0+phase4-6.completeness.increment03",
   "candidate_status": "LOCAL_SOURCE_CANDIDATE",
   "production_release_accepted": false,
-  "phase3_six_source_recovery_gate": {
+  "permanent_historical_disposition": {
     "status": "CLOSED_BY_PERMANENT_DISPOSITION",
     "approved_in_phase": 3,
     "historical_bytes_recovered": false,
     "routine_recovery_search_required": false,
-    "authoritative_register": "migrations/migration_dispositions.json"
+    "authoritative_register": "migrations/migration_dispositions.json",
+    "source_checker": "PASS"
   },
   "source_reconciliation": {
     "status": "PASS",
     "observed_full_ledger_identity_count": 31,
     "canonical_sources_present": 25,
     "permanently_replaced_histories": 6,
+    "recovered_current_sources": [
+      "029_phase3_runtime_privilege_surface",
+      "031_phase3_auth_surface_rls"
+    ],
     "numeric_prefix_collisions": [
       "023",
       "029"
     ],
     "historical_byte_parity_claimed": false,
-    "semantic_replay_status": "PENDING_CI_DISPOSABLE_POSTGRES"
+    "semantic_replay_status": "PENDING_CI_DISPOSABLE_POSTGRES",
+    "separate_qa_032_discrepancy": "EXCLUDED_FROM_CANONICAL_PRODUCTION_REPLAY; reconcile only if that QA environment is reused"
   },
-  "phase6_increment_01": {
-    "feature": "Location/variant replenishment policies and explainable advisory reorder recommendations",
-    "migration": "036_phase6_inventory_intelligence.sql",
-    "production_migration_applied": false,
-    "purchase_orders_created_by_recommendations": false,
-    "stock_movements_created_by_recommendations": false
+  "phase4": {
+    "report_period_validation": "IMPLEMENTED_LOCAL",
+    "business_profile_currency": "IMPLEMENTED_LOCAL; missing currency surfaces unavailable instead of assuming UGX",
+    "data_unavailable_vs_zero": "IMPLEMENTED_LOCAL",
+    "ast_control_audit": "PASS_STATIC_ONLY"
+  },
+  "phase5": {
+    "multi_line_returns_ui": "IMPLEMENTED_LOCAL",
+    "settlement_and_accounting_forward_migrations": [
+      "033_phase5_refund_settlement_consistency",
+      "034_phase5_return_accounting_journals",
+      "035_phase5_none_return_receivable_guard"
+    ],
+    "production_migrations_applied": false
+  },
+  "phase6": {
+    "replenishment_policy_and_recommendations": "IMPLEMENTED_LOCAL_ADVISORY_ONLY",
+    "stock_age_bands": "IMPLEMENTED_LOCAL; unknown provenance explicit; not FIFO accounting valuation",
+    "movement_health": "IMPLEMENTED_LOCAL; stockout/no-sale/return counters",
+    "candidate_migrations": [
+      "036_phase6_inventory_intelligence",
+      "037_phase6_inventory_ageing_index",
+      "038_phase6_movement_health_indexes"
+    ],
+    "production_migrations_applied": false
   },
   "local_validation": {
-    "python_compileall": "PASS",
-    "backend_tests": {
-      "passed": 182,
+    "python_tests": {
+      "passed": 188,
       "failed": 0,
       "skipped": 1,
-      "skip_reason": "Redis package unavailable in offline local environment; CI provisions Redis and must execute the test"
+      "skip_reason": "Redis Python dependency unavailable in offline local runner; CI provisions Redis service and installs project test dependencies."
     },
     "frontend_contract_tests": {
-      "passed": 28,
+      "passed": 33,
       "failed": 0,
       "runtime": "Node 22.16.0",
-      "browser_e2e": false
+      "browser_e2e": false,
+      "note": "Node 24 typecheck/build remains CI-only in this offline environment."
     },
+    "frontend_action_audit": {
+      "status": "PASS",
+      "tsx_files": 29,
+      "button_like_controls": 117,
+      "forms": 27,
+      "links": 33
+    },
+    "python_compileall": "PASS",
     "migration_recovery_manifest": "PASS",
-    "strict_migration_source_reconciliation": "PASS_HISTORICAL_RECOVERY_GATE_CLOSED_SEMANTIC_GATE_PENDING",
+    "strict_source_reconciliation": "PASS; semantic validation remains separate",
     "clean_replay_plan_only": {
       "status": "PASS",
-      "sql_input_count": 40,
+      "sql_input_count": 42,
       "sql_executed": false,
-      "migration_bundle_sha256": "62c1589520a832973d620417c4a677b1a35f10d4359582c61dcb16df498b13a7"
+      "migration_bundle_sha256": "ca3d402f58650ba4acf9ede4493ec3960b7d546fccb806ee96e02f6e93282864"
     },
     "node24_install_typecheck_build": "NOT_VERIFIED_LOCAL_OFFLINE_ENVIRONMENT",
     "authenticated_staging_e2e": "NOT_RUN_NO_SANITIZED_ISOLATED_STAGING"
@@ -62,14 +100,14 @@
     "candidate_committed": false,
     "candidate_deployed": false,
     "production_schema_mutated": false,
-    "candidate_migrations_033_036_applied": false,
+    "candidate_migrations_033_038_applied": false,
     "required_next_evidence": [
-      "Complete Redis-backed backend CI against candidate SHA",
-      "Node 24 npm ci, typecheck, frontend contracts and production build against candidate SHA",
-      "Successful 40-step disposable SQL replay with complete same-SHA evidence and runtime RLS probe",
-      "Authenticated browser E2E in sanitized isolated staging",
-      "Exact-SHA Render/Vercel deployment parity and readiness checks",
-      "Explicitly approved production migration rollout and rollback plan"
+      "candidate-specific Redis-backed CI",
+      "Node 24 npm ci/typecheck/contracts/build",
+      "42-step actual disposable PostgreSQL replay with current hash/SHA evidence",
+      "authenticated browser E2E in sanitized isolated staging",
+      "exact-SHA Render/Vercel candidate readiness checks",
+      "separately approved production migration rollout and rollback plan"
     ]
   }
 }

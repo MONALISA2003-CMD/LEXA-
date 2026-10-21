@@ -102,7 +102,7 @@ def test_clean_replay_plan_hashes_all_inputs_without_touching_database():
         cwd=ROOT, text=True, capture_output=True, check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "PLAN PASS: 40 migration inputs are present and hashed." in result.stdout
+    assert "PLAN PASS: 42 migration inputs are present and hashed." in result.stdout
     assert "No database connection opened; no SQL executed." in result.stdout
 
 

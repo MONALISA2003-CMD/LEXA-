@@ -161,7 +161,8 @@ def main() -> int:
                      WHERE version IN ('029_phase3_runtime_privilege_surface','029_phase1_runtime_role_least_privilege',
                        '030_phase3_workspace_memberships','031_phase3_auth_surface_rls',
                        '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
-                       '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence')
+                       '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
+                       '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes')
                 """)
                 migration_rows = sorted(row[0] for row in cur.fetchall())
                 expected_migrations = sorted([
@@ -169,6 +170,7 @@ def main() -> int:
                     '030_phase3_workspace_memberships','031_phase3_auth_surface_rls',
                     '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                     '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
+                    '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes',
                 ])
                 cur.execute("""
                     SELECT to_regclass('public.inventory_replenishment_policies') IS NOT NULL,
@@ -185,6 +187,24 @@ def main() -> int:
                        AND policyname='inventory_replenishment_policies_tenant_isolation'
                 """)
                 policy_count = cur.fetchone()[0]
+                cur.execute("""
+                    SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname='idx_inventory_transactions_age_analysis'
+                """)
+                age_index_count = cur.fetchone()[0]
+                cur.execute("""
+                    SELECT count(*)
+                      FROM pg_index i
+                      JOIN pg_class idx ON idx.oid=i.indexrelid
+                      JOIN pg_namespace n ON n.oid=idx.relnamespace
+                     WHERE n.nspname='public' AND i.indisvalid AND i.indisready
+                       AND idx.relname IN (
+                         'idx_sales_inventory_movement_history',
+                         'idx_transaction_lines_variant_demand',
+                         'idx_sale_returns_movement_history',
+                         'idx_sale_return_lines_variant_movement'
+                       )
+                """)
+                health_index_count = cur.fetchone()[0]
                 cur.execute("""
                     SELECT count(*) FROM information_schema.tables
                      WHERE table_schema='public' AND table_type='BASE TABLE'
@@ -233,6 +253,8 @@ def main() -> int:
         if not policy_exists or not policy_rls or policy_count != 1: failures.append("Phase 6 replenishment table/RLS/policy contract failed")
         if can_write_permissions or can_write_migrations: failures.append("lexa_app can mutate permission or schema migration reference data")
         if routine_count != 4: failures.append(f"expected four required return/accounting routines, found {routine_count}")
+        if age_index_count != 1: failures.append("Phase 6 stock-age analysis index is missing")
+        if health_index_count != 4: failures.append(f"Phase 6 movement-health indexes are incomplete or invalid: found {health_index_count}/4")
 
         evidence = {
             "schema_version": 1,
@@ -253,6 +275,8 @@ def main() -> int:
             "phase6_replenishment_table_exists": bool(policy_exists),
             "phase6_replenishment_rls_forced": bool(policy_rls),
             "phase6_replenishment_tenant_policy_count": policy_count,
+            "phase6_inventory_age_index_count": age_index_count,
+            "phase6_inventory_health_index_count": health_index_count,
             "lexa_app_can_write_permissions_reference": bool(can_write_permissions),
             "lexa_app_can_write_schema_migrations": bool(can_write_migrations),
             "required_phase5_return_routines_found": routine_count,
@@ -275,6 +299,7 @@ def main() -> int:
         print(f"PASS: {len(completed)} SQL steps applied to disposable database {dbname}.")
         print(f"PASS: RLS enabled/forced on all {rls_total} public tables; least-privilege and return/accounting routines verified.")
         print("PASS: runtime role cross-tenant read/write isolation verified; all probe fixtures rolled back.")
+        print("PASS: Phase 6 inventory age-analysis index and four movement-health indexes exist and are valid.")
         print(f"Evidence: {args.output}")
         return 0
     except Exception as exc:

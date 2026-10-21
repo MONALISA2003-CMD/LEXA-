@@ -188,6 +188,14 @@
     {
       "path": "migrations/036_phase6_inventory_intelligence.sql",
       "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/037_phase6_inventory_ageing_index.sql",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/038_phase6_movement_health_indexes.sql",
+      "mode": "additive-forward-migration-candidate"
     }
   ],
   "replay_only_notice": "Runs only on a fresh local/CI disposable PostgreSQL database after explicit environment opt-in. Never execute against production. A successful replay validates the selected replacement chain, not original historical-byte parity.",
