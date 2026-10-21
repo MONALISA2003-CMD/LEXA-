@@ -131,10 +131,16 @@ def balance_sheet(as_of: date, ctx=Depends(require_permission("accounting.read")
 @router.get("/journal-entries")
 def journal_entries(status: str | None = Query(default=None), ctx=Depends(require_permission("accounting.read"))):
     db, _, tenant_id, _ = ctx
-    rows = db.execute(text("""
+    query = """
       SELECT id,entry_date,source_type,source_id,entry_role,reference,description,currency_code,status,posted_at,posted_by,created_at
-      FROM journal_entries WHERE tenant_id=:t AND (:s IS NULL OR status=:s) ORDER BY entry_date DESC,created_at DESC LIMIT 500
-    """), {"t": str(tenant_id), "s": status}).mappings().all()
+      FROM journal_entries WHERE tenant_id=:t
+    """
+    params = {"t": str(tenant_id)}
+    if status is not None:
+        query += " AND status=:s"
+        params["s"] = status
+    query += " ORDER BY entry_date DESC,created_at DESC LIMIT 500"
+    rows = db.execute(text(query), params).mappings().all()
     return [out(r) for r in rows]
 
 
