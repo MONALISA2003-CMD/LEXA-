@@ -1,5 +1,11 @@
 BEGIN;
 
+-- Replay prerequisite: composite tenant-scoped foreign keys below reference
+-- payments(tenant_id,id). The live schema contains this unique index, but the
+-- checked-in bootstrap chain previously failed to create it before this FK.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payments_tenant_id ON payments(tenant_id,id);
+
+
 -- Phase 4A sales, payments, receivables and reconciliation foundation.
 -- Additive and tenant-scoped. This migration is safe to replay with IF NOT EXISTS guards.
 

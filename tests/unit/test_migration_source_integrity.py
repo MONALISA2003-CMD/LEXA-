@@ -20,48 +20,40 @@ def test_brain_migration_policy_sql_uses_safe_empty_tenant_context_and_quoted_id
     assert "%I_tenant_isolation" not in sql
 
 
-def test_every_known_live_migration_source_gap_is_explicit_and_actionable():
+def test_every_known_live_migration_source_gap_is_replaced_by_a_labelled_checksum_pinned_source():
+    import hashlib
     snapshot = json.loads((MIGRATIONS / "live_ledger_snapshot_2026-10-15.json").read_text())
-    gaps = json.loads((MIGRATIONS / "source_gaps.json").read_text())
+    manifest = json.loads((MIGRATIONS / "source_gaps.json").read_text())
     ledger_versions = {row["version"] for row in snapshot["migrations"]}
-    gap_versions = {row["version"] for row in gaps["gaps"]}
-    assert gap_versions == {
-        "010_phase2_catalog_intelligence",
-        "011_phase2_catalog_runtime_constraints",
-        "023_phase4_purchasing_core",
-        "024_phase4_purchasing_security",
-        "025_phase4_purchasing_permissions",
-        "026_phase4_membership_branch_integrity",
+    expected = {
+        "010_phase2_catalog_intelligence", "011_phase2_catalog_runtime_constraints",
+        "023_phase4_purchasing_core", "024_phase4_purchasing_security",
+        "025_phase4_purchasing_permissions", "026_phase4_membership_branch_integrity",
     }
-    assert gap_versions <= ledger_versions
-    for gap in gaps["gaps"]:
-        assert gap["expected_path"] == f"migrations/{gap['version']}.sql"
-        assert gap["reason"].strip()
-        assert gap["next_step"].strip()
-        assert not (ROOT / gap["expected_path"]).exists()
-    assert (MIGRATIONS / "019_phase4a_customer_credit_allocation.sql").is_file()
+    replacements = {row["version"]: row for row in manifest["replacements"]}
+    assert set(replacements) == expected
+    assert set(manifest["gaps"]) == set()
+    assert expected <= ledger_versions
+    assert manifest["decision"]["decision"]
+    for version, row in replacements.items():
+        path = ROOT / row["expected_path"]
+        raw = path.read_bytes()
+        assert row["original_source_status"] == "LOST_DECLARED"
+        assert raw.startswith("-- ACCEPTED REPLACEMENT — ORIGINAL HISTORICAL SOURCE LOST; NOT BYTE-IDENTICAL.".encode("utf-8"))
+        assert hashlib.sha256(raw).hexdigest() == row["replacement_sha256"]
+        assert "NOT BYTE-IDENTICAL" in raw.decode("utf-8").splitlines()[0]
+    assert (MIGRATIONS / "023_phase2_identity_tenancy_authorization_foundation.sql").is_file()
     restored_027 = MIGRATIONS / "027_release_convergence.sql"
     assert restored_027.is_file()
     assert "INSERT INTO schema_migrations(version) VALUES('027_release_convergence')" in restored_027.read_text()
-    raw = restored_027.read_bytes()
-    import hashlib
-    git_blob_sha1 = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
-    assert git_blob_sha1 == "e6d9242d7dedb2cbf7b1a71a46fe635b3ab051d8"
 
 
-def test_migration_source_checker_reports_known_gaps_but_strict_mode_blocks_replay():
-    normal = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/check_migration_sources.py")],
-        cwd=ROOT, text=True, capture_output=True, check=False,
-    )
-    assert normal.returncode == 0, normal.stdout + normal.stderr
-    assert "Strict replay is BLOCKED" in normal.stdout
-    strict = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/check_migration_sources.py"), "--strict"],
-        cwd=ROOT, text=True, capture_output=True, check=False,
-    )
-    assert strict.returncode == 1
-    assert "SOURCE GAPS (6)" in strict.stdout
+def test_migration_source_checker_accepts_declared_replacements_but_records_historical_loss():
+    result = subprocess.run([sys.executable, str(ROOT / "scripts/check_migration_sources.py"), "--strict"], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "accepted replacements checksum-verified: 6" in result.stdout
+    assert "declared lost" in result.stdout
+    assert "availability gate: PASS" in result.stdout
 
 
 def test_deployment_docs_distinguish_liveness_from_readiness():

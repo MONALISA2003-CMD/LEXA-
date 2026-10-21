@@ -351,11 +351,17 @@ def update_efris_config(body: EfrisConfigPatch, ctx=Depends(require_permission("
 @compliance.get("/fiscal-documents")
 def fiscal_documents(status: str | None = Query(default=None), ctx=Depends(require_permission("efris.read"))):
     db, _, tenant_id, _ = ctx
-    rows = db.execute(text("""
+    query = """
       SELECT id,source_type,source_id,document_type,currency_code,issue_date,status,document_number,fdn,verification_code,qr_code,
              efris_reference,response_code,response_message,submitted_at,accepted_at,voided_at,last_error,created_at,updated_at
-      FROM fiscal_documents WHERE tenant_id=:t AND (:s IS NULL OR status=:s) ORDER BY issue_date DESC,created_at DESC LIMIT 500
-    """), {"t": str(tenant_id), "s": status}).mappings().all()
+      FROM fiscal_documents WHERE tenant_id=:t
+    """
+    params = {"t": str(tenant_id)}
+    if status is not None:
+        query += " AND status=:s"
+        params["s"] = status
+    query += " ORDER BY issue_date DESC,created_at DESC LIMIT 500"
+    rows = db.execute(text(query), params).mappings().all()
     return [out(r) for r in rows]
 
 
