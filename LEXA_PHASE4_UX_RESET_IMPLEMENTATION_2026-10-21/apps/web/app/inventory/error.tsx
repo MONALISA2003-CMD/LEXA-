@@ -1,0 +1,2 @@
+"use client";
+export default function Error({ reset }: { reset: () => void }) { return <div className="route-error"><strong>Inventory could not load.</strong><span>The workspace hit an unexpected error while loading authoritative stock data.</span><button className="button button-dark" onClick={() => reset()}>Try again</button></div>; }

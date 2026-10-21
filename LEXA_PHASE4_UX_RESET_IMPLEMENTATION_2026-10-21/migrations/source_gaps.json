@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "purpose": "Track the exact applied live migration SQL sources that remain unavailable from the supplied package and inspectable GitHub history. Never reconstruct missing historical migrations from schema inference.",
+  "status": "BLOCKS_REPRODUCIBLE_FROM_ZERO_MIGRATION_REPLAY",
+  "gaps": [
+    {
+      "version": "010_phase2_catalog_intelligence",
+      "expected_path": "migrations/010_phase2_catalog_intelligence.sql",
+      "reason": "Recorded in the live ledger and README, but exact SQL was absent from the ZIP and the inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact; do not recreate from schema inference."
+    },
+    {
+      "version": "011_phase2_catalog_runtime_constraints",
+      "expected_path": "migrations/011_phase2_catalog_runtime_constraints.sql",
+      "reason": "Recorded in the live ledger and README, but exact SQL was absent from the ZIP and the inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact; do not recreate from schema inference."
+    },
+    {
+      "version": "023_phase4_purchasing_core",
+      "expected_path": "migrations/023_phase4_purchasing_core.sql",
+      "reason": "Present in the live ledger but absent from the source package; it shares numeric prefix 023 with a distinct identity migration.",
+      "next_step": "Recover the exact applied SQL, retain its full historical version string, and ensure tooling treats full version strings as identities."
+    },
+    {
+      "version": "024_phase4_purchasing_security",
+      "expected_path": "migrations/024_phase4_purchasing_security.sql",
+      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+    },
+    {
+      "version": "025_phase4_purchasing_permissions",
+      "expected_path": "migrations/025_phase4_purchasing_permissions.sql",
+      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+    },
+    {
+      "version": "026_phase4_membership_branch_integrity",
+      "expected_path": "migrations/026_phase4_membership_branch_integrity.sql",
+      "reason": "Present in the live ledger but absent from the source package and inspected GitHub revision.",
+      "next_step": "Recover the exact applied SQL from an authoritative historical release or database migration artifact."
+    }
+  ],
+  "numeric_prefix_collisions": {
+    "023": [
+      "023_phase2_identity_tenancy_authorization_foundation",
+      "023_phase4_purchasing_core"
+    ]
+  },
+  "recovered_sources": [
+    {
+      "version": "027_release_convergence",
+      "path": "migrations/027_release_convergence.sql",
+      "recovered_from_path": "lexa_v280_src/migrations/027_release_convergence.sql",
+      "source_repository": "MONALISA2003-CMD/LEXA-",
+      "source_commit": "51355d941eb50e075e3d4f884838a11b6807778b",
+      "git_blob_sha1": "e6d9242d7dedb2cbf7b1a71a46fe635b3ab051d8",
+      "sha256": "404334dde3e34a80d3176b1ba38347eb1def3cc8793f6b52d3a663cbc05b19cd",
+      "size_bytes": 16980,
+      "verification": "Recovered source bytes recompute to the original Git blob SHA-1 and documented SHA-256. Database ledger records the full version but does not record a source checksum, so this proves artifact provenance, not an independent DB-side checksum of applied bytes."
+    }
+  ]
+}

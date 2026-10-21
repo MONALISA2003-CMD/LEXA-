@@ -1,0 +1,87 @@
+name: LEXA CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      strict_migration_replay:
+        description: 'Run strict exact-source gate (expected to fail while six originals are unavailable)'
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lexa-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-contracts:
+    name: Backend contracts and migration provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # actions/checkout v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # actions/setup-python v7.0.0
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: apps/api/pyproject.toml
+      - name: Install all API test dependencies
+        working-directory: apps/api
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
+      - name: Run complete canonical Python suites
+        run: python -m pytest -q tests apps/api/tests
+      - name: Compile backend and test scripts
+        run: python -m compileall -q apps/api/app apps/api/tests scripts
+      - name: Validate reconstructed-source hashes and separation
+        run: python scripts/check_migration_recovery_manifest.py
+      - name: Check exact source reconciliation ledger (non-strict)
+        run: python scripts/check_migration_sources.py
+
+  frontend-contracts:
+    name: Frontend Node 24 typecheck, tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # actions/checkout v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # actions/setup-node v7.1.0
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Clean dependency install
+        working-directory: apps/web
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        working-directory: apps/web
+        run: npm run typecheck
+      - name: All frontend contract tests
+        run: node --test apps/web/tests/*.test.mjs
+      - name: Production build
+        working-directory: apps/web
+        run: npm run build
+
+  strict-exact-source-gate:
+    name: Explicit strict source-history gate (expected blocked today)
+    if: github.event_name == 'workflow_dispatch' && inputs.strict_migration_replay == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # actions/checkout v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # actions/setup-python v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Fail closed until six exact historical sources exist
+        run: python scripts/check_migration_sources.py --strict
