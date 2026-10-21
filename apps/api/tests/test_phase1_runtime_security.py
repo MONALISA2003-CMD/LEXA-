@@ -69,7 +69,7 @@ def test_production_database_requires_runtime_login_pooler_and_tls():
         jwt_secret="x" * 40,
         cors_origins=["https://lexa-green.vercel.app"],
     )
-    good = "postgresql://lexa_runtime:example@ep-test-pooler.c-5.neon.tech/neondb?sslmode=require"
+    good = "postgresql://lexa_runtime_login_p3:example@ep-test-pooler.c-5.neon.tech/neondb?sslmode=require"
     assert validate_production_settings(**common, database_url=good)
 
     safe_login_url = "postgresql://lexa_runtime_safe:example@ep-test-pooler.c-5.neon.tech/neondb?sslmode=require"

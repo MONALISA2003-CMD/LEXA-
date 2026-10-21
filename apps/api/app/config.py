@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str
     database_app_role: str = ""
-    database_login_role: str = "lexa_runtime"
+    database_login_role: str = "lexa_runtime_login_p3"
     redis_url: str
     jwt_secret: str
     jwt_issuer: str = "lexa"
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
-def validate_production_settings(*, app_env: str, database_app_role: str, jwt_secret: str, cors_origins: list[str], database_url: str | None = None, database_login_role: str = "lexa_runtime") -> bool:
+def validate_production_settings(*, app_env: str, database_app_role: str, jwt_secret: str, cors_origins: list[str], database_url: str | None = None, database_login_role: str = "lexa_runtime_login_p3") -> bool:
     if app_env.strip().lower() != "production":
         return True
     if database_app_role != "lexa_app":

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "purpose": "Documented disposable clean-replay order for the Phase 0\u20133 candidate chain. This is not a production migration runner.",
   "baseline_commit": "8124cca301062eac6ffe59f68d02fc689a3ffae1",
-  "status": "REPLAY_VALIDATED_THROUGH_031_WITH_LABELLED_EQUIVALENTS_AND_COMPATIBILITY_STEPS; CANONICAL_BYTE_PARITY_NOT_PROVEN; AUTHENTICATED_LIVE_ACCEPTANCE_PENDING",
+  "status": "PRODUCTION_RLS_031_GREEN; LEAST_PRIVILEGE_LOGIN_CUTOVER_GREEN; POST_CUTOVER_AUTHENTICATED_E2E_ACCEPTANCE_GREEN; SIX_CANONICAL_SQL_SOURCES_DECLARED_LOST_AND_REPLACED; CANONICAL_BYTE_PARITY_NOT_PROVEN",
   "source_gaps": [
     "migrations/010_phase2_catalog_intelligence.sql",
     "migrations/011_phase2_catalog_runtime_constraints.sql",
@@ -179,5 +179,15 @@
     }
   ],
   "replay_only_notice": "Do not run this list against production. It deliberately selects replay-equivalents/reconciliation files instead of claimed historical originals. A successful replay does not upgrade the six missing sources to recovered originals.",
-  "validation_head_commit": "be08fd23b0920d5a2f1847c6c2263adbbaddd82e"
+  "validation_head_commit": "be08fd23b0920d5a2f1847c6c2263adbbaddd82e",
+  "production_closeout": {
+    "migration_031_applied": true,
+    "all_119_public_base_tables_rls_enabled_and_forced": true,
+    "least_privilege_runtime_login": "lexa_runtime_login_p3",
+    "render_deployment_id": "dep-dbc7nnd9fdbs73c5a760",
+    "render_commit": "3b2edd639d2828ad371c2176376e4016f2992439",
+    "readiness": "HTTP 200; database ok; cache ok",
+    "authenticated_live_acceptance": "registration/login/identity; branch create/read; category create/read/update/soft-delete; QA sessions revoked",
+    "historical_source_parity": "NOT_PROVEN; six sources remain declared lost and represented by labelled equivalents"
+  }
 }

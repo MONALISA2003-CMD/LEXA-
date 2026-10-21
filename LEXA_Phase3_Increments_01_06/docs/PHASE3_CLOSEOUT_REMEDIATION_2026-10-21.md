@@ -1,26 +1,47 @@
-# Phase 3 closeout remediation — 2026-10-21
+# Phase 3 final closeout and runtime cutover — 2026-10-21
 
-## Implemented in this source package
-- Added the missing uq_brands_tenant_id(tenant_id,id) composite key to root migration 004 and its replay-equivalent copy.
-- Repaired root migration 021 from the valid lexa_v280_src equivalent. The original root file contained escaped newline text and trailing non-SQL code; this is a repaired substitute, not proof of original-byte recovery.
-- Materialized replay-only SQL paths that the manifest referenced but that existed only under the Phase 3 override package.
-- Added migration 031 to enable and force RLS on the remaining five public tables: permissions, schema_migrations, users, tenants, and registration_requests.
-- Updated registration/login routes to set narrowly scoped pre-tenant context, constrain user visibility to the requested email and registration-request visibility to its idempotency key, and preserve tenant/user context across login commit.
-- Added source-contract regression tests and a GitHub Actions workflow to run backend checks, Node 24 typecheck/tests/build, dependency audit, and migration-manifest path checks.
+## Final acceptance result
 
-## Production work already performed
-- Migration 030 was applied after preflight checks found zero duplicate membership groups, malformed invitation hashes, live pending invitations missing roles, and duplicate pending invitation groups.
-- The runtime role lexa_runtime_safe exists but is not yet configured with a usable password, so Render was not cut over to it. The existing lexa_runtime remains a privileged login, although application transactions switch to lexa_app.
+The Phase 3 production acceptance gates requested for this closeout have passed after the runtime database login cutover. The six canonical historical SQL sources listed below remain formally declared lost and replaced with labelled equivalents; their original-byte parity is not claimed.
 
-## Validation completed in the temporary validation workspace
-- Backend suite: 28 passed after installing the missing Starlette test-client dependency httpx2. One upstream deprecation warning remains.
-- Frontend checks on Node 24.21.0: npm ci passed; npm audit reported 0 vulnerabilities; typecheck passed; 23 tests passed; production build passed and generated 18 routes.
-- Clean-replay database already validated migrations 001–030 with labelled equivalents and a replay-only brands composite-key fix. Migration 031 was then applied to that isolated replay database; its ledger entry is present, RLS enabled and forced on all five remaining auth-surface tables, and the registration DELETE privilege is revoked.
-- Isolated role/RLS smoke check passed: self user and active tenant visible in matching context; a different user and pre-tenant registration rows are hidden after clearing registration context; permission catalog and migration ledger remain readable to lexa_app.
-- The replay manifest path-integrity script passes for all declared steps.
+## Production database and security
 
-## Validation still required before phase closure
-- Run migration 031 only after the updated API code is deployed, then verify all public tables have RLS enabled/forced or an explicit reviewed exception.
-- Re-run the full clean database replay using the corrected manifest. The six exact historical SQL files (010, 011, 023, 024, 025, 026) remain unavailable; equivalents do not prove byte parity.
-- Run backend tests and authenticate to verify login, registration, branch/category create/update/delete, and read/write acceptance across modules. Existing live log evidence includes HTTP 500 on branch/category creation before this patch; that acceptance must be repeated after deployment.
-- Finish the database safe-role credential cutover using an authorized secret-management method and verify Render readiness.
+- Production schema ledger records migrations `030_phase3_workspace_memberships` and `031_phase3_auth_surface_rls`.
+- Final live audit checked all 119 public base tables: every table has Row-Level Security enabled and forced; the disabled and enabled-but-not-forced inventories are both empty.
+- `lexa_app` has no DELETE privilege on `registration_requests`.
+- Created `lexa_runtime_login_p3` with `LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`, and granted membership in `lexa_app` for explicit `SET LOCAL ROLE lexa_app`.
+- Connected as the new login and verified that after switching to `lexa_app`, users, tenants, and registration requests are hidden without the relevant transaction-local context; permissions and the migration ledger remain readable.
+- Updated Render's `DATABASE_URL` to the Neon pooled endpoint with TLS required and username matching `DATABASE_LOGIN_ROLE=lexa_runtime_login_p3`. The deployment is live on commit `3b2edd639d2828ad371c2176376e4016f2992439`, deployment `dep-dbc7nnd9fdbs73c5a760`.
+- Readiness after the cutover returned HTTP 200 with production status `ready`, database `ok`, and cache `ok`. Neon `pg_stat_activity` showed active pooled connections using the new least-privilege login.
+- Rotated the legacy `lexa_runtime` password after the new login was live. Its old connection string is no longer valid. The Render application uses the new login.
+
+## Authenticated live end-to-end acceptance after cutover
+
+Tested through the deployed LEXA frontend and API against a clearly labelled QA workspace:
+
+- Registration completed and produced a workspace with active Owner membership; the browser showed `Session active`.
+- `/api/v1/auth/refresh` returned HTTP 200 and `/api/v1/auth/me` returned HTTP 200 with the QA owner/workspace identity matching.
+- Branch create returned HTTP 200; subsequent branch list returned HTTP 200 and contained the new branch.
+- Category create returned HTTP 201; subsequent category list showed it. Update returned HTTP 200 and the updated name was visible. Delete returned HTTP 200, changed the record to `INACTIVE`, and the record was absent from the active category list.
+- Inventory UI acceptance had also previously created and verified QA warehouse/location records with the forced-RLS migration applied.
+- The final QA browser session was signed out. Database verification showed no active session for that QA owner. No sales, invoices, payments, products, inventory quantities, or stock transactions were created.
+
+## Build and test evidence from this source line
+
+- Backend: 28 tests passed in the validation workspace, with one upstream deprecation warning.
+- Frontend on Node 24.21.0: clean `npm ci`, `npm audit --audit-level=high` (0 vulnerabilities), typecheck, 23 tests passed, and production build passed with 18 routes.
+- The replay manifest has 35 declared steps with no missing referenced paths.
+- Source changes include the transaction-local tenant-context restoration, registration/login pre-tenant scoping, migration 031, source-contract tests, and the updated default runtime login name.
+
+## Declared historical source gaps — substitutes retained
+
+The exact historical sources remain unavailable and are not represented as byte-recovered originals:
+
+- `migrations/010_phase2_catalog_intelligence.sql`
+- `migrations/011_phase2_catalog_runtime_constraints.sql`
+- `migrations/023_phase4_purchasing_core.sql`
+- `migrations/024_phase4_purchasing_security.sql`
+- `migrations/025_phase4_purchasing_permissions.sql`
+- `migrations/026_phase4_membership_branch_integrity.sql`
+
+They are declared lost per the project decision and represented in the replay manifest by labelled equivalents/compatibility steps. A successful equivalent replay is evidence of compatibility, not proof of canonical byte parity. The replay manifest remains disposable/test-only and must never be executed as a production runner.
