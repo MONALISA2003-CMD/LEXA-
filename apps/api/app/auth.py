@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 import hashlib, secrets
 from uuid import UUID
+
 import jwt
+from fastapi import Response
 from pwdlib import PasswordHash
 from .config import settings
 
@@ -30,3 +32,16 @@ def new_refresh_token() -> str:
 
 def hash_refresh_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    """Set the shared refresh-token cookie consistently across auth workflows."""
+    response.set_cookie(
+        "lexa_refresh_token",
+        token,
+        httponly=True,
+        secure=settings.app_env.strip().lower() == "production",
+        samesite="lax",
+        max_age=settings.refresh_token_days * 86400,
+        path="/",
+    )

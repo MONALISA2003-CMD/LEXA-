@@ -85,7 +85,10 @@
     "Phase 5 Increment 01: multi-line sales cart, checkout idempotency key, branch-scoped sales history, sale detail and print view.",
     "Phase 5 Increment 02: cumulative refund cap evaluated against original collections minus all recorded prior refunds while locking the source sale.",
     "Phase 5 Increment 02: branch-scoped returns list and payment/return/refund ledger details on sale detail.",
-    "Phase 5 Increment 02: staging-only Playwright cases for split tender, partial payment, idempotent retry, stock ledger read-after-write, cumulative refund limit, cashier permission denial, manager positive price/discount, and optional cross-branch denial."
+    "Phase 5 Increment 02: staging-only Playwright cases for split tender, partial payment, idempotent retry, stock ledger read-after-write, cumulative refund limit, cashier permission denial, manager positive price/discount, and optional cross-branch denial.",
+    "Phase 5 final gate review (2026-10-21): pinned GitHub revision d228e6467894857aeeb632a189d10680179404db; Vercel Node 24.x production build is ready, while the same-commit Render startup failed because workspace/membership routes import a missing shared refresh-cookie helper.",
+    "Added a shared HttpOnly refresh-cookie helper to apps/api/app/auth.py and aligned apps/api/app/routes/auth.py to use it; this is a local source repair and is not committed/deployed because the GitHub integration returned HTTP 403.",
+    "Updated cookie hardening regression contract and added a source-level shared-cookie import regression test."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -98,7 +101,7 @@
   "package_version": "2.9.1",
   "phase": "1 security and stability",
   "phase_name": "Least-privilege database login, readiness role context, and production config hardening",
-  "phase_status": "SOURCE_CANDIDATE_VERIFIED_LOCAL_109_PASSED_1_DEPENDENCY_SKIP_4_FRONTEND_CONTRACTS_27_TS_SYNTAX_FILES_PASS_SEVEN_HISTORICAL_MIGRATION_GAPS_FRONTEND_BUILD_AND_HOSTED_AUTH_PENDING",
+  "phase_status": "CANDIDATE_ONLY_VERCEL_PRODUCTION_BUILD_PASS_NEON_RLS_PASS_RENDER_SAME_SHA_FAILED_SHARED_REFRESH_COOKIE_IMPORT_LOCAL_BACKEND_43_PASS_1_REDIS_SKIP_FRONTEND_CONTRACTS_25_PASS_NODE22_NODE24_CLEAN_INSTALL_AND_AUTHENTICATED_STAGING_PENDING",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -144,16 +147,22 @@
   },
   "release": "phase1-security-stability-source-candidate-2.9.1-2026-10-19",
   "release_name": "phase-1-security-stability-isolated-test-verified-production-cutover-not-authorized",
-  "source_baseline": "Reconstructed from preserved Phase 4 UX reset source archive plus the Phase 5 Increment 01 overlay and Increment 02 checkout-integrity changes.",
+  "source_baseline": "Reconstructed from preserved Phase 4 source archive plus Phase 5 Increment 01/02 overlays; the final gate repair is local to this package until committed.",
   "canonical_source_parity": false,
-  "release_status": "candidate only; not merged or deployed; do not promote until source reconciliation, Node 24 build, and authenticated staging acceptance pass",
+  "release_status": "NOT RELEASE-ACCEPTED. GitHub main revision d228e6467894857aeeb632a189d10680179404db built successfully on Vercel (project Node 24.x), but Render deployment for that same SHA failed importing app.auth._set_refresh_cookie; locally repaired package passes available tests, yet GitHub writes were denied (403), clean npm ci on Node 24 and authenticated isolated staging E2E remain outstanding. Do not advance to Phase 6.",
   "validation_summary": {
-    "backend_tests": "41 passed, 1 skipped (Redis-dependent auth-refresh test)",
-    "frontend_contract_tests": "25 passed",
-    "typescript_tsx_syntax_scan": "34 files scanned; 0 syntax diagnostics; not a full typecheck",
-    "node24_clean_install_typecheck_production_build": "not completed: only Node 22.16 available and required dependency tarball missing from offline npm cache",
-    "authenticated_staging_playwright": "tests authored; not run (staging host and disposable QA fixtures required)",
-    "production_database_mutation": "none",
-    "deployment": "none"
-  }
+    "reviewed_source_sha": "d228e6467894857aeeb632a189d10680179404db",
+    "vercel": "READY production deployment dpl_4h1ftGMSNohHWvgxMqjpN2FwJQuD for the reviewed SHA; project nodeVersion 24.x; TypeScript and Next production build completed (21/21 static pages); deployed build used npm install, not a separately verified clean npm ci.",
+    "render": "FAIL for the reviewed SHA: dep-dbc9rmo473hc73a6niog; ImportError: cannot import name _set_refresh_cookie from app.auth. Prior live deploy commit c1cd002bece6de028357d7ed156c6f03d3d5a7f7 remains ready; frontend and backend deployment SHAs are not aligned.",
+    "neon": "PASS read-only security audit: migration 031 present; 119/119 public base tables have RLS enabled and forced; no RLS-disabled/not-forced tables; runtime login is non-superuser, non-inheriting, no CREATEDB/CREATEROLE/BYPASSRLS and member of lexa_app; no long-running queries or locks. Branch protection enablement was refused by the plan protected-branch quota.",
+    "backend_tests": "43 passed, 1 skipped because Redis dependency is absent from this offline runner; Python compileall passed.",
+    "frontend_contract_tests": "25 passed under Node 22.16.0; this is a source-contract suite, not a Node 24 run.",
+    "node24_clean_install_typecheck_production_build": "Vercel production build/typecheck pass for project configured as Node 24.x; separate clean npm ci and frontend test run under Node 24 not completed because local runner cannot fetch Node 24/cache misses and Vercel Sandbox creation is blocked by Hobby snapshot storage limit.",
+    "authenticated_staging_playwright": "Not run: no isolated Render staging API; Vercel API-origin vars target production only and default API origin is the live Render URL; mutation tests intentionally not run against production.",
+    "preview": "No safe preview of the locally repaired code exists because GitHub branch/file writes were denied (403) and Vercel sandbox creation is blocked by snapshot-storage quota.",
+    "production_data_mutation": "none by this final gate review.",
+    "canonical_source_parity": false
+  },
+  "final_gate_report": "PHASE5_FINAL_GATE_REPORT_2026-10-21.md",
+  "local_repair_readme": "PHASE5_REPAIR_README_2026-10-21.md"
 }

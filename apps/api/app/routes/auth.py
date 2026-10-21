@@ -12,7 +12,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 import redis
 
-from ..auth import create_access_token, hash_password, verify_password, new_refresh_token, hash_refresh_token
+from ..auth import create_access_token, hash_password, verify_password, new_refresh_token, hash_refresh_token, _set_refresh_cookie
 from ..catalog_rules import request_hash
 from ..dependencies import get_db, current_context
 from ..models import (
@@ -106,10 +106,6 @@ def _clear_login_rate_limit(request: Request, email: str) -> None:
         client.delete(_login_rate_key(request, email))
     except Exception:
         logger.warning("login_rate_limit_clear_failed", extra={"request_id": getattr(request.state, "request_id", "untracked")})
-
-
-def _set_refresh_cookie(response: Response, token: str) -> None:
-    response.set_cookie("lexa_refresh_token", token, httponly=True, secure=settings.app_env.strip().lower() == "production", samesite="lax", max_age=settings.refresh_token_days * 86400, path="/")
 
 
 def _clear_refresh_cookie(response: Response) -> None:

@@ -41,10 +41,11 @@ def test_web_auth_never_persists_access_tokens_and_refreshes_with_cookie():
 
 def test_auth_rate_limit_and_refresh_cookie_are_present():
     source = (ROOT / "app" / "routes" / "auth.py").read_text()
+    shared_auth = (ROOT / "app" / "auth.py").read_text()
     assert "_enforce_login_rate_limit" in source
     assert "_enforce_registration_rate_limit" in source
-    assert 'httponly=True' in source
-    assert 'samesite="lax"' in source
+    assert 'httponly=True' in shared_auth
+    assert 'samesite="lax"' in shared_auth
     assert '"refresh_token": new_refresh' not in source
 
 
