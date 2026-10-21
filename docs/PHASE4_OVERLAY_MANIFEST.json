@@ -1,17 +1,9 @@
 {
-  "package": "LEXA Phase 4 closeout candidate overlay",
+  "package": "LEXA Phase 4 closeout overlay",
   "created_date": "2026-10-21",
-  "base": "Accepted LEXA Phase 3 final-cutover source; exact local source archive unavailable during this run.",
-  "archive_layout": "repo-relative paths; no enclosing folder; overlay only",
-  "phase4_implementation": "PREPARED",
-  "phase4_release_acceptance": "PENDING_SOURCE_REBASE_NODE24_BUILD_AUTHENTICATED_PREVIEW_E2E",
-  "phase5_planning_and_development": "UNBLOCKED",
-  "route_reconciliation_warning": [
-    "apps/api/app/routes/commerce.py differs from the currently readable GitHub main blob and includes preserved source overlay code alongside Phase 4 changes.",
-    "apps/api/app/routes/inventory.py differs from the currently readable GitHub main blob and includes preserved source overlay code alongside Phase 4 changes.",
-    "apps/api/app/routes/analytics.py differs from the currently readable GitHub main blob and includes preserved source overlay code alongside Phase 4 changes.",
-    "Do not blindly replace these three files on main. Merge them against the exact accepted Phase 3 final-cutover source first. Keep apps/api/app/main.py router mounts and migration 031_phase3_auth_surface_rls.sql intact."
-  ],
+  "base": "LEXA_PHASE3_FINAL_CUTOVER_2026-10-21.zip or newer reconciled phase-3 source",
+  "archive_layout": "repo-relative paths; overlay only; no outer folder",
+  "phase4_release_acceptance": "PENDING_NODE24_BUILD_AND_AUTHENTICATED_PREVIEW_E2E",
   "entries": [
     {
       "path": "apps/api/app/routes/commerce.py",
@@ -90,13 +82,13 @@
     },
     {
       "path": "PHASE4_IMPLEMENTATION_REPORT_2026-10-21.md",
-      "size_bytes": 1048,
-      "sha256": "fbbe5561b6c2e6656e8cd92888d27678fe5d4a83d93e981adaa73a180cad7209"
+      "size_bytes": 3909,
+      "sha256": "e00edeaafc94f074417b7c47bdd6247656e99be09d7706b8492e0de5926695b8"
     },
     {
       "path": "PHASE4_CLOSEOUT_STATUS_2026-10-21.json",
-      "size_bytes": 1274,
-      "sha256": "78335cc8a38e58e15f64ff667d8f662d900c4f586cbf66bfded7f75ed27dbde9"
+      "size_bytes": 1205,
+      "sha256": "b4d7f4cce3c4c12922b50a06a50b8b7dd22dfdcce3e68a2d91aa72f2c0a5a84c"
     },
     {
       "path": "docs/PHASE4_KPI_DEFINITIONS.md",
@@ -110,41 +102,25 @@
     },
     {
       "path": "docs/PHASE4_SOURCE_RECONCILIATION_2026-10-21.md",
-      "size_bytes": 3286,
-      "sha256": "9169c99024f90611a3ddb59140c8e987e0a96eb81e06d50e0c5ed6a6859119a6"
+      "size_bytes": 2064,
+      "sha256": "225844a302f7ad8c62d6aed0f2f68abcc7ced784da391e9d0758a76ab570738e"
     },
     {
       "path": "docs/PHASE4_CLOSEOUT_REPORT_2026-10-21.md",
-      "size_bytes": 4430,
-      "sha256": "f1ae8ee911fe41b407896ce6d3a128e0f3a4a57e5b665cf66ef608d206bd3048"
+      "size_bytes": 3909,
+      "sha256": "e00edeaafc94f074417b7c47bdd6247656e99be09d7706b8492e0de5926695b8"
     },
     {
       "path": "docs/PHASE4_OVERLAY_README.md",
-      "size_bytes": 1806,
-      "sha256": "8e72f0a412e87ec2da3c5c0fae10654b573d1497bc0b30d218a99770a3022418"
-    },
-    {
-      "path": "docs/PHASE5_ENTRY_BRIEF.md",
-      "size_bytes": 3257,
-      "sha256": "76dc626fa5596a098b6187988580560ea374c1f718b80206e23625b6e8b4342e"
+      "size_bytes": 1923,
+      "sha256": "e9d1a3e15642dc25c1efcab23d185bb08cc0338f4e56aa6b3dc118816dbed380"
     }
   ],
   "excluded": [
-    ".env and production secrets",
+    ".env and other secrets",
     "GitHub workflow files",
     "schema migration files",
     "node_modules and build caches",
-    "unrelated Phase 3 files",
-    "apps/api/app/main.py (preserve accepted Phase 3 router mounts)"
-  ],
-  "validation": {
-    "frontend_contracts": "24 passed on Node 22.16.0; full app specifies Node 24.x",
-    "backend": "27 passed, 1 skipped because auth-refresh API test dependencies unavailable",
-    "python_compileall": "PASS",
-    "migration_manifest_integrity": "PASS; strict canonical source parity not claimed for six agreed substitutions",
-    "typescript_transpile_syntax": "33 TS/TSX files parsed without syntax diagnostics; not a full typecheck",
-    "node24_clean_install_typecheck_build": "BLOCKED; Vercel Hobby sandbox snapshot quota exceeded; offline package cache incomplete",
-    "authenticated_preview_e2e": "NOT RUN",
-    "github_commit_or_deploy": "NOT PERFORMED; connected GitHub write permission unavailable"
-  }
+    "unrelated Phase 3 files"
+  ]
 }

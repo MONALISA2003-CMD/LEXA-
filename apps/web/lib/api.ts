@@ -292,9 +292,17 @@ export function createCommerceCustomer(body:{display_name:string;party_type?:'PE
 export function getPaymentChannels(){return getJson<PaymentChannel[]>('/api/v1/commerce/payment-channels');}
 export function createPaymentChannel(body:{name:string;channel_type:string;provider?:string;currency_code:string}){return getJson<PaymentChannel>('/api/v1/commerce/payment-channels',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
 export function getCommerceProducts(){return getJson<CommerceProduct[]>('/api/v1/commerce/products');}
-export function getCommerceSales(){return getJson<CommerceSale[]>('/api/v1/commerce/sales?limit=100');}
+export type CommerceSalesQuery = { limit?:number; offset?:number; search?:string; status?:string; start_date?:string; end_date?:string; branch_id?:string };
+export function getCommerceSales(query:CommerceSalesQuery={}){
+  const params = new URLSearchParams({limit:String(query.limit ?? 100),offset:String(query.offset ?? 0)});
+  for (const field of ["search","status","start_date","end_date","branch_id"] as const) {
+    const value = query[field];
+    if (value && value.trim()) params.set(field,value.trim());
+  }
+  return getJson<CommerceSale[]>(`/api/v1/commerce/sales?${params.toString()}`);
+}
 export function getCommerceSale(id:string){return getJson<CommerceSaleDetail>(`/api/v1/commerce/sales/${id}`);}
-export function createCommerceSale(body:{customer_party_id?:string|null;branch_id?:string|null;location_id:string;currency_code:string;business_date:string;lines:Array<{variant_id:string;quantity:string;unit_price:string;discount_amount?:string;tax_rate?:string}>;payments:Array<{payment_channel_id:string;amount:string;reference?:string|null}>;notes?:string|null}){return getJson<CommerceSale>('/api/v1/commerce/sales',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
+export function createCommerceSale(body:{customer_party_id?:string|null;branch_id?:string|null;location_id:string;currency_code:string;business_date:string;lines:Array<{variant_id:string;quantity:string;unit_price:string;discount_amount?:string;tax_rate?:string}>;payments:Array<{payment_channel_id:string;amount:string;reference?:string|null}>;notes?:string|null}, idempotencyKey?:string){return getJson<CommerceSale>('/api/v1/commerce/sales',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':idempotencyKey || key()},body:JSON.stringify(body)});}
 export function getReceivables(){return getJson<Receivable[]>('/api/v1/commerce/receivables');}
 export function payReceivable(id:string,body:{payment_channel_id:string;amount:string;business_date:string;reference?:string|null}){return getJson<Receivable>(`/api/v1/commerce/receivables/${id}/payments`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
 export function getReconciliations(dateValue=''){return getJson<Reconciliation[]>(`/api/v1/commerce/reconciliations${dateValue?`?business_date=${encodeURIComponent(dateValue)}`:''}`);}

@@ -825,3 +825,23 @@ input, select, textarea { accent-color: var(--blue); }
   .quick-links a, .button { transition: none; }
   .quick-links a:hover, .button:hover { transform: none; }
 }
+
+/* Phase 5 Sales Cockpit and checkout cart */
+.cart-line { align-items: end; gap: 12px; flex-wrap: wrap; }
+.cart-line > div:first-child { flex: 1 1 180px; min-width: 150px; }
+.cart-line label { display: grid; gap: 6px; width: 120px; color: var(--muted, #65718a); font-size: 12px; }
+.cart-line input { width: 100%; min-width: 0; }
+.sales-history-workspace { display: grid; gap: 16px; }
+.sales-history-filters { display: grid; grid-template-columns: minmax(180px, 2fr) repeat(3, minmax(120px, 1fr)) auto auto; gap: 10px; align-items: end; padding: 14px; border: 1px solid var(--line, #dce3ee); border-radius: 14px; background: var(--paper, #fff); }
+.sales-history-filters label { display: grid; gap: 6px; font-size: 12px; color: var(--muted, #65718a); }
+.sales-history-filters input, .sales-history-filters select { width: 100%; min-width: 0; }
+.sale-history-row { align-items: center; }
+.sale-detail-panel { border: 1px solid var(--line, #dce3ee); border-radius: 16px; padding: 18px; background: var(--paper, #fff); }
+.sale-detail-panel .panel-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; margin-bottom: 14px; }
+.sale-detail-panel h3 { margin: 0; }
+.sale-detail-panel p { margin: 5px 0 0; }
+.sale-detail-totals { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin-top: 16px; }
+.sale-detail-totals span { display: flex; justify-content: space-between; gap: 8px; border: 1px solid var(--line, #dce3ee); border-radius: 10px; padding: 10px; font-size: 13px; }
+@media (max-width: 900px) { .sales-history-filters { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 520px) { .sales-history-filters { grid-template-columns: minmax(0,1fr); } .sale-detail-totals { grid-template-columns: minmax(0,1fr); } .cart-line label { width: calc(50% - 8px); } .sale-detail-panel { padding: 12px; } }
+@media print { body * { visibility: hidden !important; } .sale-detail-panel, .sale-detail-panel * { visibility: visible !important; } .sale-detail-panel { position: absolute; inset: 0; width: 100%; border: 0; } .sale-detail-panel button { display: none !important; } }

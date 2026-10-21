@@ -1,11 +1,10 @@
 {
   "candidate_date": "2026-10-21",
   "phase": 4,
-  "source_candidate": "PREPARED",
-  "source_reconciliation": "PENDING_FOR_COMMERCE_INVENTORY_ANALYTICS_ROUTE_FILES",
+  "source_implementation": "READY_FOR_CONTROLLED_CI_PREVIEW_VALIDATION",
   "release_acceptance": "PENDING",
-  "phase5_planning_and_development": "UNBLOCKED",
-  "production_promotion": "BLOCKED_PENDING_SOURCE_REBASE_NODE24_BUILD_AUTHENTICATED_PREVIEW_E2E",
+  "phase5_planning": "UNBLOCKED",
+  "production_promotion": "BLOCKED_PENDING_NODE24_AND_AUTHENTICATED_PREVIEW_ACCEPTANCE",
   "tests": {
     "frontend_contracts": {"passed": 24, "failed": 0, "runtime": "Node 22.16.0; candidate package requires Node 24.x"},
     "backend": {"passed": 27, "failed": 0, "skipped": 1, "skip_reason": "API test dependencies for auth-refresh integration are unavailable"},

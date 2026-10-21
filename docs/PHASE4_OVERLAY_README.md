@@ -1,30 +1,21 @@
-# LEXA Phase 4 closeout candidate
+# Applying the Phase 4 closeout overlay
 
-**Target base:** the accepted `LEXA_PHASE3_FINAL_CUTOVER_2026-10-21.zip` or a newer reconciled copy of that source.
+**Target base:** `LEXA_PHASE3_FINAL_CUTOVER_2026-10-21.zip` (or a newer reconciled copy of that Phase 3 final-cutover source).  
+**Do not apply to:** an older raw project ZIP while discarding the accepted Phase 3 final-cutover files.
 
-## Important source-alignment warning
+## Phone-friendly ZIP extraction workflow
 
-This package is a candidate source overlay, not a safely rebased drop-in for arbitrary `main`. The three API route files (`commerce.py`, `inventory.py`, `analytics.py`) include preserved API source-overlay code in addition to Phase 4 changes and do not byte-match the GitHub `main` blobs currently available to the connected reader. Compare/merge those paths against the exact accepted Phase 3 final-cutover ZIP before committing. `apps/api/app/main.py` and schema migrations are intentionally not part of this package: keep the accepted Phase 3 router mounts and migration `031_phase3_auth_surface_rls.sql` intact.
+1. Keep a backup copy of the accepted Phase 3 final-cutover ZIP.
+2. Upload/extract this Phase 4 overlay ZIP **into the same repository root** using the existing LEXA ZIP extractor workflow. ZIP entries are repo-relative paths; there is no enclosing top-level folder.
+3. The overlay replaces only the listed Phase 4 source/test/doc paths. It intentionally contains no `.env`, production secrets, schema migration files or GitHub workflow paths. Unlisted Phase 3 files—including migration `031_phase3_auth_surface_rls.sql`—are not removed.
+4. After the overlay lands, run clean Node 24 install, typecheck, contract tests and production build in CI/preview; see `PHASE4_RELEASE_ACCEPTANCE_MATRIX.md`.
+5. Do not promote to production until authenticated non-production browser acceptance passes against the same candidate and frontend/backend source revisions are aligned.
 
-## ZIP contents and constraints
+## What changed
 
-- Entries use repo-relative paths with no enclosing top-level folder.
-- No `.env`, production secrets, GitHub workflow files or migration files are included.
-- The package includes Phase 4 dashboard/analytics UI, inventory summary, product-summary aggregation, regression contracts, KPI definitions, source reconciliation and closeout status.
+- Added a currency-aware sales dashboard response: completed sales and credit are separated from payments recorded for the business date.
+- Added `/api/v1/inventory/summary`, which aggregates every inventory balance in the user's authorized locations and returns a small, bounded low/out-of-stock attention list.
+- Added range-aggregated product metrics and dashboard charts with an accessible SVG title/description and tabular data alternative.
+- Added regression contracts, KPI definitions, source reconciliation, release acceptance and closeout documentation.
 
-## Run gates before deployment
-
-Use an authorized Node 24 environment:
-
-```bash
-cd apps/web
-node --version                 # must report v24.x
-npm ci
-npm run typecheck
-npm test
-npm run build
-```
-
-Then install Playwright as a direct dev dependency through an authorized lockfile update; run the opt-in authenticated acceptance test with a non-production QA storage state against a preview URL. Complete the acceptance matrix before promoting any release.
-
-**Disposition:** Phase 4 code candidate prepared; source merge, clean Node 24 build and authenticated preview acceptance remain pending. No deployment has been made.
+The overlay is a controlled-release candidate, not a claim that the not-yet-run Node 24 build, authenticated browser E2E or deployment gates passed.

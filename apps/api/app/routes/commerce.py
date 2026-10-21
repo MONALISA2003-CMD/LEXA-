@@ -284,14 +284,47 @@ def commerce_products(ctx=Depends(require_permission("sales.read"))):
 
 
 @router.get("/sales")
-def list_sales(limit: int = Query(default=100, ge=1, le=500), ctx=Depends(require_permission("sales.read"))):
-    db,actor_id,tenant_id,_=ctx
-    rows=db.execute(text("""
-      SELECT s.id,s.transaction_id,s.customer_party_id,p.display_name customer_name,s.currency_code,s.status,
-             s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,s.return_adjustment_amount,s.created_at,s.completed_at
+def list_sales(
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=100000),
+    search: str | None = Query(default=None, max_length=100),
+    status: str | None = Query(default=None, max_length=20),
+    start_date: date | None = None,
+    end_date: date | None = None,
+    branch_id: UUID | None = None,
+    ctx=Depends(require_permission("sales.read")),
+):
+    """List only sales in the caller's assigned branches, with safe bound filters."""
+    db, actor_id, tenant_id, _ = ctx
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(422, "start_date must be on or before end_date")
+    if branch_id is not None:
+        ensure_branch_access(db, tenant_id=tenant_id, user_id=actor_id, branch_id=branch_id)
+    params: dict[str, Any] = {"t": str(tenant_id), "u": str(actor_id), "lim": limit, "off": offset}
+    filters = ["s.tenant_id=:t", "EXISTS (SELECT 1 FROM tenant_memberships tm JOIN membership_branch_assignments mba ON mba.membership_id=tm.id AND mba.tenant_id=tm.tenant_id JOIN branches b ON b.id=mba.branch_id AND b.tenant_id=mba.tenant_id WHERE tm.tenant_id=s.tenant_id AND tm.user_id=:u AND tm.status='ACTIVE' AND mba.status='ACTIVE' AND b.status='ACTIVE' AND b.id=s.branch_id)"]
+    if status and status.strip():
+        filters.append("s.status=:status")
+        params["status"] = status.strip().upper()
+    if search and search.strip():
+        filters.append("(COALESCE(p.display_name,'') ILIKE :search OR s.id::text ILIKE :search OR s.transaction_id::text ILIKE :search)")
+        params["search"] = f"%{search.strip()}%"
+    if start_date:
+        filters.append("public.lexa_business_date(s.created_at, :t) >= :start_date")
+        params["start_date"] = start_date
+    if end_date:
+        filters.append("public.lexa_business_date(s.created_at, :t) <= :end_date")
+        params["end_date"] = end_date
+    if branch_id is not None:
+        filters.append("s.branch_id=:branch_id")
+        params["branch_id"] = str(branch_id)
+    rows = db.execute(text(f"""
+      SELECT s.id,s.transaction_id,s.customer_party_id,p.display_name customer_name,s.branch_id,s.location_id,
+             s.currency_code,s.status,s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,
+             s.return_adjustment_amount,s.created_at,s.completed_at
       FROM sales s LEFT JOIN parties p ON p.id=s.customer_party_id AND p.tenant_id=s.tenant_id
-      WHERE s.tenant_id=:t ORDER BY s.created_at DESC LIMIT :lim
-    """),{"t":str(tenant_id),"lim":limit}).mappings().all()
+      WHERE {' AND '.join(filters)}
+      ORDER BY s.created_at DESC, s.id DESC LIMIT :lim OFFSET :off
+    """), params).mappings().all()
     return [out(x) for x in rows]
 
 
@@ -306,6 +339,9 @@ def get_sale(sale_id: UUID, ctx=Depends(require_permission("sales.read"))):
     """),{"t":str(tenant_id),"s":str(sale_id)}).mappings().first()
     if not sale:
         raise HTTPException(404,"Sale not found")
+    if sale["branch_id"] is None:
+        raise HTTPException(403, "Sale is not linked to an accessible branch")
+    ensure_branch_access(db, tenant_id=tenant_id, user_id=actor_id, branch_id=sale["branch_id"])
     lines=db.execute(text("""
       SELECT tl.id sale_line_id,tl.product_variant_id,pv.sku,pv.name variant_name,tl.quantity,tl.unit_price,tl.discount_amount,tl.tax_amount,tl.line_total
       FROM transaction_lines tl LEFT JOIN product_variants pv ON pv.id=tl.product_variant_id AND pv.tenant_id=tl.tenant_id
@@ -328,10 +364,36 @@ def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=N
         if body.branch_id and body.branch_id != location_branch_id:
             raise HTTPException(400,"Sale branch must match the selected stock location branch")
         branch_id = body.branch_id or location_branch_id
+        # Price changes and discounts are business controls, not trusted client data.
+        # Cashiers can sell at the configured catalogue price; only members with
+        # explicit pricing/sales-management capabilities may override it.
+        granted = {row[0] for row in db.execute(text("""
+          SELECT DISTINCT p.code
+          FROM membership_roles mr
+          JOIN roles r ON r.id=mr.role_id AND r.tenant_id=:tenant_id
+          JOIN role_permissions rp ON rp.role_id=r.id
+          JOIN permissions p ON p.id=rp.permission_id
+          JOIN tenant_memberships tm ON tm.id=mr.membership_id AND tm.tenant_id=:tenant_id
+          WHERE tm.user_id=:user_id AND tm.status='ACTIVE'
+            AND p.code IN ('catalog.pricing.manage','catalog.manage','sales.manage')
+        """), {"tenant_id":str(tenant_id),"user_id":str(actor)}).all()}
+        can_manage_price = bool({"catalog.pricing.manage", "catalog.manage"} & granted)
+        can_manage_sales = "sales.manage" in granted
         subtotal=Decimal("0"); discount=Decimal("0"); tax=Decimal("0")
         validated=[]
         for line in body.lines:
             variant=tenant_variant(db,tenant_id,line.variant_id)
+            catalog_price = db.execute(text("""
+              SELECT unit_price FROM product_prices
+              WHERE tenant_id=:t AND variant_id=:v
+              ORDER BY effective_from DESC LIMIT 1
+            """), {"t":str(tenant_id),"v":str(line.variant_id)}).scalar_one_or_none()
+            if catalog_price is None and not can_manage_price:
+                raise HTTPException(409, "No catalogue price is configured for this product; ask a pricing manager to set one")
+            if catalog_price is not None and q(line.unit_price) != q(Decimal(str(catalog_price))) and not can_manage_price:
+                raise HTTPException(403, "Price override permission required; use the catalogue price or ask a manager")
+            if line.discount_amount > 0 and not can_manage_sales:
+                raise HTTPException(403, "Discount permission required; ask a manager to apply this discount")
             gross=q(line.quantity*line.unit_price)
             if line.discount_amount>gross: raise HTTPException(422,"Line discount cannot exceed line value")
             taxable=q(gross-line.discount_amount)
