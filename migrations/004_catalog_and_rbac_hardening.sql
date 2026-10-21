@@ -189,6 +189,7 @@ CREATE INDEX IF NOT EXISTS idx_outbox_unpublished ON outbox_events(tenant_id, pu
 
 -- Tenant-consistency checks through composite FKs where practical.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_categories_tenant_id ON categories(tenant_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_brands_tenant_id ON brands(tenant_id, id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_products_tenant_id ON products(tenant_id, id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_variants_tenant_id ON product_variants(tenant_id, id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_units_tenant_id ON units(tenant_id, id);
