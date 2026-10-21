@@ -1,3 +1,7 @@
+## Phase 5 Increment 03 — review candidate (2026-10-21)
+
+The latest deployed baseline SHA `779f8fe5dc704411b9abab371a29311e7dbc844a` is live on Render and READY on Vercel. The full-source candidate now includes refund/return settlement reconciliation, no-refund receivable guarding, return accounting/COGS journals, store-credit liability, optional EFRIS credit notes and the related UI/tests. It is not yet committed or deployed. See `PHASE5_INCREMENT_03_IMPLEMENTATION_REPORT_2026-10-21.md` and `PHASE5_FINAL_GATE_REPORT_2026-10-21.md` for exact evidence and remaining gates.
+
 # LEXA — v2.9.0 Phase 1 UX Foundation Handoff
 
 LEXA is a real multi-tenant business operating and intelligence system. The canonical business system of record is Neon PostgreSQL project `LEXA`, branch `lexa-live`, database `neondb`.

@@ -1,79 +1,59 @@
 # LEXA Phase 5 — Final Gate Report
 
 **Review date:** 2026-10-21 (Africa/Kampala)  
-**Pinned GitHub source revision:** `d228e6467894857aeeb632a189d10680179404db`  
-**Repository:** `MONALISA2003-CMD/LEXA-`  
-**Decision:** **Phase 5 is NOT release-accepted. Do not advance to Phase 6 yet.**
+**Latest uploaded GitHub revision:** `779f8fe5dc704411b9abab371a29311e7dbc844a`  
+**Candidate package:** Phase 5 Increment 03 (local source delta, not committed)  
+**Disposition:** **Current deployed baseline is green on Render and Vercel. Increment 03 is locally implemented and tested but is NOT release-accepted until the candidate is uploaded, built and accepted on isolated staging. Phase 6 remains blocked.**
 
-This report distinguishes deployed evidence from local candidate validation. Passing UI tests and an accessible production readiness endpoint do not prove a same-commit, authenticated frontend → API → Neon end-to-end release.
+This report deliberately separates the **currently deployed baseline** from the new Phase 5 Increment 03 source. A healthy production readiness response is not evidence that the new, uncommitted files are live.
 
-## Executive status
+## Gate summary
 
-| Gate | Verified state | Result |
+| Gate | Evidence | Result |
 |---|---|---|
-| Source revision | GitHub `main` at `d228e6467894857aeeb632a189d10680179404db`; package manifest still marks canonical source parity false | **Amber** |
-| Vercel production build | Deployment `dpl_4h1ftGMSNohHWvgxMqjpN2FwJQuD` is `READY`, target `production`, commit matches the pinned revision | **Green for frontend build only** |
-| Node version | Vercel project setting is `24.x`; deployed build completed TypeScript and Next production build | **Green for deployed build; clean `npm ci` still not run** |
-| Frontend contracts | 25/25 passed locally under Node 22.16.0 | **Green for source contracts** |
-| Backend unit/contract suite | 43 passed, 1 skipped locally; the skipped auth-refresh integration requires Redis | **Green for available tests; one dependency test outstanding** |
-| Render deployment | Deployment `dep-dbc9rmo473hc73a6niog` for the same pinned commit failed at startup with `ImportError: cannot import name '_set_refresh_cookie' from 'app.auth'` | **Red** |
-| Live API readiness | Current older live Render deployment returns HTTP 200 `/ready` with database and cache `ok`; current live deploy remains on commit `c1cd002bece6de028357d7ed156c6f03d3d5a7f7`, not the pinned frontend SHA | **Amber — code mismatch** |
-| Vercel → API proxy | `https://lexa-green.vercel.app/api/lexa/ready` returned HTTP 200 and the expected dependency readiness JSON | **Green for read-only proxy smoke** |
-| Neon RLS | 119 public base tables have RLS enabled and forced; RLS-disabled and not-forced lists empty | **Green** |
-| Neon runtime role | `lexa_runtime_login_p3`: login enabled, not superuser, no inherit, no create DB/role, no bypass RLS; member of `lexa_app` | **Green** |
-| Neon migration 031 | `031_phase3_auth_surface_rls` is present in `schema_migrations` | **Green** |
-| Neon query health | No long-running queries over 5 minutes; no locks returned by the read-only inspection | **Green at audit time** |
-| Neon production branch protection | Enabling protection was refused by Neon because the plan has reached its protected-branch quota; branch remains unprotected | **Amber — plan restriction** |
-| Authenticated staging E2E | Not run. There is no isolated Render staging service; current Vercel API-origin variables are production-only and code defaults to production Render URL | **Blocked for safety** |
-| Preview deployment | No safe preview built from the locally repaired source: GitHub branch creation and direct file update both returned 403; Vercel Sandbox creation is blocked by the Hobby snapshot-storage quota | **Blocked** |
-| Production data writes | None made by this gate review | **Confirmed** |
+| Source baseline | GitHub `main` latest upload is `779f8fe5dc704411b9abab371a29311e7dbc844a`; Increment 03 working-tree delta is in this ZIP only | **Amber — source handoff** |
+| Vercel production | `dpl_DhA4A5ZFDg9LYVSpuY7rjSxHGCTx` is `READY` on SHA `779f8fe5…`; project Node version configured as 24.x | **Green for currently deployed revision** |
+| Render production | `dep-dbca7f8u01pc73d2doj0` is `live` on the same SHA `779f8fe5…` | **Green for currently deployed revision** |
+| Readiness | Render `/ready` and Vercel same-origin `/api/lexa/ready` both returned HTTP 200 with DB/cache OK | **Green smoke test for deployed baseline** |
+| Backend tests | `python -m compileall -q apps/api/app apps/api/tests`; pytest `66 passed, 1 skipped` | **Green for local candidate contracts/unit tests; Redis integration skipped** |
+| Frontend contract tests | `node --test apps/web/tests/*.test.mjs`: 27/27 under Node 22.16.0 | **Green for source contract tests** |
+| Clean Node 24 suite | Fresh `npm ci`, typecheck, tests and build have not been run on Increment 03 candidate. Local runner only has Node 22; Vercel Sandbox allocation has been blocked by Hobby snapshot-storage quota. | **Pending** |
+| Neon production RLS/runtime | Current production branch remains at migration 031; 119 public tables RLS enabled and forced; runtime login is least-privilege. No production SQL mutation made this increment. | **Green for existing production baseline** |
+| Neon QA DDL verification | Branch `br-young-base-b1mi15fs` has migrations 033–035 and all new functions/triggers; RLS disabled/not-forced counts both zero; sales and journal entries both zero. | **Green for DDL/source-function checks only** |
+| Authenticated staging E2E | Not run: no separate LEXA staging service; Neon branch quota is full; Render Free plan has its one Key Value instance already used. QA branch carries parent data and is not sanitized. | **Blocked — fail closed** |
+| Production migration rollout | Candidate migrations 033–035 have NOT been applied to production | **Pending review/approval** |
+| Historical source parity | Six accepted historical source gaps remain byte-unrecovered; migration 021 is a labelled repair candidate; a QA-only 032 ledger entry lacks a source file in this repository. | **Amber — no parity claim** |
 
-## Concrete Render startup failure and local repair
+## What Increment 03 implements
 
-The pinned source's `apps/api/app/routes/workspace_context.py` and `apps/api/app/routes/membership_admin.py` import `_set_refresh_cookie` from `app.auth`, but `apps/api/app/auth.py` does not define it. The login route had a local implementation, which did not satisfy those shared imports.
+1. **Refund integrity:** refund capacity is computed from the original recorded collections minus all previously recorded refunds, avoiding double-subtraction after sale totals have already become net of refunds. Sale paid/due amounts are recalculated from payment/refund/credit ledgers and a refund-row trigger keeps them synchronized.
+2. **Return math:** partial return quantities prorate discounts, taxes and line totals; previously completed quantities are excluded from further return allowance.
+3. **Settlement accounting:** completed returns produce an idempotent `RETURN_SETTLEMENT` journal, including sales-return/tax reversals and the right balancing path for cash refund, customer credit or an open receivable.
+4. **Inventory and cost:** returned stock is posted through the existing stock ledger and a `RETURN_COGS` journal reverses COGS when there is recorded returned inventory cost.
+5. **Customer credit:** code 2210 is mapped as a dedicated customer-store-credit liability; unallocated credit does not silently write off the source sale’s receivable. Allocated credit only reduces the receivable it is applied to.
+6. **EFRIS:** an active registered tenant receives an idempotent pending `CREDIT_NOTE` fiscal document/event for the completed return. No live EFRIS submission is claimed.
+7. **Analytics/UI:** analytics reads authoritative `sales.amount_due`; sale details and returns expose accounting journal/fiscal-document references; safe staging Playwright contracts cover checkout and refund/return flows.
+8. **Receivable guard:** no-refund/no-credit return settlement is rejected if the open receivable cannot absorb the full return, in both API validation and database function.
 
-The repaired source in this handoff:
+## Verification performed
 
-1. Adds the shared `_set_refresh_cookie(response, token)` helper to `apps/api/app/auth.py` with the existing cookie contract: HttpOnly, SameSite=Lax, root path, configured refresh-token max age, and Secure in production.
-2. Changes the login/refresh route module to reuse the shared helper rather than maintaining a duplicate local copy.
-3. Updates the security contract test to assert the shared helper's location and adds a regression test that verifies all expected imports and cookie attributes in source.
+- Backend: **66 passed, 1 skipped**. The skip is `apps/api/tests/test_auth_refresh.py` because Redis is not installed in this offline test environment. Python `compileall` passed.
+- Frontend contracts: **27 passed** under Node 22.16.0. These are lightweight source-contract tests, not browser acceptance.
+- QA Neon branch: installed/verifed migrations `033_phase5_refund_settlement_consistency`, `034_phase5_return_accounting_journals`, and `035_phase5_none_return_receivable_guard`; verified corrected payment/refund totals function, refund synchronization trigger, analytics `amount_due` formulas, 2210 credit-liability mapping, return settlement and COGS functions, fiscal credit-note function, and no-refund receivable guard. RLS disabled=0, RLS not forced=0, sales rows=0, journal rows=0.
+- Live endpoints: `/ready` and Vercel’s same-origin readiness proxy both return HTTP 200 for the currently deployed baseline commit `779f8fe5…`.
+- A raw scraper request briefly returned a Render block/challenge page with HTTP 503 and the same-source proxy returned `UPSTREAM_UNAVAILABLE`; re-checking with a browser-side fetch for Render and the Vercel-owned fetch tool returned HTTP 200 from both with `database: ok` and `cache: ok`. Render remained not suspended, latest deploy status is live, no matching Render 5xx log rows were found, and Vercel had no runtime-error cluster. The successful re-checks are used as the current readiness evidence; the earlier raw-scraper 503 is recorded as an intermittent scraper/proxy response, not silently discarded.
 
-**This repair exists in this local package only. It was not committed or deployed.** The GitHub integration rejected both branch creation and `update_file` with HTTP 403 (`Resource not accessible by integration`). I did not bypass repository permissions or alter Render startup commands to mask the missing import.
+## Why the new candidate is not release-accepted
 
-## Frontend / Node 24 evidence
+The Increment 03 code and migrations are local source files in the full-source ZIP and are **not** part of the deployed SHA `779f8fe5…` yet. The connected GitHub integration previously denied direct branch/file writes with HTTP 403, so this package has not been committed. A separate clean Node 24 install/build is pending. Authenticated Playwright tests create sales/returns and must run only against a distinct, sanitized staging service; the present QA Neon branch is parented to production and not a safe mutating staging target. The Neon project is at its branch limit and Render Free allows only one Key Value instance, currently used by production.
 
-The Vercel project configuration reports `nodeVersion: 24.x`. Deployment logs for the pinned SHA record TypeScript completing, successful compilation, static page generation (21/21), and `Build Completed in /vercel/output [19s]`. The Vercel install log says `npm install --include=dev --no-audit --no-fund`, not `npm ci`.
+## Required promotion sequence
 
-The separate local frontend contract suite passed 25/25 under Node 22.16.0. A clean Node 24 local install/typecheck/test/build could not be run here: the runner only has Node 22, npm access to the Node 24 package and uncached tarballs failed due network/cache restrictions, and Vercel Sandbox creation was rejected with HTTP 402 because the Hobby team's snapshot-storage quota is exceeded until 2026-11-01.
+1. Upload the supplied full-source ZIP through the existing approved ZIP extractor and verify the produced GitHub SHA contains migrations 033–035 plus the Phase 5 source/tests/UI changes.
+2. Run clean Node 24 `npm ci`, `npm run typecheck`, `npm test`, and `npm run build`, plus backend tests with Redis installed so the auth-refresh integration executes.
+3. Confirm Render and Vercel both deploy that **same exact reviewed SHA** and readiness returns 200 after the API startup imports successfully.
+4. Provision genuine isolated staging (sanitized Neon DB/branch, non-production API and Redis, preview-specific API origin, disposable cashier and manager accounts). Resolve Neon branch quota / Render KV capacity without deleting unknown branches or changing billing automatically.
+5. Run `apps/web/e2e/phase5-sales-acceptance.spec.ts` in staging for split tender, partial payment, idempotent retry, stock ledger read-after-write, refund cap, permissions, branch denial, return settlement, accounting journals, and EFRIS pending credit note. Reconcile amounts before promotion.
+6. Review migrations 033–035 and the repaired migration 021 candidate, then apply production schema changes only under an approved rollback/backup plan.
 
-Therefore the deployed Next production build is verified on a project configured for Node 24, but the explicitly requested clean Node 24 `npm ci` + test run is not claimed as complete.
-
-## Why authenticated staging was not run
-
-The Phase 5 Playwright suite is designed to fail closed: it requires an explicit allow-listed staging hostname, a fixture marked `environment: staging`, separate QA storage states, and `LEXA_PHASE5_ALLOW_STAGING_WRITES=1`. The suite creates sales and returns by design.
-
-The available Vercel `LEXA_API_URL` and `NEXT_PUBLIC_API_URL` variables are targeted to `production`; without preview-specific environment variables, the app's API proxy falls back to `https://lexa-n10e.onrender.com`. Testing mutations through that path would write to production. Render's LEXA service has previews disabled and is on the Free plan; Render documentation says Preview Environments require a Pro workspace or higher. Neon branches copy schema and data, so a new branch forked from live should not be treated as scrubbed staging.
-
-No production sales, returns, refunds, or stock movements were generated for acceptance. Once isolated staging is provisioned and the shared cookie repair is committed, run `apps/web/e2e/phase5-sales-acceptance.spec.ts` with a sanitized disposable fixture and separate cashier/manager QA storage states.
-
-## Required gates before Phase 6
-
-1. Restore GitHub write capability for this integration, or apply the included small auth repair overlay to the uploaded source. Confirm the new commit contains the shared helper and regression tests.
-2. Verify the Render deployment for that exact new SHA reaches `live`; inspect logs to confirm `app.main` and all routers import; verify `/health` and `/ready`.
-3. Configure dedicated Vercel Preview API origins and an isolated Render staging service backed by a sanitized Neon branch/database and non-production Redis. Do not use the live branch for mutating acceptance.
-4. Run clean Node 24 `npm ci`, `npm run typecheck`, `npm test`, `npm run build`; run backend tests including Redis-dependent auth refresh; run authenticated Playwright for cashier and manager, multi-line/split payment, partial payment, idempotent replay, stock ledger, cumulative refund cap, branch denial, sale detail/read-after-write, plus returns and reconciliation.
-5. Record one exact reviewed SHA for both the Vercel Preview frontend and Render staging backend. Validate that preview environment variables point at staging. Confirm transaction/payment/stock/reporting totals reconcile before promoting.
-6. Resolve Neon branch protection's plan quota or have the workspace owner explicitly accept the residual operational risk. RLS and runtime-role audit currently pass; branch protection remains a separate account/plan gate.
-
-## Research notes
-
-- Vercel deploys pushes to the configured production branch to Production; non-production branches receive Preview deployments. The present source extractor pushed the candidate to `main`, which explains why this candidate was deployed to production instead of a preview.
-- Render Preview Environments require a Pro workspace or higher.
-- Neon branch workflows copy schema and data, so isolated staging requires sanitization or synthetic data.
-- Playwright documentation recommends isolated contexts/storage states and warns that authenticated state contains cookies and headers; do not commit QA storage-state files.
-
-## Final disposition
-
-**Vercel frontend build: pass. Neon RLS/runtime access: pass. Live old API readiness: pass. Same-commit Render deployment: fail. Local repair tests: pass. Node 24 clean install and authenticated isolated staging: pending.**
-
-This is not an all-green release and should not be marked Phase 5 complete. Phase 6 stays blocked until the same-source deployment and authenticated staging gates pass.
+**No production sales, returns, refunds, stock movements, roles or schema were modified in this increment.** Do not advance to Phase 6 until all pending gates are green.

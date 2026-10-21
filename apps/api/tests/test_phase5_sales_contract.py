@@ -50,7 +50,10 @@ def test_cumulative_refund_balance_is_checked_inside_locked_sale_transaction():
     assert 'SELECT * FROM sales WHERE tenant_id=:t AND id=:s FOR UPDATE' in block
     assert 'JOIN sale_returns prior_return ON prior_return.id=rr.return_id AND prior_return.tenant_id=rr.tenant_id' in block
     assert "prior_return.sale_id=:s AND rr.status='RECORDED'" in block
-    assert 'remaining_refund_balance(sale["amount_paid"],prior_refunds)' in block
+    assert 'remaining_refund_balance(gross_collected,prior_refunds)' in block
+    assert 'SUM(pa.amount)' in block
+    assert 'p.status=\'RECORDED\'' in block
+    assert 'AND (pa.sale_id=:s OR r.sale_id=:s)' in block
     assert 'Refund exceeds the remaining collected amount after previous refunds' in block
 
 
@@ -74,3 +77,77 @@ def test_sale_detail_includes_payment_return_and_refund_ledger_rows():
     assert 'result["payments"]' in block
     assert 'result["returns"]' in block
     assert 'result["refunds"]' in block
+
+
+def test_sale_totals_refresh_happens_after_refund_or_credit_is_recorded():
+    source = SOURCE.read_text()
+    block = source.split('@router.post("/sales/{sale_id}/returns", status_code=201)', 1)[1]
+    refund_insert = block.index('INSERT INTO refund_records')
+    credit_insert = block.index('INSERT INTO customer_credits')
+    refresh = block.index('SELECT refresh_sale_payment_totals(:t,:s)')
+    assert refresh > refund_insert
+    assert refresh > credit_insert
+
+
+def test_refund_cap_does_not_double_subtract_prior_refunds_from_net_paid():
+    source = SOURCE.read_text()
+    block = source.split('@router.post("/sales/{sale_id}/returns", status_code=201)', 1)[1]
+    assert 'remaining_refund_balance(sale["amount_paid"],prior_refunds)' not in block
+    assert 'remaining_refund_balance(gross_collected,prior_refunds)' in block
+
+
+
+
+def test_cash_refund_does_not_write_return_adjustment_against_receivable():
+    source = SOURCE.read_text()
+    block = source.split('@router.post("/sales/{sale_id}/returns", status_code=201)', 1)[1]
+    guard = block.index("if body.settlement_type == 'NONE':")
+    receivable_update = block.index('UPDATE receivables', guard)
+    receivable_adjustment = block[guard:receivable_update]
+    assert guard < receivable_update
+    assert "if body.settlement_type != 'REFUND':" not in block
+    assert 'GREATEST(original_amount-paid_amount,0)' in block[receivable_update:]
+
+
+
+def test_partial_return_uses_prorated_line_adjustments():
+    source = SOURCE.read_text()
+    assert "prorate_return_line_amounts(" in source
+    block = source.split('@router.post("/sales/{sale_id}/returns", status_code=201)', 1)[1]
+    assert '"d":str(line_discount)' in block
+    assert '"tax":str(line_tax)' in block
+    assert '"d":str(line["discount_amount"])' not in block
+    assert '"tax":str(line["tax_amount"])' not in block
+
+
+
+def test_completed_return_posts_settlement_and_inventory_cogs_journals():
+    source = SOURCE.read_text()
+    block = source.split('@router.post("/sales/{sale_id}/returns", status_code=201)', 1)[1]
+    settle = block.index('post_sale_return_journal(:id,:u)')
+    cogs = block.index('post_sale_return_cogs_journal(:id,:u)')
+    commit = block.index('db.commit()', block.index('sale.return.created'))
+    assert settle < cogs < commit
+    assert 'entry_role":"RETURN_SETTLEMENT"' in block
+    assert 'entry_role":"RETURN_COGS"' in block
+
+
+
+def test_return_flow_connects_fiscal_credit_note_and_accounting_ledger():
+    source = SOURCE.read_text()
+    return_block = source.split('@router.post("/sales/{sale_id}/returns", status_code=201)', 1)[1]
+    assert 'create_fiscal_document_for_return(:id)' in return_block
+    assert 'post_sale_return_journal(:id,:u)' in return_block
+    assert 'post_sale_return_cogs_journal(:id,:u)' in return_block
+    detail_block = source.split('@router.get("/sales/{sale_id}")', 1)[1].split('@router.post("/sales", status_code=201)', 1)[0]
+    assert 'result["accounting_entries"]=[out(x) for x in accounting_entries]' in detail_block
+    assert "entry_role='RETURN_SETTLEMENT'" in detail_block
+
+
+def test_no_refund_return_is_limited_to_open_receivable():
+    source = SOURCE.read_text()
+    block = source.split('@router.post("/sales/{sale_id}/returns", status_code=201)', 1)[1]
+    assert "if body.settlement_type == 'NONE':" in block
+    assert "SUM(GREATEST(balance,0))" in block
+    assert "status IN ('OPEN','PARTIALLY_PAID')" in block
+    assert "choose REFUND or CUSTOMER_CREDIT settlement" in block

@@ -1,3 +1,8 @@
+-- RECONSTRUCTED REPAIR CANDIDATE, NOT HISTORICAL ORIGINAL BYTES.
+-- Malformed Git blob SHA-1 recorded by the forensic workflow: c32a60352f10a1463937ff4aa0b204adf38f470b.
+-- Repaired 32 escaped-newline sequences, removed an appended non-SQL invocation trailer,
+-- and made analytics credit metrics use sales.amount_due as the authoritative balance.
+-- A decoded malformed copy is retained under migrations/reconstructed for review.
 -- Phase 5: deterministic analytics / business intelligence foundation
 CREATE TABLE IF NOT EXISTS analytics_refresh_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -98,12 +103,12 @@ BEGIN
   LEFT JOIN LATERAL (SELECT SUM(sr.total) returns_total,COUNT(*) return_count FROM sale_returns sr JOIN sales ss ON ss.tenant_id=sr.tenant_id AND ss.id=sr.sale_id WHERE sr.tenant_id=p_tenant_id AND sr.status='COMPLETED' AND ss.currency_code=c.currency_code AND COALESCE(sr.completed_at,sr.created_at)::date=c.business_date) r ON true
   LEFT JOIN LATERAL (SELECT SUM(amount) payments_collected,COUNT(*) payment_count FROM payments WHERE tenant_id=p_tenant_id AND status='RECORDED' AND currency_code=c.currency_code AND business_date=c.business_date) pay ON true
   LEFT JOIN LATERAL (SELECT SUM(amount) refunds_total FROM refund_records WHERE tenant_id=p_tenant_id AND status='RECORDED' AND currency_code=c.currency_code AND business_date=c.business_date) ref ON true
-  LEFT JOIN LATERAL (SELECT SUM(GREATEST(sx.total-sx.amount_paid-sx.return_adjustment_amount,0)) credit_created FROM sales sx WHERE sx.tenant_id=p_tenant_id AND sx.status='COMPLETED' AND sx.currency_code=c.currency_code AND COALESCE(sx.completed_at,sx.created_at)::date=c.business_date) cr ON true
+  LEFT JOIN LATERAL (SELECT SUM(GREATEST(sx.amount_due,0)) credit_created FROM sales sx WHERE sx.tenant_id=p_tenant_id AND sx.status='COMPLETED' AND sx.currency_code=c.currency_code AND COALESCE(sx.completed_at,sx.created_at)::date=c.business_date) cr ON true
   LEFT JOIN LATERAL (SELECT SUM(total) expenses_total,COUNT(*) expense_count FROM expense_records WHERE tenant_id=p_tenant_id AND status='POSTED' AND currency_code=c.currency_code AND expense_date=c.business_date) ex ON true;
 
   DELETE FROM analytics_branch_daily_metrics WHERE tenant_id=p_tenant_id AND business_date BETWEEN p_from AND p_to;
   WITH bs AS (
-    SELECT branch_id,COALESCE(completed_at,created_at)::date business_date,currency_code,SUM(total) sales_total,COUNT(*) sale_count,SUM(GREATEST(total-amount_paid-return_adjustment_amount,0)) credit_created
+    SELECT branch_id,COALESCE(completed_at,created_at)::date business_date,currency_code,SUM(total) sales_total,COUNT(*) sale_count,SUM(GREATEST(amount_due,0)) credit_created
     FROM sales WHERE tenant_id=p_tenant_id AND status='COMPLETED' AND COALESCE(completed_at,created_at)::date BETWEEN p_from AND p_to GROUP BY branch_id,COALESCE(completed_at,created_at)::date,currency_code
   ), br AS (
     SELECT ss.branch_id,COALESCE(sr.completed_at,sr.created_at)::date business_date,ss.currency_code,SUM(sr.total) returns_total
@@ -159,7 +164,34 @@ BEGIN
 
   UPDATE analytics_refresh_runs SET status='SUCCEEDED',completed_at=now() WHERE id=v_run; RETURN v_run;
 EXCEPTION WHEN OTHERS THEN UPDATE analytics_refresh_runs SET status='FAILED',completed_at=now(),error_message=SQLERRM WHERE id=v_run; RAISE;
-END $fn$;\n\nALTER TABLE analytics_refresh_runs ENABLE ROW LEVEL SECURITY;\nALTER TABLE analytics_refresh_runs FORCE ROW LEVEL SECURITY;\nDROP POLICY IF EXISTS analytics_refresh_runs_tenant ON analytics_refresh_runs;\nCREATE POLICY analytics_refresh_runs_tenant ON analytics_refresh_runs USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));\nALTER TABLE analytics_daily_business_metrics ENABLE ROW LEVEL SECURITY;\nALTER TABLE analytics_daily_business_metrics FORCE ROW LEVEL SECURITY;\nDROP POLICY IF EXISTS analytics_daily_business_metrics_tenant ON analytics_daily_business_metrics;\nCREATE POLICY analytics_daily_business_metrics_tenant ON analytics_daily_business_metrics USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));\nALTER TABLE analytics_branch_daily_metrics ENABLE ROW LEVEL SECURITY;\nALTER TABLE analytics_branch_daily_metrics FORCE ROW LEVEL SECURITY;\nDROP POLICY IF EXISTS analytics_branch_daily_metrics_tenant ON analytics_branch_daily_metrics;\nCREATE POLICY analytics_branch_daily_metrics_tenant ON analytics_branch_daily_metrics USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));\nALTER TABLE analytics_product_daily_metrics ENABLE ROW LEVEL SECURITY;\nALTER TABLE analytics_product_daily_metrics FORCE ROW LEVEL SECURITY;\nDROP POLICY IF EXISTS analytics_product_daily_metrics_tenant ON analytics_product_daily_metrics;\nCREATE POLICY analytics_product_daily_metrics_tenant ON analytics_product_daily_metrics USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));\nALTER TABLE analytics_customer_purchase_patterns ENABLE ROW LEVEL SECURITY;\nALTER TABLE analytics_customer_purchase_patterns FORCE ROW LEVEL SECURITY;\nDROP POLICY IF EXISTS analytics_customer_purchase_patterns_tenant ON analytics_customer_purchase_patterns;\nCREATE POLICY analytics_customer_purchase_patterns_tenant ON analytics_customer_purchase_patterns USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));\nALTER TABLE analytics_inventory_health_metrics ENABLE ROW LEVEL SECURITY;\nALTER TABLE analytics_inventory_health_metrics FORCE ROW LEVEL SECURITY;\nDROP POLICY IF EXISTS analytics_inventory_health_metrics_tenant ON analytics_inventory_health_metrics;\nCREATE POLICY analytics_inventory_health_metrics_tenant ON analytics_inventory_health_metrics USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));\nINSERT INTO permissions(code,description) VALUES ('analytics.read','View business intelligence and analytics'),('analytics.refresh','Refresh deterministic analytics projections') ON CONFLICT(code) DO NOTHING;\nINSERT INTO role_permissions(role_id,permission_id) SELECT r.id,p.id FROM roles r JOIN permissions p ON p.code='analytics.read' WHERE r.name IN ('Owner','Admin','Manager','Accountant','Auditor') ON CONFLICT DO NOTHING;\nINSERT INTO role_permissions(role_id,permission_id) SELECT r.id,p.id FROM roles r JOIN permissions p ON p.code='analytics.refresh' WHERE r.name IN ('Owner','Admin') ON CONFLICT DO NOTHING;\nINSERT INTO schema_migrations(version) VALUES('021_phase5_analytics_foundation') ON CONFLICT(version) DO NOTHING;\nCOMMIT;\nCOMMIT;\n`; // outer transaction handled by PostgreSQL statement parser; inner COMMIT is intentionally ignored by tool transaction wrapper.
-text(await tools.mcp__Neon__run_sql({sql,project_id:p,branch_id:b,database_name:d}));
-.unregister; 
- krwar=1;
+END $fn$;
+
+ALTER TABLE analytics_refresh_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_refresh_runs FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS analytics_refresh_runs_tenant ON analytics_refresh_runs;
+CREATE POLICY analytics_refresh_runs_tenant ON analytics_refresh_runs USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));
+ALTER TABLE analytics_daily_business_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_daily_business_metrics FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS analytics_daily_business_metrics_tenant ON analytics_daily_business_metrics;
+CREATE POLICY analytics_daily_business_metrics_tenant ON analytics_daily_business_metrics USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));
+ALTER TABLE analytics_branch_daily_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_branch_daily_metrics FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS analytics_branch_daily_metrics_tenant ON analytics_branch_daily_metrics;
+CREATE POLICY analytics_branch_daily_metrics_tenant ON analytics_branch_daily_metrics USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));
+ALTER TABLE analytics_product_daily_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_product_daily_metrics FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS analytics_product_daily_metrics_tenant ON analytics_product_daily_metrics;
+CREATE POLICY analytics_product_daily_metrics_tenant ON analytics_product_daily_metrics USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));
+ALTER TABLE analytics_customer_purchase_patterns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_customer_purchase_patterns FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS analytics_customer_purchase_patterns_tenant ON analytics_customer_purchase_patterns;
+CREATE POLICY analytics_customer_purchase_patterns_tenant ON analytics_customer_purchase_patterns USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));
+ALTER TABLE analytics_inventory_health_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_inventory_health_metrics FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS analytics_inventory_health_metrics_tenant ON analytics_inventory_health_metrics;
+CREATE POLICY analytics_inventory_health_metrics_tenant ON analytics_inventory_health_metrics USING (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid)) WITH CHECK (tenant_id=(NULLIF(current_setting('app.tenant_id',true),'')::uuid));
+INSERT INTO permissions(code,description) VALUES ('analytics.read','View business intelligence and analytics'),('analytics.refresh','Refresh deterministic analytics projections') ON CONFLICT(code) DO NOTHING;
+INSERT INTO role_permissions(role_id,permission_id) SELECT r.id,p.id FROM roles r JOIN permissions p ON p.code='analytics.read' WHERE r.name IN ('Owner','Admin','Manager','Accountant','Auditor') ON CONFLICT DO NOTHING;
+INSERT INTO role_permissions(role_id,permission_id) SELECT r.id,p.id FROM roles r JOIN permissions p ON p.code='analytics.refresh' WHERE r.name IN ('Owner','Admin') ON CONFLICT DO NOTHING;
+INSERT INTO schema_migrations(version) VALUES('021_phase5_analytics_foundation') ON CONFLICT(version) DO NOTHING;
+COMMIT;

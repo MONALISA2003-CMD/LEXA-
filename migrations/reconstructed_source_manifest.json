@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "project": "LEXA",
-  "as_of": "2026-10-20",
+  "as_of": "2026-10-21",
   "historical_source_gate": "UNRESOLVED: exact SQL bytes for six source gaps were not recovered from 58 distinct historical ZIP archives spanning 116 ZIP-related commits; zero hits, zero scan errors.",
   "semantic_replay_gate": "BLOCKED: an isolated first-pass replay applied the available chain plus explicitly labelled equivalents and produced the same 119 table and 116 policy counts as the observed canonical clone, but schema parity failed across columns, constraints, indexes, functions, and triggers. The first-pass database used earlier drafts of the reconstructed 010/011/024/026 files and must be replayed cleanly against the current refreshed files before any status can change.",
   "release_gate": "NO-GO for Phase 3 production cutover until exact-source decision is documented, refreshed semantic replay deltas reconciled, CI is installed and passes on an immutable SHA, branch protection is enforced, authenticated E2E with isolated tenant fixtures passes, and Render staging/health-check settings are confirmed.",
@@ -87,9 +87,11 @@
   },
   "additional_source_integrity_finding": {
     "path": "migrations/021_phase5_analytics_foundation.sql",
-    "finding": "A GitHub-read copy contains 32 literal backslash-n sequences after the intended SQL function block and additional non-SQL text. Raw execution failed at a backslash. Isolated replay used a documented normalization only; original file untouched.",
-    "impact": "Additional source-integrity blocker, separate from the six missing historical migration sources.",
-    "sha256_observed_file_bytes": "d26742cfadbb0ae1e1db4563c955dd3271cca4aaceec4a79190feefe27dca298"
+    "finding": "The GitHub-read copy had 32 literal backslash-n sequences and a non-SQL trailer. The packaged canonical path now contains a clearly-labelled repaired SQL candidate with clean SQL termination and amount_due analytics formulas; this is not a byte-recovered historical original. A decoded malformed copy and a repair candidate are retained under migrations/reconstructed.",
+    "impact": "Do not claim canonical byte parity. For zero-based replay, reconcile the repaired Phase 5 analytics SQL with the original historical release before production use.",
+    "sha256_observed_file_bytes": "d26742cfadbb0ae1e1db4563c955dd3271cca4aaceec4a79190feefe27dca298",
+    "current_candidate_path": "migrations/021_phase5_analytics_foundation.sql",
+    "current_candidate_header": "RECONSTRUCTED REPAIR CANDIDATE, NOT HISTORICAL ORIGINAL BYTES"
   },
   "schema_replay": {
     "project_id": "wispy-mud-75323042",
@@ -136,5 +138,23 @@
     "config": "apps/web/playwright.config.ts",
     "result": "4 passed, 0 failed on the inspected LEXA SHA using Node 24.21.0 / Playwright 1.64.1 / Chromium 156.0.8078.4 in a disposable Vercel sandbox",
     "integration_status": "Source/config delivered only. @playwright/test and updated package-lock are not committed; package integration into CI awaits a reviewed lockfile update in an authorized Node 24 environment."
-  }
+  },
+  "phase5_increment_03_replacements": [
+    {
+      "version": "033_phase5_refund_settlement_consistency",
+      "path": "migrations/033_phase5_refund_settlement_consistency.sql",
+      "status": "new additive replacement migration; not historical source bytes; QA branch DDL/function checked; not applied to production"
+    },
+    {
+      "version": "034_phase5_return_accounting_journals",
+      "path": "migrations/034_phase5_return_accounting_journals.sql",
+      "status": "new additive replacement migration; return settlement/COGS/fiscal functions checked on QA branch; not applied to production"
+    },
+    {
+      "version": "035_phase5_none_return_receivable_guard",
+      "path": "migrations/035_phase5_none_return_receivable_guard.sql",
+      "status": "new additive invariant guard; API and QA database guard checked; not applied to production"
+    }
+  ],
+  "increment_03_release_gate": "Current live baseline is SHA 779f8fe5dc704411b9abab371a29311e7dbc844a and ready on both hosts. Increment 03 local changes are not committed or deployed; Node 24 clean checks and authenticated isolated staging E2E remain pending."
 }

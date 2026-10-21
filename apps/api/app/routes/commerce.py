@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..catalog import begin_idempotency, emit_event, finish_idempotency, write_audit
-from ..commerce_rules import remaining_refund_balance
+from ..commerce_rules import remaining_refund_balance, prorate_return_line_amounts
 from ..branch_access import ensure_branch_access, ensure_location_access, require_full_branch_scope
 from ..dependencies import require_permission
 from ..inventory import post_ledger, tenant_location, tenant_variant
@@ -363,7 +363,10 @@ def get_sale(sale_id: UUID, ctx=Depends(require_permission("sales.read"))):
     returns=db.execute(text("""
       SELECT sr.id,sr.sale_id,sr.status,sr.reason,sr.total,sr.completed_at,sr.created_at,
              COALESCE((SELECT SUM(rr.amount) FROM refund_records rr WHERE rr.return_id=sr.id AND rr.tenant_id=sr.tenant_id AND rr.status='RECORDED'),0) refunded,
-             COALESCE((SELECT MAX(cc.balance) FROM customer_credits cc WHERE cc.source_return_id=sr.id AND cc.tenant_id=sr.tenant_id),0) credit_balance
+             COALESCE((SELECT MAX(cc.balance) FROM customer_credits cc WHERE cc.source_return_id=sr.id AND cc.tenant_id=sr.tenant_id),0) credit_balance,
+             (SELECT je.id FROM journal_entries je WHERE je.tenant_id=sr.tenant_id AND je.source_type='SALE_RETURN' AND je.source_id=sr.id AND je.entry_role='RETURN_SETTLEMENT' LIMIT 1) journal_entry_id,
+             (SELECT fd.id FROM fiscal_documents fd WHERE fd.tenant_id=sr.tenant_id AND fd.source_type='SALE_RETURN' AND fd.source_id=sr.id AND fd.document_type='CREDIT_NOTE' ORDER BY fd.created_at DESC LIMIT 1) fiscal_document_id,
+             (SELECT fd.status FROM fiscal_documents fd WHERE fd.tenant_id=sr.tenant_id AND fd.source_type='SALE_RETURN' AND fd.source_id=sr.id AND fd.document_type='CREDIT_NOTE' ORDER BY fd.created_at DESC LIMIT 1) fiscal_document_status
       FROM sale_returns sr WHERE sr.tenant_id=:t AND sr.sale_id=:s
       ORDER BY sr.created_at,sr.id
     """),{"t":str(tenant_id),"s":str(sale_id)}).mappings().all()
@@ -376,10 +379,26 @@ def get_sale(sale_id: UUID, ctx=Depends(require_permission("sales.read"))):
       ORDER BY rr.business_date,rr.id
     """),{"t":str(tenant_id),"s":str(sale_id)}).mappings().all()
     result=out(sale)
+    accounting_entries=db.execute(text("""
+      SELECT je.id,je.source_type,je.source_id,je.entry_role,je.entry_date,je.reference,
+             je.description,je.currency_code,je.status,je.posted_at
+      FROM journal_entries je
+      WHERE je.tenant_id=:t AND (
+        (je.source_type='SALE' AND je.source_id=:s)
+        OR (je.source_type='PAYMENT' AND je.source_id IN (
+          SELECT p.id FROM payment_allocations pa JOIN payments p ON p.tenant_id=pa.tenant_id AND p.id=pa.payment_id
+          LEFT JOIN receivables r ON r.tenant_id=pa.tenant_id AND r.id=pa.receivable_id
+          WHERE pa.tenant_id=:t AND (pa.sale_id=:s OR r.sale_id=:s)
+        ))
+        OR (je.source_type='SALE_RETURN' AND je.source_id IN (SELECT sr.id FROM sale_returns sr WHERE sr.tenant_id=:t AND sr.sale_id=:s))
+      )
+      ORDER BY je.entry_date,je.created_at,je.id
+    """),{"t":str(tenant_id),"s":str(sale_id)}).mappings().all()
     result["lines"]=[out(x) for x in lines]
     result["payments"]=[out(x) for x in payments]
     result["returns"]=[out(x) for x in returns]
     result["refunds"]=[out(x) for x in refunds]
+    result["accounting_entries"]=[out(x) for x in accounting_entries]
     return result
 
 
@@ -619,7 +638,10 @@ def list_returns(ctx=Depends(require_permission("returns.manage"))):
     rows=db.execute(text("""
       SELECT sr.id,sr.sale_id,sr.status,sr.reason,sr.total,sr.completed_at,sr.created_at,
              COALESCE((SELECT SUM(rr.amount) FROM refund_records rr WHERE rr.return_id=sr.id AND rr.tenant_id=sr.tenant_id AND rr.status='RECORDED'),0) refunded,
-             COALESCE((SELECT MAX(cc.balance) FROM customer_credits cc WHERE cc.source_return_id=sr.id AND cc.tenant_id=sr.tenant_id),0) credit_balance
+             COALESCE((SELECT MAX(cc.balance) FROM customer_credits cc WHERE cc.source_return_id=sr.id AND cc.tenant_id=sr.tenant_id),0) credit_balance,
+             (SELECT je.id FROM journal_entries je WHERE je.tenant_id=sr.tenant_id AND je.source_type='SALE_RETURN' AND je.source_id=sr.id AND je.entry_role='RETURN_SETTLEMENT' LIMIT 1) journal_entry_id,
+             (SELECT fd.id FROM fiscal_documents fd WHERE fd.tenant_id=sr.tenant_id AND fd.source_type='SALE_RETURN' AND fd.source_id=sr.id AND fd.document_type='CREDIT_NOTE' ORDER BY fd.created_at DESC LIMIT 1) fiscal_document_id,
+             (SELECT fd.status FROM fiscal_documents fd WHERE fd.tenant_id=sr.tenant_id AND fd.source_type='SALE_RETURN' AND fd.source_id=sr.id AND fd.document_type='CREDIT_NOTE' ORDER BY fd.created_at DESC LIMIT 1) fiscal_document_status
       FROM sale_returns sr
       JOIN sales s ON s.id=sr.sale_id AND s.tenant_id=sr.tenant_id
       WHERE sr.tenant_id=:t AND EXISTS (
@@ -661,20 +683,53 @@ def create_return(sale_id: UUID, body: ReturnCreate, idempotency_key: str | None
             returned=db.execute(text("""SELECT COALESCE(SUM(srl.quantity),0) qty FROM sale_return_lines srl JOIN sale_returns sr ON sr.id=srl.return_id AND sr.tenant_id=srl.tenant_id WHERE srl.tenant_id=:t AND srl.sale_line_id=:sl AND sr.status='COMPLETED'"""),{"t":str(tenant_id),"sl":str(req_line.sale_line_id)}).scalar_one()
             available=Decimal(str(line["quantity"]))-Decimal(str(returned))
             if req_line.quantity>available: raise HTTPException(409,"Return quantity exceeds the remaining sale quantity")
-            line_total=q((Decimal(str(line["line_total"])) / Decimal(str(line["quantity"]))) * req_line.quantity)
-            total+=line_total
-            validated.append((req_line,line,line_total))
+            line_total, line_discount, line_tax = prorate_return_line_amounts(
+                req_line.quantity, line["quantity"], line["discount_amount"],
+                line["tax_amount"], line["line_total"]
+            )
+            # A sale line stores the total tax and discount for its full quantity;
+            # proportion partial returns instead of copying all original adjustments.
+            total += line_total
+            validated.append((req_line, line, line_total, line_discount, line_tax))
         total=q(total)
         remaining_sales_value=q(Decimal(str(sale["total"]))-Decimal(str(sale["return_adjustment_amount"])))
         if total<=0 or total>remaining_sales_value: raise HTTPException(422,"Return total is outside the remaining sale value")
+        if body.settlement_type == 'NONE':
+            # A no-cash/no-credit return may only offset an existing receivable.
+            # Reject before any ledger writes when the customer has already paid
+            # or the return exceeds the open receivable; otherwise accounting would
+            # credit AR beyond the amount the customer still owes.
+            open_receivable = db.execute(text("""
+              SELECT COALESCE(SUM(GREATEST(balance,0)),0)
+              FROM receivables
+              WHERE tenant_id=:t AND sale_id=:s
+                AND status IN ('OPEN','PARTIALLY_PAID')
+            """), {"t":str(tenant_id), "s":str(sale_id)}).scalar_one()
+            if total > Decimal(str(open_receivable)):
+                raise HTTPException(
+                    422,
+                    "A no-refund return cannot exceed the open receivable; choose REFUND or CUSTOMER_CREDIT settlement",
+                )
         if body.settlement_type=='REFUND':
+            # Refundability must be based on the original recorded collection ledger,
+            # not sales.amount_paid: after refund settlement that field is net of prior
+            # refunds on migration 033 deployments. Using net amount_paid here would
+            # subtract prior refunds twice and understate the remaining refundable cap.
+            gross_collected=db.execute(text("""
+              SELECT COALESCE(SUM(pa.amount),0)
+              FROM payment_allocations pa
+              JOIN payments p ON p.id=pa.payment_id AND p.tenant_id=pa.tenant_id
+              LEFT JOIN receivables r ON r.id=pa.receivable_id AND r.tenant_id=pa.tenant_id
+              WHERE pa.tenant_id=:t AND pa.status='RECORDED' AND p.status='RECORDED'
+                AND (pa.sale_id=:s OR r.sale_id=:s)
+            """),{"t":str(tenant_id),"s":str(sale_id)}).scalar_one()
             prior_refunds=db.execute(text("""
               SELECT COALESCE(SUM(rr.amount),0)
               FROM refund_records rr
               JOIN sale_returns prior_return ON prior_return.id=rr.return_id AND prior_return.tenant_id=rr.tenant_id
               WHERE rr.tenant_id=:t AND prior_return.sale_id=:s AND rr.status='RECORDED'
             """),{"t":str(tenant_id),"s":str(sale_id)}).scalar_one()
-            refundable_balance=remaining_refund_balance(sale["amount_paid"],prior_refunds)
+            refundable_balance=remaining_refund_balance(gross_collected,prior_refunds)
             if total>refundable_balance:
                 raise HTTPException(422,"Refund exceeds the remaining collected amount after previous refunds")
         tx_ref=f"RET-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8].upper()}"
@@ -683,28 +738,46 @@ def create_return(sale_id: UUID, body: ReturnCreate, idempotency_key: str | None
         db.execute(text("""INSERT INTO sale_returns(tenant_id,sale_id,transaction_id,inventory_location_id,status,reason,total,created_by) VALUES(:t,:s,:tx,:l,'DRAFT',:r,:total,:u) RETURNING id"""),{"t":str(tenant_id),"s":str(sale_id),"tx":str(tx.id),"l":str(return_location),"r":body.reason.strip(),"total":str(total),"u":str(actor)})
         return_id=db.execute(text("SELECT id FROM sale_returns WHERE tenant_id=:t AND transaction_id=:tx"),{"t":str(tenant_id),"tx":str(tx.id)}).scalar_one()
         from ..models import InventoryBalance
-        for req_line,line,line_total in validated:
-            db.execute(text("""INSERT INTO sale_return_lines(tenant_id,return_id,sale_line_id,variant_id,quantity,unit_price,discount_amount,tax_amount,line_total) VALUES(:t,:r,:sl,:v,:q,:u,:d,:tax,:total)"""),{"t":str(tenant_id),"r":str(return_id),"sl":str(req_line.sale_line_id),"v":str(line["product_variant_id"]),"q":str(req_line.quantity),"u":str(line["unit_price"]),"d":str(line["discount_amount"]),"tax":str(line["tax_amount"]),"total":str(line_total)})
+        for req_line, line, line_total, line_discount, line_tax in validated:
+            db.execute(text("""INSERT INTO sale_return_lines(tenant_id,return_id,sale_line_id,variant_id,quantity,unit_price,discount_amount,tax_amount,line_total) VALUES(:t,:r,:sl,:v,:q,:u,:d,:tax,:total)"""),{"t":str(tenant_id),"r":str(return_id),"sl":str(req_line.sale_line_id),"v":str(line["product_variant_id"]),"q":str(req_line.quantity),"u":str(line["unit_price"]),"d":str(line_discount),"tax":str(line_tax),"total":str(line_total)})
             balance=db.scalar(select(InventoryBalance).where(InventoryBalance.tenant_id==tenant_id,InventoryBalance.location_id==return_location,InventoryBalance.variant_id==line["product_variant_id"]).with_for_update())
             unit_cost=balance.average_cost if balance else Decimal("0")
             post_ledger(db,tenant_id=tenant_id,actor_user_id=actor,location_id=return_location,variant_id=line["product_variant_id"],quantity_delta=q(req_line.quantity),unit_cost=unit_cost,transaction_type="RETURN",reference_type="sale_return",reference_id=return_id,idempotency_key=f"{idempotency_key or return_id}:inventory:{req_line.sale_line_id}",metadata={"sale_id":str(sale_id),"return_id":str(return_id)})
         db.execute(text("UPDATE sales SET return_adjustment_amount=return_adjustment_amount+:a,updated_at=now() WHERE tenant_id=:t AND id=:s"),{"t":str(tenant_id),"s":str(sale_id),"a":str(total)})
-        db.execute(text("""
-          UPDATE receivables
-          SET adjustment_amount=LEAST(original_amount,adjustment_amount+:a),
-              balance=GREATEST(original_amount-paid_amount-LEAST(original_amount,adjustment_amount+:a),0),
-              status=CASE
-                WHEN GREATEST(original_amount-paid_amount-LEAST(original_amount,adjustment_amount+:a),0)=0 THEN 'PAID'
-                WHEN paid_amount>0 THEN 'PARTIALLY_PAID'
-                ELSE 'OPEN'
-              END,
-              updated_at=now()
-          WHERE tenant_id=:t AND sale_id=:s AND status IN ('OPEN','PARTIALLY_PAID')
-        """),{"t":str(tenant_id),"s":str(sale_id),"a":str(total)})
+        # NONE reduces the sale value without issuing cash or store credit, so it
+        # may offset the open receivable. A cash refund reduces both net collections
+        # and sale value; a customer-credit return creates a separate liability.
+        # Neither settlement should silently write off the sale receivable. Customer
+        # credit reduces that receivable only if a later credit-allocation row does so.
+        if body.settlement_type == 'NONE':
+            db.execute(text("""
+              UPDATE receivables
+              SET adjustment_amount=LEAST(
+                    GREATEST(original_amount-paid_amount,0),
+                    adjustment_amount+:a
+                  ),
+                  balance=GREATEST(
+                    original_amount-paid_amount-LEAST(
+                      GREATEST(original_amount-paid_amount,0),
+                      adjustment_amount+:a
+                    ),0
+                  ),
+                  status=CASE
+                    WHEN GREATEST(
+                      original_amount-paid_amount-LEAST(
+                        GREATEST(original_amount-paid_amount,0),
+                        adjustment_amount+:a
+                      ),0
+                    )=0 THEN 'PAID'
+                    WHEN paid_amount>0 THEN 'PARTIALLY_PAID'
+                    ELSE 'OPEN'
+                  END,
+                  updated_at=now()
+              WHERE tenant_id=:t AND sale_id=:s AND status IN ('OPEN','PARTIALLY_PAID')
+            """),{"t":str(tenant_id),"s":str(sale_id),"a":str(total)})
         db.execute(text("UPDATE sale_returns SET status='COMPLETED',completed_by=:u,completed_at=now(),updated_at=now() WHERE tenant_id=:t AND id=:r"),{"t":str(tenant_id),"r":str(return_id),"u":str(actor)})
         db.execute(text("UPDATE business_transactions SET status='COMPLETED',closed_at=now(),updated_at=now() WHERE tenant_id=:t AND id=:tx"),{"t":str(tenant_id),"tx":str(tx.id)})
         db.execute(text("INSERT INTO transaction_status_history(tenant_id,transaction_id,from_status,to_status,reason,changed_by) VALUES(:t,:tx,'DRAFT','COMPLETED','Sale return completed',:u)"),{"t":str(tenant_id),"tx":str(tx.id),"u":str(actor)})
-        db.execute(text("SELECT refresh_sale_payment_totals(:t,:s)"),{"t":str(tenant_id),"s":str(sale_id)})
         if body.settlement_type=='REFUND':
             ch=_channel(db,tenant_id,body.refund_channel_id,sale["currency_code"])
             refund_id=db.execute(text("""INSERT INTO refund_records(tenant_id,return_id,payment_channel_id,amount,currency_code,reference,status,business_date,created_by) VALUES(:t,:r,:c,:a,:cur,:ref,'RECORDED',:d,:u) RETURNING id"""),{"t":str(tenant_id),"r":str(return_id),"c":str(ch["id"]),"a":str(total),"cur":sale["currency_code"],"ref":f"REF-{tx_ref}","d":body.business_date,"u":str(actor)}).scalar_one()
@@ -712,8 +785,22 @@ def create_return(sale_id: UUID, body: ReturnCreate, idempotency_key: str | None
         elif body.settlement_type=='CUSTOMER_CREDIT':
             credit_id=db.execute(text("""INSERT INTO customer_credits(tenant_id,customer_party_id,source_return_id,original_amount,allocated_amount,balance,status) VALUES(:t,:p,:r,:a,0,:a,'OPEN') RETURNING id"""),{"t":str(tenant_id),"p":str(sale["customer_party_id"]),"r":str(return_id),"a":str(total)}).scalar_one()
             _emit(db,tenant_id,actor,"customer_credit.created","CUSTOMER_CREDIT_CREATED","customer_credit",credit_id,{"return_id":str(return_id),"amount":str(total)},request_id)
-        _emit(db,tenant_id,actor,"sale.return.created","RETURN_CREATED","sale_return",return_id,{"sale_id":str(sale_id),"total":str(total)},request_id)
+        # Recalculate only after any cash refund row has been recorded. Migration
+        # 033 also does this from an AFTER trigger so non-API refund changes reconcile.
+        db.execute(text("SELECT refresh_sale_payment_totals(:t,:s)"),{"t":str(tenant_id),"s":str(sale_id)})
+        return_journal = db.execute(text("SELECT post_sale_return_journal(:id,:u)"), {"id":str(return_id),"u":str(actor)}).scalar_one()
+        return_cogs_journal = db.execute(text("SELECT post_sale_return_cogs_journal(:id,:u)"), {"id":str(return_id),"u":str(actor)}).scalar()
+        _emit(db,tenant_id,actor,"accounting.entry.posted","ACCOUNTING_ENTRY_POSTED","journal_entry",return_journal,{"return_id":str(return_id),"entry_role":"RETURN_SETTLEMENT"},request_id)
+        if return_cogs_journal:
+            _emit(db,tenant_id,actor,"accounting.entry.posted","ACCOUNTING_ENTRY_POSTED","journal_entry",return_cogs_journal,{"return_id":str(return_id),"entry_role":"RETURN_COGS"},request_id)
+        fiscal_document = db.execute(text("SELECT create_fiscal_document_for_return(:id)"), {"id":str(return_id)}).scalar()
+        if fiscal_document:
+            _emit(db,tenant_id,actor,"fiscal.credit_note.created","FISCAL_CREDIT_NOTE_CREATED","fiscal_document",fiscal_document,{"return_id":str(return_id),"status":"PENDING"},request_id)
+        _emit(db,tenant_id,actor,"sale.return.created","RETURN_CREATED","sale_return",return_id,{"sale_id":str(sale_id),"total":str(total),"journal_entry_id":str(return_journal)},request_id)
         result=db.execute(text("SELECT id,sale_id,status,reason,total,completed_at,created_at FROM sale_returns WHERE tenant_id=:t AND id=:r"),{"t":str(tenant_id),"r":str(return_id)}).mappings().one(); result=out(result)
+        result["journal_entry_id"] = str(return_journal)
+        result["cogs_journal_entry_id"] = str(return_cogs_journal) if return_cogs_journal else None
+        result["fiscal_document_id"] = str(fiscal_document) if fiscal_document else None
         _finish(db,idem,201,result,"sale_return",return_id); db.commit(); return result
     except HTTPException: db.rollback(); raise
     except IntegrityError as exc: db.rollback(); raise HTTPException(409,"Return could not be committed because a business invariant was violated") from exc

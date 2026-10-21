@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Phase 5 Increment 02 — Full Source Candidate",
-  "version": "2.9.1+phase5.increment02",
+  "package": "LEXA Phase 5 Increment 03 — Settlement, Returns, Accounting & EFRIS",
+  "version": "2.9.2+phase5.increment03",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -88,7 +88,18 @@
     "Phase 5 Increment 02: staging-only Playwright cases for split tender, partial payment, idempotent retry, stock ledger read-after-write, cumulative refund limit, cashier permission denial, manager positive price/discount, and optional cross-branch denial.",
     "Phase 5 final gate review (2026-10-21): pinned GitHub revision d228e6467894857aeeb632a189d10680179404db; Vercel Node 24.x production build is ready, while the same-commit Render startup failed because workspace/membership routes import a missing shared refresh-cookie helper.",
     "Added a shared HttpOnly refresh-cookie helper to apps/api/app/auth.py and aligned apps/api/app/routes/auth.py to use it; this is a local source repair and is not committed/deployed because the GitHub integration returned HTTP 403.",
-    "Updated cookie hardening regression contract and added a source-level shared-cookie import regression test."
+    "Updated cookie hardening regression contract and added a source-level shared-cookie import regression test.",
+    "Phase 5 Increment 03: compute cumulative refund allowance from gross recorded payment allocations minus every prior recorded refund; do not subtract earlier refunds twice from the already-net sale.amount_paid value.",
+    "Phase 5 Increment 03: recompute sale paid/due values from the payment, refund and customer-credit ledgers; refund-table mutations refresh their source sale through an AFTER trigger.",
+    "Phase 5 Increment 03: partial returns prorate line total, discount and tax by returned quantity rather than reusing full-line adjustments.",
+    "Phase 5 Increment 03: no-refund returns are bounded by the customer open receivable in both the API and accounting-journal function; choose refund/customer-credit settlement when the receivable is insufficient.",
+    "Phase 5 Increment 03: post idempotent sale-return settlement journal entries, returned-inventory COGS reversals and a pending EFRIS CREDIT_NOTE only for active registered tenants.",
+    "Phase 5 Increment 03: add dedicated 2210 customer store-credit liability mapping; distinguish issued credit from amounts allocated to a particular receivable.",
+    "Phase 5 Increment 03: analytics credit/outstanding values read the authoritative sales.amount_due value instead of independently recalculating and drifting after refunds/returns.",
+    "Phase 5 Increment 03: sale details and return list surface associated accounting-journal and fiscal-document states in the frontend.",
+    "Added migration 033 for cumulative refund settlement, refund ledger synchronization and authoritative analytics balances; migration 034 for return settlement/COGS journals, customer-credit liability and optional EFRIS credit notes; migration 035 for the no-refund/open-receivable invariant.",
+    "Added Phase 5 rule tests, source-contract tests and migration-contract tests; authenticated Playwright test runner remains fail-closed and requires explicit staging-only opt-in.",
+    "Repaired malformed Phase 5 analytics migration source by adding an explicit non-historical repair-candidate header, removing non-SQL trailer content and using sales.amount_due for the outstanding-balance projections; canonical byte parity is not claimed."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -97,11 +108,11 @@
   "database_reset": false,
   "seed_reset": false,
   "product_deletion": false,
-  "description": "Canonical LEXA Neon foundation for deterministic business intelligence, reporting, product performance, customer patterns, branch performance, and inventory health.",
-  "package_version": "2.9.1",
-  "phase": "1 security and stability",
-  "phase_name": "Least-privilege database login, readiness role context, and production config hardening",
-  "phase_status": "CANDIDATE_ONLY_VERCEL_PRODUCTION_BUILD_PASS_NEON_RLS_PASS_RENDER_SAME_SHA_FAILED_SHARED_REFRESH_COOKIE_IMPORT_LOCAL_BACKEND_43_PASS_1_REDIS_SKIP_FRONTEND_CONTRACTS_25_PASS_NODE22_NODE24_CLEAN_INSTALL_AND_AUTHENTICATED_STAGING_PENDING",
+  "description": "LEXA consolidated source candidate with the Phase 5 checkout, return/refund settlement, accounting, stock-ledger and EFRIS credit-note integrations.",
+  "package_version": "2.9.2",
+  "phase": "5 settlement, returns and accounting",
+  "phase_name": "Phase 5 — refund integrity, return accounting, store credit and EFRIS",
+  "phase_status": "INCREMENT_03_LOCAL_CANDIDATE_VERIFIED_UNIT_CONTRACTS_NEON_QA_DDL_PASS_LIVE_BASELINE_GREEN_NEW_MIGRATIONS_NOT_PRODUCTION_NODE24_CLEAN_INSTALL_AND_AUTHENTICATED_STAGING_PENDING",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -137,32 +148,56 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": "109 passed, 1 skipped; auth-refresh test requires redis which is not installed in the offline local runner",
-    "frontend_contract_tests": "4 passed, 0 failed",
-    "frontend_typescript_syntax": "pass: 27 TS/TSX files transpile syntactically using the available global TypeScript compiler",
-    "frontend_typecheck_and_build": "not verified: npm ci --offline fails because undici-types@6.21.0 is not cached and registry DNS is unavailable; run npm ci, npm run typecheck, npm test, npm run build in Node 24 CI",
-    "phase1_security_migration": "migration 029 executed on isolated Neon branch lexa-phase1-security-test-2026-10-19; verified lexa_runtime_safe has NOINHERIT/NOCREATEDB/NOCREATEROLE/NOREPLICATION/NOBYPASSRLS, no neon_superuser membership, SET membership in lexa_app, and no direct SELECT on users or DELETE on schema_migrations",
-    "migration_source_replay": "seven historical SQL sources still missing; strict full replay blocked",
-    "production": "no production schema/role/settings/deployments changed; GitHub branch creation denied with 403; Render/Vercel deployments not triggered"
+    "python_tests": "66 passed, 1 skipped on 2026-10-21. The skipped auth-refresh integration requires Redis, which is not installed in the offline local runner; Python compileall passed.",
+    "frontend_contract_tests": "27 passed under Node 22.16.0. These are source-contract tests; they are not browser E2E or a Node 24 test result.",
+    "node24_clean_install_typecheck_production_build": "Not completed on this Increment 03 candidate. The project is configured with Vercel Node 24.x and the currently deployed baseline build succeeded, but a separate clean npm ci/typecheck/test/build against this candidate is a release gate.",
+    "authenticated_staging_e2e": "Not run. The only Neon QA branch used for DDL validation is a copy of parent data and is not sanitized staging. Current workspace has no isolated LEXA Render staging service, Neon branch limit is reached, and Render Free only permits the one Key Value instance already used by production.",
+    "phase5_increment_03_database": "Migrations 033–035 and their key function/trigger definitions installed and checked on QA branch br-young-base-b1mi15fs. RLS disabled=0 and RLS not forced=0; sales and journal-entry row counts=0. No production migrations applied.",
+    "production_deployment_baseline": "Latest uploaded source SHA 779f8fe5dc704411b9abab371a29311e7dbc844a is live on Render and READY on Vercel; browser-side Render /health and /ready and Vercel-owned /api/lexa/ready fetch all returned HTTP 200 with database/cache healthy.",
+    "migration_source_replay": "Strict historical byte parity remains blocked by the six previously accepted missing SQL files. Migration 021 is a labelled repair candidate rather than historical byte recovery. An earlier QA branch has a ledger row for 032_phase5_return_settlement_reconciliation but the SQL source is absent from this repository. Current candidate migrations 033–035 supply reviewed replacement behavior, without claiming historical parity.",
+    "production": "No production schema, role, business data, sales, returns, refunds, stock or journal-entry writes were performed by this increment. Increment 03 working tree is not yet committed/deployed; previously attempted GitHub branch/file writes were denied with 403."
   },
-  "release": "phase1-security-stability-source-candidate-2.9.1-2026-10-19",
-  "release_name": "phase-1-security-stability-isolated-test-verified-production-cutover-not-authorized",
-  "source_baseline": "Reconstructed from preserved Phase 4 source archive plus Phase 5 Increment 01/02 overlays; the final gate repair is local to this package until committed.",
+  "release": "phase5-increment-03-return-settlement-accounting-2026-10-21",
+  "release_name": "phase-5-increment-03-review-candidate-not-release-accepted",
+  "source_baseline": "Consolidated candidate based on the latest uploaded GitHub source revision 779f8fe5dc704411b9abab371a29311e7dbc844a plus the local Phase 5 Increment 03 settlement/accounting/frontend changes. This archive has not been committed or deployed.",
   "canonical_source_parity": false,
-  "release_status": "NOT RELEASE-ACCEPTED. GitHub main revision d228e6467894857aeeb632a189d10680179404db built successfully on Vercel (project Node 24.x), but Render deployment for that same SHA failed importing app.auth._set_refresh_cookie; locally repaired package passes available tests, yet GitHub writes were denied (403), clean npm ci on Node 24 and authenticated isolated staging E2E remain outstanding. Do not advance to Phase 6.",
+  "release_status": "CANDIDATE ONLY. Latest uploaded baseline SHA 779f8fe5dc704411b9abab371a29311e7dbc844a is live on Render and READY on Vercel, both readiness checks return 200. Increment 03 local source changes include migrations 033-035 and are not yet committed/deployed. Do not mark Phase 5 fully green or advance to Phase 6 until reviewed source is uploaded, the same SHA passes Node 24 clean install/typecheck/tests/build, the Render revision is live, the production migration rollout is approved, and authenticated E2E passes on isolated staging.",
   "validation_summary": {
-    "reviewed_source_sha": "d228e6467894857aeeb632a189d10680179404db",
-    "vercel": "READY production deployment dpl_4h1ftGMSNohHWvgxMqjpN2FwJQuD for the reviewed SHA; project nodeVersion 24.x; TypeScript and Next production build completed (21/21 static pages); deployed build used npm install, not a separately verified clean npm ci.",
-    "render": "FAIL for the reviewed SHA: dep-dbc9rmo473hc73a6niog; ImportError: cannot import name _set_refresh_cookie from app.auth. Prior live deploy commit c1cd002bece6de028357d7ed156c6f03d3d5a7f7 remains ready; frontend and backend deployment SHAs are not aligned.",
-    "neon": "PASS read-only security audit: migration 031 present; 119/119 public base tables have RLS enabled and forced; no RLS-disabled/not-forced tables; runtime login is non-superuser, non-inheriting, no CREATEDB/CREATEROLE/BYPASSRLS and member of lexa_app; no long-running queries or locks. Branch protection enablement was refused by the plan protected-branch quota.",
-    "backend_tests": "43 passed, 1 skipped because Redis dependency is absent from this offline runner; Python compileall passed.",
-    "frontend_contract_tests": "25 passed under Node 22.16.0; this is a source-contract suite, not a Node 24 run.",
-    "node24_clean_install_typecheck_production_build": "Vercel production build/typecheck pass for project configured as Node 24.x; separate clean npm ci and frontend test run under Node 24 not completed because local runner cannot fetch Node 24/cache misses and Vercel Sandbox creation is blocked by Hobby snapshot storage limit.",
-    "authenticated_staging_playwright": "Not run: no isolated Render staging API; Vercel API-origin vars target production only and default API origin is the live Render URL; mutation tests intentionally not run against production.",
-    "preview": "No safe preview of the locally repaired code exists because GitHub branch/file writes were denied (403) and Vercel sandbox creation is blocked by snapshot-storage quota.",
-    "production_data_mutation": "none by this final gate review.",
-    "canonical_source_parity": false
+    "current_live_revision": "779f8fe5dc704411b9abab371a29311e7dbc844a",
+    "current_live_deployment_baseline": "Render deployment dep-dbca7f8u01pc73d2doj0 is live on SHA 779f8fe5dc704411b9abab371a29311e7dbc844a; Vercel production deployment dpl_DhA4A5ZFDg9LYVSpuY7rjSxHGCTx is READY on the same SHA.",
+    "readiness": "Repeat direct checks: Firecrawl browser-side fetch returned HTTP 200 for Render /health and /ready with database/cache OK; Vercel-owned deployment fetch returned HTTP 200 for https://lexa-green.vercel.app/api/lexa/ready with database/cache OK. A raw Firecrawl scrape briefly emitted a Render block/challenge 503 and proxy UPSTREAM_UNAVAILABLE; the repeat direct/browser fetches returned 200, so that one scraper response was not treated as an app failure.",
+    "vercel_node24": "Project nodeVersion is 24.x; current deployed baseline has a successful Vercel production build/typecheck. Increment 03 local candidate has not been built by Vercel yet.",
+    "backend_tests": "66 passed, 1 skipped; the skipped auth-refresh integration requires Redis which is not installed in the offline test runner. Python compileall passed.",
+    "frontend_contract_tests": "27 passed under Node 22.16.0; these are source-contract tests, not browser E2E.",
+    "node24_clean_install_typecheck_test_build": "Not completed locally. Runtime available here is Node 22.16.0. The Vercel project is configured for Node 24.x, but a fresh npm ci/typecheck/test/build for the Increment 03 working tree remains a release gate.",
+    "neon_production": "No production SQL changes made in this increment. Canonical live branch br-soft-star-b1dj2m2w remains at migration 031; 119/119 public base tables have RLS enabled and forced and the production runtime login remains least privilege. Branch protection remains unavailable because the Neon plan protected-branch quota is full.",
+    "neon_qa_validation": "QA branch br-young-base-b1mi15fs has migrations 033, 034, 035 recorded; refund totals/trigger, analytics amount_due formula, customer credit liability account 2210, return settlement journal, returned-inventory COGS reversal, EFRIS credit-note function, and the no-refund/open-receivable guard are present. RLS disabled=0, RLS not forced=0, sales rows=0, journal rows=0. Branch is copied from the canonical parent and is NOT scrubbed staging.",
+    "authenticated_staging_e2e": "Not run. The workspace has no isolated LEXA Render staging service, Neon branch creation is at quota, and Render Free already uses its single allowed Key Value instance. The authored Playwright suite writes sales/returns and has fail-closed staging-host/fixture safeguards, so it was not pointed at production.",
+    "production_migrations": "Migrations 033, 034 and 035 are local candidate migration files and are NOT applied to production. Apply them only after source review, clean replay and release approval.",
+    "github_and_deploy": "Increment 03 changes are not yet committed. Previous direct GitHub branch/file writes returned 403 Resource not accessible by integration. Upload the included full-source ZIP through the existing approved ZIP extractor; allow auto-deploy to build its exact resulting SHA.",
+    "historical_sources": "The six previously accepted lost historical source files remain explicit substitute/byte-parity gaps. Migration 021 is a clearly-labelled repair candidate, not a byte-recovered historical original. The QA branch records a 032_phase5_return_settlement_reconciliation version but the corresponding SQL source is not present in this repository; migrations 033-035 carry the current replacement behavior, not historical 032 byte parity.",
+    "production_data_mutation": "None in this increment; QA SQL changes were applied only on branch br-young-base-b1mi15fs, which still has zero sales and journal-entry rows.",
+    "canonical_source_parity": false,
+    "latest_external_recheck": {
+      "render": "Browser-side Node fetch of https://lexa-n10e.onrender.com/health returned HTTP 200 JSON {status: ok}; /ready returned HTTP 200 JSON status ready, database ok, cache ok.",
+      "vercel": "Vercel-owned fetch of https://lexa-green.vercel.app/api/lexa/ready returned HTTP 200 JSON status ready, database ok, cache ok.",
+      "probe_caveat": "One raw scraper fetch returned a visual Render block page with 503 and one corresponding proxy fetch said UPSTREAM_UNAVAILABLE; subsequent direct/browser/API-owned fetches succeeded. Render logs show no corresponding 5xx entries, latest Render deployment remains live, and Vercel reports no runtime error cluster."
+    }
   },
   "final_gate_report": "PHASE5_FINAL_GATE_REPORT_2026-10-21.md",
-  "local_repair_readme": "PHASE5_REPAIR_README_2026-10-21.md"
+  "local_repair_readme": "PHASE5_REPAIR_README_2026-10-21.md",
+  "phase5_increment_03_validation": {
+    "neon_project_id": "wispy-mud-75323042",
+    "qa_branch_id": "br-young-base-b1mi15fs",
+    "migrations": [
+      "033_phase5_refund_settlement_consistency",
+      "034_phase5_return_accounting_journals",
+      "035_phase5_none_return_receivable_guard"
+    ],
+    "qa_branch_is_sanitized_staging": false,
+    "tests": "66 passed, 1 Redis-dependent skip; 27 frontend contract tests passed under Node 22.16.0",
+    "release_gate": "Not release accepted: source upload/review, Node 24 clean checks, same-SHA Render/Vercel deployment, approved production migration rollout and authenticated isolated staging E2E remain outstanding."
+  },
+  "increment_03_report": "PHASE5_INCREMENT_03_IMPLEMENTATION_REPORT_2026-10-21.md",
+  "increment_03_readme": "PHASE5_INCREMENT_03_README_2026-10-21.md"
 }

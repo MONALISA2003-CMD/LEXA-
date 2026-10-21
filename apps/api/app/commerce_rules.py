@@ -23,3 +23,64 @@ def remaining_refund_balance(amount_collected: Decimal | int | str, prior_refund
     if collected < ZERO_MONEY or refunded < ZERO_MONEY:
         raise ValueError("Collected and refunded amounts cannot be negative")
     return max(ZERO_MONEY, money(collected - refunded))
+
+
+def sale_settlement_totals(
+    total: Decimal | int | str,
+    returned_value: Decimal | int | str,
+    gross_collected: Decimal | int | str,
+    recorded_refunds: Decimal | int | str,
+    customer_credit_issued: Decimal | int | str = 0,
+    customer_credit_applied_to_sale: Decimal | int | str = 0,
+) -> tuple[Decimal, Decimal]:
+    """Calculate cash collections and current due from immutable ledgers.
+
+    Customer credits are a separate liability. A source-sale credit that remains
+    unallocated preserves that sale's outstanding receivable; a recorded credit
+    allocation to this sale's receivable pays it down. Credits applied to another
+    sale do not change the source sale's receivable.
+    """
+    sale_total = money(total)
+    returned = money(returned_value)
+    collected = money(gross_collected)
+    refunded = money(recorded_refunds)
+    credit_issued = money(customer_credit_issued)
+    credit_applied = money(customer_credit_applied_to_sale)
+    if min(sale_total, returned, collected, refunded, credit_issued, credit_applied) < ZERO_MONEY:
+        raise ValueError("Sale, return, collection, refund, and credit amounts cannot be negative")
+    if returned > sale_total:
+        raise ValueError("Returned value cannot exceed the sale total")
+    net_collected = min(sale_total, max(ZERO_MONEY, money(collected - refunded)))
+    amount_due = max(
+        ZERO_MONEY,
+        money(sale_total - returned - net_collected + credit_issued - credit_applied),
+    )
+    return money(net_collected), money(amount_due)
+
+
+def prorate_return_line_amounts(
+    return_quantity: Decimal | int | str,
+    original_quantity: Decimal | int | str,
+    discount_amount: Decimal | int | str,
+    tax_amount: Decimal | int | str,
+    line_total: Decimal | int | str,
+) -> tuple[Decimal, Decimal, Decimal]:
+    """Return (line_total, discount, tax) proportionally for a partial return.
+
+    The returned line stores its own discounted/taxed amounts. Copying the full
+    source-line discount and tax to a partial return overstates both the credit
+    note and the tax reversal. Four-decimal rounding matches commerce money.
+    """
+    qty = Decimal(str(return_quantity))
+    original_qty = Decimal(str(original_quantity))
+    if qty <= 0 or original_qty <= 0:
+        raise ValueError("Return and original quantities must be positive")
+    if qty > original_qty:
+        raise ValueError("Return quantity cannot exceed the original quantity")
+    discount = money(discount_amount)
+    tax = money(tax_amount)
+    total = money(line_total)
+    if min(discount, tax, total) < ZERO_MONEY:
+        raise ValueError("Line money amounts cannot be negative")
+    ratio = qty / original_qty
+    return money(total * ratio), money(discount * ratio), money(tax * ratio)

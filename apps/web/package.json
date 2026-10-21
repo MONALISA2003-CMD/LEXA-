@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "test:e2e": "playwright test --config=playwright.config.ts",
+    "test:e2e:phase5": "playwright test --config=playwright.config.ts e2e/phase5-sales-acceptance.spec.ts"
   },
   "dependencies": {
     "next": "16.4.0",
@@ -19,7 +21,8 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "tailwindcss": "4.3.3",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "@playwright/test": "1.64.1"
   },
   "engines": {
     "node": "24.x"

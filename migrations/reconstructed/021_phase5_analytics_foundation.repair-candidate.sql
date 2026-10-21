@@ -1,7 +1,8 @@
 -- RECONSTRUCTED REPAIR CANDIDATE, NOT HISTORICAL ORIGINAL BYTES.
--- Original malformed Git blob SHA-1 retained as provenance: c32a60352f10a1463937ff4aa0b204adf38f470b
--- Decoded 32 literal \n sequences in the SQL tail and removed pasted tool invocation/trailer.
--- Review and compare before use; the original migration file is never overwritten by this script.
+-- Malformed Git blob SHA-1 recorded by the forensic workflow: c32a60352f10a1463937ff4aa0b204adf38f470b.
+-- Repaired 32 escaped-newline sequences, removed an appended non-SQL invocation trailer,
+-- and made analytics credit metrics use sales.amount_due as the authoritative balance.
+-- A decoded malformed copy is retained under migrations/reconstructed for review.
 -- Phase 5: deterministic analytics / business intelligence foundation
 CREATE TABLE IF NOT EXISTS analytics_refresh_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -102,12 +103,12 @@ BEGIN
   LEFT JOIN LATERAL (SELECT SUM(sr.total) returns_total,COUNT(*) return_count FROM sale_returns sr JOIN sales ss ON ss.tenant_id=sr.tenant_id AND ss.id=sr.sale_id WHERE sr.tenant_id=p_tenant_id AND sr.status='COMPLETED' AND ss.currency_code=c.currency_code AND COALESCE(sr.completed_at,sr.created_at)::date=c.business_date) r ON true
   LEFT JOIN LATERAL (SELECT SUM(amount) payments_collected,COUNT(*) payment_count FROM payments WHERE tenant_id=p_tenant_id AND status='RECORDED' AND currency_code=c.currency_code AND business_date=c.business_date) pay ON true
   LEFT JOIN LATERAL (SELECT SUM(amount) refunds_total FROM refund_records WHERE tenant_id=p_tenant_id AND status='RECORDED' AND currency_code=c.currency_code AND business_date=c.business_date) ref ON true
-  LEFT JOIN LATERAL (SELECT SUM(GREATEST(sx.total-sx.amount_paid-sx.return_adjustment_amount,0)) credit_created FROM sales sx WHERE sx.tenant_id=p_tenant_id AND sx.status='COMPLETED' AND sx.currency_code=c.currency_code AND COALESCE(sx.completed_at,sx.created_at)::date=c.business_date) cr ON true
+  LEFT JOIN LATERAL (SELECT SUM(GREATEST(sx.amount_due,0)) credit_created FROM sales sx WHERE sx.tenant_id=p_tenant_id AND sx.status='COMPLETED' AND sx.currency_code=c.currency_code AND COALESCE(sx.completed_at,sx.created_at)::date=c.business_date) cr ON true
   LEFT JOIN LATERAL (SELECT SUM(total) expenses_total,COUNT(*) expense_count FROM expense_records WHERE tenant_id=p_tenant_id AND status='POSTED' AND currency_code=c.currency_code AND expense_date=c.business_date) ex ON true;
 
   DELETE FROM analytics_branch_daily_metrics WHERE tenant_id=p_tenant_id AND business_date BETWEEN p_from AND p_to;
   WITH bs AS (
-    SELECT branch_id,COALESCE(completed_at,created_at)::date business_date,currency_code,SUM(total) sales_total,COUNT(*) sale_count,SUM(GREATEST(total-amount_paid-return_adjustment_amount,0)) credit_created
+    SELECT branch_id,COALESCE(completed_at,created_at)::date business_date,currency_code,SUM(total) sales_total,COUNT(*) sale_count,SUM(GREATEST(amount_due,0)) credit_created
     FROM sales WHERE tenant_id=p_tenant_id AND status='COMPLETED' AND COALESCE(completed_at,created_at)::date BETWEEN p_from AND p_to GROUP BY branch_id,COALESCE(completed_at,created_at)::date,currency_code
   ), br AS (
     SELECT ss.branch_id,COALESCE(sr.completed_at,sr.created_at)::date business_date,ss.currency_code,SUM(sr.total) returns_total
