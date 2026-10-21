@@ -7,10 +7,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from ..catalog import emit_event, write_audit
+from ..branch_access import accessible_location_ids, ensure_location_access, require_full_branch_scope
 from ..dependencies import require_permission
 from ..inventory import (
     ZERO,
@@ -19,7 +20,7 @@ from ..inventory import (
 )
 from ..models import (
     InventoryAdjustment, InventoryAdjustmentLine, InventoryBalance, InventoryTransaction,
-    InventoryTransfer, InventoryTransferLine, Product, ProductVariant, StockCount, StockCountLine,
+    InventoryTransfer, InventoryTransferLine, Location, Product, ProductVariant, StockCount, StockCountLine,
 )
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -93,17 +94,87 @@ def balances(
     q_search: str | None = Query(None, alias="q"), limit: int = Query(100, ge=1, le=500),
     ctx=Depends(require_permission("inventory.read")),
 ):
-    db, _, tenant_id, _ = ctx
-    stmt = select(InventoryBalance).where(InventoryBalance.tenant_id == tenant_id)
-    if location_id: stmt = stmt.where(InventoryBalance.location_id == location_id)
+    db, actor_id, tenant_id, _ = ctx
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
+    stmt = select(InventoryBalance).where(InventoryBalance.tenant_id == tenant_id, InventoryBalance.location_id.in_(allowed_locations))
+    if location_id:
+        ensure_location_access(db, tenant_id=tenant_id, user_id=actor_id, location_id=location_id)
+        stmt = stmt.where(InventoryBalance.location_id == location_id)
     if variant_id: stmt = stmt.where(InventoryBalance.variant_id == variant_id)
     if q_search:
         like = f"%{q_search.strip()}%"
-        stmt = stmt.join(ProductVariant, ProductVariant.id == InventoryBalance.variant_id).join(Product, Product.id == ProductVariant.product_id).where(
+        stmt = stmt.join(ProductVariant, (ProductVariant.id == InventoryBalance.variant_id) & (ProductVariant.tenant_id == InventoryBalance.tenant_id)).join(Product, Product.id == ProductVariant.product_id).where(
             Product.name.ilike(like) | ProductVariant.sku.ilike(like)
         )
     rows = list(db.scalars(stmt.order_by(InventoryBalance.updated_at.desc()).limit(limit)))
     return [serialize_balance(r) for r in rows]
+
+@router.get("/summary")
+def inventory_summary(ctx=Depends(require_permission("inventory.read"))):
+    """Aggregate inventory health across every location the member can access.
+
+    The dashboard must not infer workspace stock value or alert counts from the
+    capped, detail-oriented /balances list. This endpoint calculates totals in
+    PostgreSQL and returns a small, actionable set of low/out-of-stock rows.
+    """
+    db, actor_id, tenant_id, _ = ctx
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
+    available = InventoryBalance.on_hand - InventoryBalance.reserved
+    summary = db.execute(
+        select(
+            func.coalesce(func.sum(InventoryBalance.stock_value), 0).label("stock_value"),
+            func.count(InventoryBalance.id).label("balance_rows"),
+            func.coalesce(func.sum(case((available <= 0, 1), else_=0)), 0).label("out_of_stock_rows"),
+            func.coalesce(func.sum(case(((available > 0) & (available <= 5), 1), else_=0)), 0).label("low_stock_rows"),
+        ).where(
+            InventoryBalance.tenant_id == tenant_id,
+            InventoryBalance.location_id.in_(allowed_locations),
+        )
+    ).mappings().one()
+
+    attention_rows = db.execute(
+        select(
+            InventoryBalance.variant_id,
+            InventoryBalance.location_id,
+            InventoryBalance.on_hand,
+            InventoryBalance.reserved,
+            available.label("available"),
+            Product.name.label("product_name"),
+            ProductVariant.sku.label("sku"),
+            Location.name.label("location_name"),
+        )
+        .join(ProductVariant, (ProductVariant.id == InventoryBalance.variant_id) & (ProductVariant.tenant_id == InventoryBalance.tenant_id))
+        .join(Product, (Product.id == ProductVariant.product_id) & (Product.tenant_id == ProductVariant.tenant_id))
+        .join(Location, (Location.id == InventoryBalance.location_id) & (Location.tenant_id == InventoryBalance.tenant_id))
+        .where(
+            InventoryBalance.tenant_id == tenant_id,
+            InventoryBalance.location_id.in_(allowed_locations),
+            available <= 5,
+        )
+        .order_by(available.asc(), InventoryBalance.updated_at.desc())
+        .limit(10)
+    ).mappings().all()
+
+    return {
+        "stock_value": str(summary["stock_value"] or 0),
+        "balance_rows": int(summary["balance_rows"] or 0),
+        "out_of_stock_rows": int(summary["out_of_stock_rows"] or 0),
+        "low_stock_rows": int(summary["low_stock_rows"] or 0),
+        "attention": [
+            {
+                "variant_id": str(row["variant_id"]),
+                "location_id": str(row["location_id"]),
+                "on_hand": str(row["on_hand"]),
+                "reserved": str(row["reserved"]),
+                "available": str(row["available"]),
+                "product_name": row["product_name"],
+                "sku": row["sku"],
+                "location_name": row["location_name"],
+            }
+            for row in attention_rows
+        ],
+    }
+
 
 @router.get("/ledger", response_model=list[LedgerOut])
 def ledger(
@@ -111,25 +182,30 @@ def ledger(
     transaction_type: str | None = None, limit: int = Query(100, ge=1, le=500),
     ctx=Depends(require_permission("inventory.read")),
 ):
-    db, _, tenant_id, _ = ctx
-    stmt = select(InventoryTransaction).where(InventoryTransaction.tenant_id == tenant_id)
-    if location_id: stmt = stmt.where(InventoryTransaction.location_id == location_id)
+    db, actor_id, tenant_id, _ = ctx
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
+    stmt = select(InventoryTransaction).where(InventoryTransaction.tenant_id == tenant_id, InventoryTransaction.location_id.in_(allowed_locations))
+    if location_id:
+        ensure_location_access(db, tenant_id=tenant_id, user_id=actor_id, location_id=location_id)
+        stmt = stmt.where(InventoryTransaction.location_id == location_id)
     if variant_id: stmt = stmt.where(InventoryTransaction.variant_id == variant_id)
     if transaction_type: stmt = stmt.where(InventoryTransaction.transaction_type == transaction_type)
     return list(db.scalars(stmt.order_by(InventoryTransaction.occurred_at.desc(), InventoryTransaction.id.desc()).limit(limit)))
 
 @router.get("/products/{variant_id}")
 def product_inventory(variant_id: UUID, ctx=Depends(require_permission("inventory.read"))):
-    db, _, tenant_id, _ = ctx
+    db, actor_id, tenant_id, _ = ctx
     tenant_variant(db, tenant_id, variant_id)
-    balances = list(db.scalars(select(InventoryBalance).where(InventoryBalance.tenant_id == tenant_id, InventoryBalance.variant_id == variant_id).order_by(InventoryBalance.updated_at.desc())))
-    recent = list(db.scalars(select(InventoryTransaction).where(InventoryTransaction.tenant_id == tenant_id, InventoryTransaction.variant_id == variant_id).order_by(InventoryTransaction.occurred_at.desc()).limit(25)))
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
+    balances = list(db.scalars(select(InventoryBalance).where(InventoryBalance.tenant_id == tenant_id, InventoryBalance.variant_id == variant_id, InventoryBalance.location_id.in_(allowed_locations)).order_by(InventoryBalance.updated_at.desc())))
+    recent = list(db.scalars(select(InventoryTransaction).where(InventoryTransaction.tenant_id == tenant_id, InventoryTransaction.variant_id == variant_id, InventoryTransaction.location_id.in_(allowed_locations)).order_by(InventoryTransaction.occurred_at.desc()).limit(25)))
     return {"balances": [serialize_balance(r) for r in balances], "ledger": recent}
 
 @router.post("/adjustments")
 def create_adjustment(body: AdjustmentIn, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("inventory.manage"))):
     db, actor, tenant_id, _ = ctx
     tenant_location(db, tenant_id, body.location_id)
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=body.location_id)
     if len({line.variant_id for line in body.lines}) != len(body.lines):
         raise HTTPException(422, "Adjustment cannot contain the same variant twice")
     for line in body.lines:
@@ -152,6 +228,7 @@ def approve_adjustment(adjustment_id: UUID, idempotency_key: str | None = Header
     db, actor, tenant_id, _ = ctx
     row = db.scalar(select(InventoryAdjustment).where(InventoryAdjustment.id == adjustment_id, InventoryAdjustment.tenant_id == tenant_id).with_for_update())
     if not row: raise HTTPException(404, "Adjustment not found")
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.location_id)
     if row.status != "DRAFT": raise HTTPException(409, f"Adjustment cannot be approved from {row.status}")
     idem = idempotent_start(db, tenant_id, "inventory.adjustment.approve", idempotency_key, {"adjustment_id": str(adjustment_id)})
     if isinstance(idem, tuple): return idem[1]
@@ -166,6 +243,7 @@ def post_adjustment(adjustment_id: UUID, idempotency_key: str | None = Header(No
     db, actor, tenant_id, _ = ctx
     row = db.scalar(select(InventoryAdjustment).where(InventoryAdjustment.id == adjustment_id, InventoryAdjustment.tenant_id == tenant_id).with_for_update())
     if not row: raise HTTPException(404, "Adjustment not found")
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.location_id)
     if row.status != "APPROVED": raise HTTPException(409, f"Adjustment cannot be posted from {row.status}")
     idem = idempotent_start(db, tenant_id, "inventory.adjustment.post", idempotency_key, {"adjustment_id": str(adjustment_id)})
     if isinstance(idem, tuple): return idem[1]
@@ -181,6 +259,7 @@ def post_adjustment(adjustment_id: UUID, idempotency_key: str | None = Header(No
 def create_stock_count(body: CountIn, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("inventory.count.manage"))):
     db, actor, tenant_id, _ = ctx
     tenant_location(db, tenant_id, body.location_id)
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=body.location_id)
     if len(set(body.variant_ids)) != len(body.variant_ids): raise HTTPException(422, "Stock count cannot contain duplicate variants")
     for variant_id in body.variant_ids: tenant_variant(db, tenant_id, variant_id)
     idem = idempotent_start(db, tenant_id, "inventory.stock_count.create", idempotency_key, body.model_dump(mode="json"))
@@ -199,6 +278,7 @@ def update_count_lines(count_id: UUID, body: CountUpdateIn, ctx=Depends(require_
     db, actor, tenant_id, _ = ctx
     count = db.scalar(select(StockCount).where(StockCount.id == count_id, StockCount.tenant_id == tenant_id).with_for_update())
     if not count: raise HTTPException(404, "Stock count not found")
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=count.location_id)
     if count.status != "COUNTING": raise HTTPException(409, f"Stock count cannot be edited from {count.status}")
     for item in body.lines:
         line = db.scalar(select(StockCountLine).where(StockCountLine.stock_count_id == count_id, StockCountLine.tenant_id == tenant_id, StockCountLine.variant_id == item.variant_id).with_for_update())
@@ -214,6 +294,7 @@ def submit_stock_count(count_id: UUID, idempotency_key: str | None = Header(None
     db, actor, tenant_id, _ = ctx
     row = db.scalar(select(StockCount).where(StockCount.id == count_id, StockCount.tenant_id == tenant_id).with_for_update())
     if not row: raise HTTPException(404, "Stock count not found")
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.location_id)
     if row.status != "COUNTING": raise HTTPException(409, f"Stock count cannot be submitted from {row.status}")
     lines = list(db.scalars(select(StockCountLine).where(StockCountLine.stock_count_id == row.id, StockCountLine.tenant_id == tenant_id)))
     if not lines or any(line.counted_quantity is None for line in lines): raise HTTPException(422, "Every stock count line must have a counted quantity before submission")
@@ -229,6 +310,7 @@ def approve_stock_count(count_id: UUID, idempotency_key: str | None = Header(Non
     db, actor, tenant_id, _ = ctx
     row = db.scalar(select(StockCount).where(StockCount.id == count_id, StockCount.tenant_id == tenant_id).with_for_update())
     if not row: raise HTTPException(404, "Stock count not found")
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.location_id)
     if row.status != "SUBMITTED": raise HTTPException(409, f"Stock count cannot be approved from {row.status}")
     idem = idempotent_start(db, tenant_id, "inventory.stock_count.approve", idempotency_key, {"count_id": str(count_id)})
     if isinstance(idem, tuple): return idem[1]
@@ -242,6 +324,7 @@ def post_stock_count(count_id: UUID, idempotency_key: str | None = Header(None, 
     db, actor, tenant_id, _ = ctx
     row = db.scalar(select(StockCount).where(StockCount.id == count_id, StockCount.tenant_id == tenant_id).with_for_update())
     if not row: raise HTTPException(404, "Stock count not found")
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.location_id)
     if row.status != "APPROVED": raise HTTPException(409, f"Stock count cannot be posted from {row.status}")
     idem = idempotent_start(db, tenant_id, "inventory.stock_count.post", idempotency_key, {"count_id": str(count_id)})
     if isinstance(idem, tuple): return idem[1]
@@ -257,8 +340,9 @@ def post_stock_count(count_id: UUID, idempotency_key: str | None = Header(None, 
 
 @router.get("/transfers")
 def list_transfers(status: str | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("inventory.read"))):
-    db, _, tenant_id, _ = ctx
-    stmt = select(InventoryTransfer).where(InventoryTransfer.tenant_id == tenant_id)
+    db, actor_id, tenant_id, _ = ctx
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
+    stmt = select(InventoryTransfer).where(InventoryTransfer.tenant_id == tenant_id, InventoryTransfer.source_location_id.in_(allowed_locations), InventoryTransfer.destination_location_id.in_(allowed_locations))
     if status: stmt = stmt.where(InventoryTransfer.status == status)
     rows = list(db.scalars(stmt.order_by(InventoryTransfer.created_at.desc()).limit(limit)))
     result = []
@@ -272,6 +356,8 @@ def create_transfer(body: TransferIn, idempotency_key: str | None = Header(None,
     db, actor, tenant_id, _ = ctx
     if body.source_location_id == body.destination_location_id: raise HTTPException(422, "Source and destination locations must be different")
     tenant_location(db, tenant_id, body.source_location_id); tenant_location(db, tenant_id, body.destination_location_id)
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=body.source_location_id)
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=body.destination_location_id)
     if len({line.variant_id for line in body.lines}) != len(body.lines): raise HTTPException(422, "Transfer cannot contain duplicate variants")
     for line in body.lines: tenant_variant(db, tenant_id, line.variant_id)
     idem = idempotent_start(db, tenant_id, "inventory.transfer.create", idempotency_key, body.model_dump(mode="json"))
@@ -288,6 +374,8 @@ def approve_transfer(transfer_id: UUID, idempotency_key: str | None = Header(Non
     db, actor, tenant_id, _ = ctx
     row = db.scalar(select(InventoryTransfer).where(InventoryTransfer.id == transfer_id, InventoryTransfer.tenant_id == tenant_id).with_for_update())
     if not row: raise HTTPException(404, "Transfer not found")
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.source_location_id)
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.destination_location_id)
     if row.status != "DRAFT": raise HTTPException(409, f"Transfer cannot be approved from {row.status}")
     lines = list(db.scalars(select(InventoryTransferLine).where(InventoryTransferLine.transfer_id == row.id, InventoryTransferLine.tenant_id == tenant_id)))
     if not lines: raise HTTPException(409, "Transfer has no lines")
@@ -303,6 +391,8 @@ def dispatch_transfer(transfer_id: UUID, idempotency_key: str | None = Header(No
     db, actor, tenant_id, _ = ctx
     row = db.scalar(select(InventoryTransfer).where(InventoryTransfer.id == transfer_id, InventoryTransfer.tenant_id == tenant_id).with_for_update())
     if not row: raise HTTPException(404, "Transfer not found")
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.source_location_id)
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.destination_location_id)
     if row.status != "APPROVED": raise HTTPException(409, f"Transfer cannot be dispatched from {row.status}")
     idem = idempotent_start(db, tenant_id, "inventory.transfer.dispatch", idempotency_key, {"transfer_id": str(transfer_id)})
     if isinstance(idem, tuple): return idem[1]
@@ -325,6 +415,8 @@ def receive_transfer(transfer_id: UUID, body: TransferReceiveIn, idempotency_key
     db, actor, tenant_id, _ = ctx
     row = db.scalar(select(InventoryTransfer).where(InventoryTransfer.id == transfer_id, InventoryTransfer.tenant_id == tenant_id).with_for_update())
     if not row: raise HTTPException(404, "Transfer not found")
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.source_location_id)
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.destination_location_id)
     if row.status not in {"DISPATCHED", "PARTIALLY_RECEIVED"}: raise HTTPException(409, f"Transfer cannot be received from {row.status}")
     if len({x.variant_id for x in body.lines}) != len(body.lines): raise HTTPException(422, "Receive cannot contain duplicate variants")
     idem = idempotent_start(db, tenant_id, "inventory.transfer.receive", idempotency_key, body.model_dump(mode="json") | {"transfer_id": str(transfer_id)})
@@ -351,6 +443,8 @@ def complete_transfer(transfer_id: UUID, idempotency_key: str | None = Header(No
     db, actor, tenant_id, _ = ctx
     row = db.scalar(select(InventoryTransfer).where(InventoryTransfer.id == transfer_id, InventoryTransfer.tenant_id == tenant_id).with_for_update())
     if not row: raise HTTPException(404, "Transfer not found")
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.source_location_id)
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row.destination_location_id)
     if row.status != "RECEIVED": raise HTTPException(409, f"Transfer cannot be completed from {row.status}")
     idem = idempotent_start(db, tenant_id, "inventory.transfer.complete", idempotency_key, {"transfer_id": str(transfer_id)})
     if isinstance(idem, tuple): return idem[1]
@@ -370,8 +464,9 @@ def variant_options(ctx=Depends(require_permission("inventory.read"))):
 
 @router.get("/adjustments")
 def list_adjustments(status: str | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("inventory.read"))):
-    db, _, tenant_id, _ = ctx
-    stmt = select(InventoryAdjustment).where(InventoryAdjustment.tenant_id == tenant_id)
+    db, actor_id, tenant_id, _ = ctx
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
+    stmt = select(InventoryAdjustment).where(InventoryAdjustment.tenant_id == tenant_id, InventoryAdjustment.location_id.in_(allowed_locations))
     if status: stmt = stmt.where(InventoryAdjustment.status == status)
     rows = list(db.scalars(stmt.order_by(InventoryAdjustment.created_at.desc()).limit(limit)))
     result = []
@@ -382,8 +477,9 @@ def list_adjustments(status: str | None = None, limit: int = Query(100, ge=1, le
 
 @router.get("/stock-counts")
 def list_stock_counts(status: str | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("inventory.read"))):
-    db, _, tenant_id, _ = ctx
-    stmt = select(StockCount).where(StockCount.tenant_id == tenant_id)
+    db, actor_id, tenant_id, _ = ctx
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
+    stmt = select(StockCount).where(StockCount.tenant_id == tenant_id, StockCount.location_id.in_(allowed_locations))
     if status: stmt = stmt.where(StockCount.status == status)
     rows = list(db.scalars(stmt.order_by(StockCount.created_at.desc()).limit(limit)))
     result = []
@@ -394,9 +490,10 @@ def list_stock_counts(status: str | None = None, limit: int = Query(100, ge=1, l
 
 @router.get("/stock-counts/{count_id}")
 def get_stock_count(count_id: UUID, ctx=Depends(require_permission("inventory.read"))):
-    db, _, tenant_id, _ = ctx
+    db, actor_id, tenant_id, _ = ctx
     row = db.scalar(select(StockCount).where(StockCount.id == count_id, StockCount.tenant_id == tenant_id))
     if not row: raise HTTPException(404, "Stock count not found")
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor_id, location_id=row.location_id)
     lines = list(db.scalars(select(StockCountLine).where(StockCountLine.stock_count_id == row.id, StockCountLine.tenant_id == tenant_id)))
     return {"id": row.id, "location_id": row.location_id, "status": row.status, "scope_description": row.scope_description, "started_at": row.started_at, "created_at": row.created_at, "lines": lines}
 
@@ -406,6 +503,7 @@ def get_stock_count(count_id: UUID, ctx=Depends(require_permission("inventory.re
 def rebuild_inventory_balances(ctx=Depends(require_permission("inventory.rebuild"))):
     """Replay the immutable ledger and rebuild materialized on-hand/WAC projections."""
     db, actor, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=actor)
     rows = list(db.scalars(select(InventoryTransaction).where(InventoryTransaction.tenant_id == tenant_id).order_by(InventoryTransaction.location_id, InventoryTransaction.variant_id, InventoryTransaction.occurred_at, InventoryTransaction.id)))
     state: dict[tuple[UUID, UUID], tuple[Decimal, Decimal]] = {}
     for tx in rows:
@@ -437,7 +535,8 @@ def rebuild_inventory_balances(ctx=Depends(require_permission("inventory.rebuild
 @router.get("/integrity")
 def inventory_integrity(ctx=Depends(require_permission("inventory.read"))):
     """Read-only consistency check: every materialized balance must equal ledger quantity sum."""
-    db, _, tenant_id, _ = ctx
+    db, actor_id, tenant_id, _ = ctx
+    allowed_locations = accessible_location_ids(db, tenant_id=tenant_id, user_id=actor_id)
     rows = db.execute(
         select(
             InventoryBalance.location_id,
@@ -449,7 +548,7 @@ def inventory_integrity(ctx=Depends(require_permission("inventory.read"))):
             (InventoryTransaction.tenant_id == InventoryBalance.tenant_id)
             & (InventoryTransaction.location_id == InventoryBalance.location_id)
             & (InventoryTransaction.variant_id == InventoryBalance.variant_id),
-        ).where(InventoryBalance.tenant_id == tenant_id)
+        ).where(InventoryBalance.tenant_id == tenant_id, InventoryBalance.location_id.in_(allowed_locations))
         .group_by(InventoryBalance.location_id, InventoryBalance.variant_id, InventoryBalance.on_hand)
     ).all()
     mismatches = []

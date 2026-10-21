@@ -58,6 +58,8 @@ export function setAccessToken(token: string | null) { accessToken = token; }
 function requiresSession(path: string): boolean {
   if (/^\/(health|ready)$/.test(path)) return false;
   if (/^\/api\/v1\/auth\/(login|register|refresh|logout)$/.test(path)) return false;
+  // Invitation preview/accept are token-authorized public routes; they must not trigger cookie refresh.
+  if (/^\/api\/v1\/invitations\/(preview|accept)(\?|$)/.test(path)) return false;
   return true;
 }
 
@@ -144,15 +146,24 @@ export function getProduct(productId: string, signal?: AbortSignal) { return get
 export function getCatalogLookup(query: string, signal?: AbortSignal) { const params = new URLSearchParams({ q: query.trim(), limit: "10" }); return getJson<CatalogLookupResult[]>(`/api/v1/catalog/lookup?${params.toString()}`, signal ? { signal } : undefined); }
 export function getVariants(productId: string) { return getJson<Variant[]>(`/api/v1/catalog/products/${productId}/variants`); }
 
+export type BusinessProfile = { id:string; tenant_id:string; legal_name:string; display_name:string; country_code:string; currency_code:string };
 export type Branch = { id:string; tenant_id:string; name:string; code:string; status:string };
 export type Warehouse = { id:string; tenant_id:string; name:string; code:string; branch_id?:string|null; status:string };
+export function getBusinessProfile() { return getJson<BusinessProfile | null>("/api/v1/organization/profile"); }
+export function createBusinessProfile(body: {legal_name:string; display_name:string; country_code:string; currency_code:string}) { return getJson<BusinessProfile>("/api/v1/organization/profile", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
+export function updateBusinessProfile(body: {legal_name:string; display_name:string; country_code:string; currency_code:string}) { return getJson<BusinessProfile>("/api/v1/organization/profile", { method:"PATCH", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
 export function getBranches() { return getJson<Branch[]>("/api/v1/organization/branches"); }
+export function createBranch(body: {name:string; code:string}) { return getJson<Branch>("/api/v1/organization/branches", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
+export function updateBranch(id:string, body: {name:string; code:string}) { return getJson<Branch>(`/api/v1/organization/branches/${encodeURIComponent(id)}`, { method:"PATCH", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
 export function getWarehouses() { return getJson<Warehouse[]>("/api/v1/organization/warehouses"); }
 export function createWarehouse(body: {name:string; code:string; branch_id?:string|null}) { return getJson<Warehouse>("/api/v1/organization/warehouses", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
 export function createLocation(body: {name:string; code:string; warehouse_id:string}) { return getJson<Location>("/api/v1/organization/locations", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:JSON.stringify(body) }); }
 export function getLocations() { return getJson<Location[]>("/api/v1/organization/locations"); }
 export function getVariantOptions() { return getJson<VariantOption[]>("/api/v1/inventory/variant-options"); }
 export function getInventoryBalances(params: { location_id?: string; variant_id?: string; q?: string } = {}, signal?: AbortSignal) { const q = new URLSearchParams(); q.set("limit", "500"); Object.entries(params).forEach(([k,v]) => v && q.set(k,v)); return getJson<InventoryBalance[]>(`/api/v1/inventory/balances?${q}`, signal ? { signal } : undefined); }
+export type InventorySummaryAttention = { variant_id: string; location_id: string; on_hand: string; reserved: string; available: string; product_name: string; sku: string | null; location_name: string };
+export type InventorySummary = { stock_value: string; balance_rows: number; out_of_stock_rows: number; low_stock_rows: number; attention: InventorySummaryAttention[] };
+export function getInventorySummary(signal?: AbortSignal) { return getJson<InventorySummary>("/api/v1/inventory/summary", signal ? { signal } : undefined); }
 export function getInventoryIntegrity() { return getJson<{status:string;checked:number;mismatches:any[]}>("/api/v1/inventory/integrity"); }
 export function getInventoryLedger(params: { location_id?: string; variant_id?: string; transaction_type?: string } = {}, signal?: AbortSignal) { const q = new URLSearchParams(); q.set("limit", "500"); Object.entries(params).forEach(([k,v]) => v && q.set(k,v)); return getJson<InventoryLedger[]>(`/api/v1/inventory/ledger?${q}`, signal ? { signal } : undefined); }
 export function getProductInventory(variantId:string) { return getJson<{balances:InventoryBalance[];ledger:InventoryLedger[]}>(`/api/v1/inventory/products/${variantId}`); }
@@ -255,6 +266,8 @@ export type AnalyticsOverview = { from_date:string; to_date:string; currency_cod
 export function getAnalyticsOverview(fromDate:string,toDate:string,currency='UGX'){return getJson<AnalyticsOverview>(`/api/v1/analytics/overview?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}`);}
 export function getAnalyticsDaily(fromDate:string,toDate:string,currency='UGX'){return getJson<AnalyticsDailyMetric[]>(`/api/v1/analytics/daily?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}`);}
 export function getAnalyticsProducts(fromDate:string,toDate:string,currency='UGX'){return getJson<AnalyticsProductMetric[]>(`/api/v1/analytics/products?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}&limit=100`);}
+export type AnalyticsProductSummary = { variant_id:string; product_id:string; sku?:string|null; product_name?:string|null; variant_name?:string|null; units_sold:string; sales_amount:string; discount_amount:string; tax_amount:string; returns_units:string; returns_amount:string; net_sales:string; cogs:string; gross_margin:string; currency_code:string };
+export function getAnalyticsProductSummary(fromDate:string,toDate:string,currency='UGX',limit=5){return getJson<AnalyticsProductSummary[]>(`/api/v1/analytics/products/summary?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}&limit=${encodeURIComponent(String(limit))}`);}
 export function getAnalyticsCustomers(){return getJson<AnalyticsCustomerMetric[]>('/api/v1/analytics/customers?limit=100');}
 export function getAnalyticsInventoryHealth(){return getJson<AnalyticsInventoryHealth[]>('/api/v1/analytics/inventory-health?limit=100');}
 export function getAnalyticsBranches(fromDate:string,toDate:string,currency='UGX'){return getJson<AnalyticsBranchMetric[]>(`/api/v1/analytics/branches?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}`);}
@@ -268,7 +281,7 @@ export type CommerceSale = { id:string; transaction_id:string; customer_party_id
 export type Receivable = { id:string; sale_id:string; customer_party_id:string; customer_name:string; original_amount:string; paid_amount:string; adjustment_amount:string; balance:string; status:string; due_at?:string|null; created_at:string };
 export type ReconciliationLine = { line_id:string; payment_channel_id:string; channel_name:string; channel_type:string; expected_amount:string; actual_amount?:string|null; variance?:string|null; line_status:string; line_notes?:string|null; reviewed_by?:string|null };
 export type Reconciliation = { id:string; business_date:string; status:string; notes?:string|null; closed_at?:string|null; lines:ReconciliationLine[] };
-export type CommerceDashboard = { business_date:string; sales:{sales:string;collected:string;credit:string}; payment_channels:Array<{id:string;name:string;channel_type:string;currency_code:string;active:boolean;expected:string}>; outstanding_receivables:string };
+export type CommerceDashboard = { business_date:string; currency_code:string; sales:{sales:string;collected:string;credit:string}; payment_channels:Array<{id:string;name:string;channel_type:string;currency_code:string;active:boolean;expected:string}>; outstanding_receivables:string };
 export type CommerceSaleLine = { sale_line_id:string; product_variant_id:string; sku?:string|null; variant_name?:string|null; quantity:string; unit_price:string; discount_amount:string; tax_amount:string; line_total:string };
 export type CommerceSaleDetail = CommerceSale & { branch_id?:string|null; location_id?:string|null; notes?:string|null; lines:CommerceSaleLine[] };
 export type SaleReturn = { id:string; sale_id:string; status:string; reason:string; total:string; completed_at?:string|null; created_at:string; refunded:string; credit_balance:string };
@@ -327,3 +340,100 @@ export function getTaxRates(){return getJson<TaxRate[]>('/api/v1/accounting/tax-
 export function getTaxConfigurations(){return getJson<TaxConfiguration[]>('/api/v1/accounting/tax-configurations');}
 export function createTaxRate(body:{code:string;name:string;rate_percent:string;inclusive?:boolean;effective_from:string;effective_to?:string|null}){return getJson<TaxRate>('/api/v1/accounting/tax-rates',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
 export function createTaxConfiguration(body:{name:string;tax_rate_id:string;scope_type:'DEFAULT'|'PRODUCT'|'CATEGORY';scope_id?:string|null;effective_from:string;effective_to?:string|null}){return getJson<TaxConfiguration>('/api/v1/accounting/tax-configurations',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
+// Phase 3 Increment 02: authoritative workspace context and resumable setup.
+export type WorkspaceOption = { tenant_id: string; tenant_name: string; membership_id: string; current: boolean };
+export type WorkspaceContext = {
+  workspace: { id: string; name: string; status: string };
+  membership: { id: string; status: string };
+  branches: { id: string; name: string; code: string; assigned: boolean }[];
+  session_id: string;
+};
+export type SetupProgress = {
+  status: "COMPLETE" | "IN_PROGRESS";
+  complete: boolean;
+  completed_required_steps: number;
+  required_steps: number;
+  resume_path: string;
+  steps: { key: string; label: string; href: string; required: boolean; complete: boolean }[];
+};
+export function getWorkspaceOptions() { return getJson<{ items: WorkspaceOption[] }>("/api/v1/workspace/options"); }
+export async function selectWorkspace(tenantId: string) {
+  const session = await getJson<AuthResponse>("/api/v1/workspace/select", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tenant_id: tenantId }),
+  });
+  setAccessToken(session.access_token);
+  return session;
+}
+export function getWorkspaceContext() { return getJson<WorkspaceContext>("/api/v1/workspace/context"); }
+export function getSetupProgress() { return getJson<SetupProgress>("/api/v1/workspace/setup/progress"); }
+
+// Phase 3 Increment 03: member lifecycle, invitation lifecycle and branch scope.
+export type WorkspaceRole = { id: string; tenant_id: string; name: string; description?: string | null };
+export type WorkspaceMember = {
+  id: string; user_id: string; email: string; status: "ACTIVE" | "INACTIVE";
+  roles: { id: string; name: string }[]; branch_ids: string[];
+};
+export type WorkspaceInvitation = {
+  id: string; email: string; status: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+  role_id: string | null; branch_ids: string[]; expires_at: string; created_at?: string | null;
+};
+export function getWorkspaceRoles() { return getJson<WorkspaceRole[]>("/api/v1/rbac/roles"); }
+export function getWorkspaceMembers() { return getJson<{ items: WorkspaceMember[] }>("/api/v1/members"); }
+export function updateWorkspaceMemberStatus(id: string, status: "ACTIVE" | "INACTIVE") {
+  return getJson<{ id: string; status: string; changed: boolean }>(`/api/v1/members/${encodeURIComponent(id)}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
+  });
+}
+export function replaceWorkspaceMemberBranches(id: string, branchIds: string[]) {
+  return getJson<{ membership_id: string; branch_ids: string[]; status: string }>(`/api/v1/members/${encodeURIComponent(id)}/branches`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ branch_ids: branchIds }),
+  });
+}
+export function getWorkspaceInvitations() { return getJson<{ items: WorkspaceInvitation[] }>("/api/v1/invitations"); }
+export function createWorkspaceInvitation(body: { email: string; role_id: string; branch_ids: string[]; expires_in_days: number }) {
+  return getJson<{ id: string; status: string; email: string; expires_at: string; invite_url: string | null; replayed: boolean; message?: string }>(
+    "/api/v1/invitations", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key() }, body: JSON.stringify(body) },
+  );
+}
+export function resendWorkspaceInvitation(id: string) {
+  return getJson<{ id: string; email?: string; status: string; invite_url: string | null; replayed: boolean; message?: string }>(
+    `/api/v1/invitations/${encodeURIComponent(id)}/resend`, { method: "POST", headers: { "Idempotency-Key": key() } },
+  );
+}
+export function revokeWorkspaceInvitation(id: string) {
+  return getJson<{ id: string; status: string; changed: boolean }>(`/api/v1/invitations/${encodeURIComponent(id)}/revoke`, { method: "POST" });
+}
+export function previewWorkspaceInvitation(token: string) {
+  return getJson<{ email: string; workspace_name: string; expires_at: string }>("/api/v1/invitations/preview", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }),
+  });
+}
+export async function acceptWorkspaceInvitation(token: string, password: string) {
+  const session = await getJson<AuthResponse & { user_id: string }>("/api/v1/invitations/accept", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, password }),
+  });
+  setAccessToken(session.access_token);
+  return session;
+}
+
+// Phase 3 Increment 04: replace role assignments through tenant-scoped, audited API.
+export function replaceWorkspaceMemberRoles(id: string, roleIds: string[]) {
+  return getJson<{ membership_id: string; roles: { id: string; name: string }[]; changed: boolean }>(`/api/v1/members/${encodeURIComponent(id)}/roles`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role_ids: roleIds }),
+  });
+}
+
+// Phase 3 Increment 06: owner-managed role and permission catalog.
+export type WorkspacePermission = { id: string; code: string; description?: string | null };
+export type WorkspaceRolePermissionEntry = WorkspaceRole & { permission_ids: string[] };
+export function getWorkspaceRolePermissionCatalog() {
+  return getJson<{ roles: WorkspaceRolePermissionEntry[]; permissions: WorkspacePermission[] }>("/api/v1/members/role-permissions");
+}
+export function createWorkspaceRole(body: { name: string; description?: string }) {
+  return getJson<WorkspaceRole>("/api/v1/members/roles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+}
+export function replaceWorkspaceRolePermissions(roleId: string, permissionIds: string[]) {
+  return getJson<{ role_id: string; permission_ids: string[]; changed: boolean }>(`/api/v1/members/roles/${encodeURIComponent(roleId)}/permissions`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ permission_ids: permissionIds }),
+  });
+}

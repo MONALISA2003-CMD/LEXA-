@@ -57,3 +57,35 @@ test('keyboard users can reach an interactive control on the login page', async 
   }
   expect(found).toBe(true);
 });
+
+
+test('authenticated Command Centre analytics and inventory summary remain usable', async ({ page }) => {
+  test.skip(!process.env.LEXA_PHASE4_STORAGE_STATE, 'Set LEXA_PHASE4_STORAGE_STATE to an authenticated, non-production QA user storage-state file.');
+  const pageErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const response = await page.goto('/');
+  expect(response, 'dashboard navigation did not produce a document response').not.toBeNull();
+  expect(response!.status()).toBeLessThan(400);
+  await expect(page.getByRole('heading', { name: 'Command Centre' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Net sales vs money collected' })).toBeVisible();
+  await expect(page.getByText('Inventory value', { exact: true })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Analytics date range' })).toBeVisible();
+
+  await page.getByRole('button', { name: '7d', exact: true }).click();
+  await expect(page.getByText(/Last 7 days/i).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: '7d', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '90d', exact: true }).click();
+  await expect(page.getByRole('button', { name: '90d', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+  const dimensions = await page.evaluate(() => ({
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+  expect(dimensions.scroll, 'Command Centre overflows on a 390px viewport').toBeLessThanOrEqual(dimensions.client + 1);
+  const refreshButton = page.getByRole('button', { name: /Refresh data|Refreshing/i });
+  await refreshButton.click();
+  await expect(refreshButton).toBeEnabled({ timeout: 15_000 });
+  expect(pageErrors, 'browser runtime errors were logged').toEqual([]);
+});

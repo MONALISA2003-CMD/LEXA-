@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..catalog import begin_idempotency, emit_event, finish_idempotency, write_audit
+from ..branch_access import ensure_branch_access, ensure_location_access, require_full_branch_scope
 from ..dependencies import require_permission
 from ..inventory import post_ledger, tenant_location, tenant_variant
 from ..models import Branch, BusinessProfile, BusinessTransaction, Party, PartyRole, TransactionLine
@@ -176,23 +177,40 @@ def _emit(db: Session, tenant_id: UUID, actor: UUID, action: str, event: str, ag
 
 @router.get("/dashboard")
 def dashboard(business_date: date | None = None, ctx=Depends(require_permission("sales.read"))):
-    db, _, tenant_id, _ = ctx
+    db, actor_id, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=actor_id)
     # The tenant's business calendar is authoritative, not the API host's UTC date.
     today = business_date or db.execute(
         text("SELECT public.lexa_business_date(now(), :tenant_id)"),
         {"tenant_id": str(tenant_id)},
     ).scalar_one()
-    # Keep the timestamp predicate on a stable business-date function so date
-    # semantics match reports; a future range-based implementation can add a
-    # supporting expression/index after measuring real production data volume.
+    # A tenant's profile currency is the reporting currency shown on the
+    # Command Centre. Do not add values from different currencies together.
+    currency_code = db.execute(
+        text("SELECT currency_code FROM public.business_profiles WHERE tenant_id=:tenant_id"),
+        {"tenant_id": str(tenant_id)},
+    ).scalar_one_or_none() or "UGX"
+    # Revenue follows the date the sale was completed, using the tenant's
+    # business calendar. Collection is a separate measure: payments recorded
+    # on the business date, including later receivable payments, are summed
+    # from the payments ledger rather than copied from sale.amount_paid.
     sales = db.execute(text("""
-      SELECT COALESCE(SUM(s.total),0) sales, COALESCE(SUM(s.amount_paid),0) collected,
+      SELECT COALESCE(SUM(s.total),0) sales,
+             COALESCE((
+               SELECT SUM(p.amount)
+               FROM public.payments AS p
+               WHERE p.tenant_id=:tenant_id
+                 AND p.currency_code=:currency_code
+                 AND p.status='RECORDED'
+                 AND p.business_date=:business_date
+             ),0) collected,
              COALESCE(SUM(s.amount_due),0) credit
       FROM public.sales AS s
       WHERE s.tenant_id=:tenant_id
-        AND public.lexa_business_date(s.created_at, :tenant_id)=:business_date
+        AND s.currency_code=:currency_code
+        AND public.lexa_business_date(COALESCE(s.completed_at, s.created_at), :tenant_id)=:business_date
         AND s.status='COMPLETED'
-    """), {"tenant_id": str(tenant_id), "business_date": today}).mappings().one()
+    """), {"tenant_id": str(tenant_id), "business_date": today, "currency_code": currency_code}).mappings().one()
     channels = db.execute(text("""
       SELECT pc.id,pc.name,pc.channel_type,pc.currency_code,pc.active,
              COALESCE(SUM(p.amount) FILTER (WHERE p.status='RECORDED' AND p.business_date=:business_date),0)
@@ -200,8 +218,8 @@ def dashboard(business_date: date | None = None, ctx=Depends(require_permission(
       FROM public.payment_channels AS pc LEFT JOIN public.payments AS p ON p.payment_channel_id=pc.id AND p.tenant_id=pc.tenant_id
       WHERE pc.tenant_id=:tenant_id GROUP BY pc.id ORDER BY pc.name
     """), {"tenant_id": str(tenant_id), "business_date": today}).mappings().all()
-    recv = db.execute(text("SELECT COALESCE(SUM(r.balance),0) outstanding FROM public.receivables AS r WHERE r.tenant_id=:tenant_id AND r.status IN ('OPEN','PARTIALLY_PAID')"), {"tenant_id":str(tenant_id)}).mappings().one()
-    return {"business_date": today, "sales": out(sales), "payment_channels":[out(x) for x in channels], "outstanding_receivables":str(recv["outstanding"])}
+    recv = db.execute(text("""SELECT COALESCE(SUM(r.balance),0) outstanding FROM public.receivables AS r JOIN public.sales AS s ON s.tenant_id=r.tenant_id AND s.id=r.sale_id WHERE r.tenant_id=:tenant_id AND s.currency_code=:currency_code AND r.status IN ('OPEN','PARTIALLY_PAID')"""), {"tenant_id":str(tenant_id), "currency_code": currency_code}).mappings().one()
+    return {"business_date": today, "currency_code": currency_code, "sales": out(sales), "payment_channels":[out(x) for x in channels], "outstanding_receivables":str(recv["outstanding"])}
 
 
 @router.get("/customers")
@@ -267,7 +285,7 @@ def commerce_products(ctx=Depends(require_permission("sales.read"))):
 
 @router.get("/sales")
 def list_sales(limit: int = Query(default=100, ge=1, le=500), ctx=Depends(require_permission("sales.read"))):
-    db,_,tenant_id,_=ctx
+    db,actor_id,tenant_id,_=ctx
     rows=db.execute(text("""
       SELECT s.id,s.transaction_id,s.customer_party_id,p.display_name customer_name,s.currency_code,s.status,
              s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,s.return_adjustment_amount,s.created_at,s.completed_at
@@ -279,7 +297,7 @@ def list_sales(limit: int = Query(default=100, ge=1, le=500), ctx=Depends(requir
 
 @router.get("/sales/{sale_id}")
 def get_sale(sale_id: UUID, ctx=Depends(require_permission("sales.read"))):
-    db,_,tenant_id,_=ctx
+    db,actor_id,tenant_id,_=ctx
     sale=db.execute(text("""
       SELECT s.id,s.transaction_id,s.customer_party_id,p.display_name customer_name,s.branch_id,s.location_id,s.currency_code,s.status,
              s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,s.return_adjustment_amount,s.notes,s.created_at,s.completed_at
@@ -306,6 +324,10 @@ def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=N
         _tenant_party(db,tenant_id,body.customer_party_id); _tenant_branch(db,tenant_id,body.branch_id)
         if body.location_id is None: raise HTTPException(400,"A sale location is required for inventory-safe checkout")
         tenant_location(db,tenant_id,body.location_id)
+        location_branch_id = ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=body.location_id)
+        if body.branch_id and body.branch_id != location_branch_id:
+            raise HTTPException(400,"Sale branch must match the selected stock location branch")
+        branch_id = body.branch_id or location_branch_id
         subtotal=Decimal("0"); discount=Decimal("0"); tax=Decimal("0")
         validated=[]
         for line in body.lines:
@@ -323,13 +345,13 @@ def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=N
         if paid>total: raise HTTPException(422,"Payment allocations cannot exceed sale total")
         if paid<total and body.customer_party_id is None: raise HTTPException(400,"A customer is required for credit/outstanding sales")
         ref=f"SAL-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8].upper()}"
-        tx=BusinessTransaction(tenant_id=tenant_id,transaction_type="SALE",reference=ref,status="DRAFT",party_id=body.customer_party_id,branch_id=body.branch_id,total_amount=total,currency_code=currency,occurred_at=datetime.now(timezone.utc),metadata_json={"source":"commerce"})
+        tx=BusinessTransaction(tenant_id=tenant_id,transaction_type="SALE",reference=ref,status="DRAFT",party_id=body.customer_party_id,branch_id=branch_id,total_amount=total,currency_code=currency,occurred_at=datetime.now(timezone.utc),metadata_json={"source":"commerce"})
         db.add(tx); db.flush()
         db.add(TransactionLine(tenant_id=tenant_id,transaction_id=tx.id,line_no=1,line_type="PRODUCT",product_variant_id=validated[0][1].id,description=validated[0][1].name,quantity=validated[0][0].quantity,unit_price=validated[0][0].unit_price,line_total=validated[0][2],currency_code=currency,discount_amount=validated[0][0].discount_amount,tax_rate=validated[0][0].tax_rate,tax_amount=validated[0][3],metadata_json={}) )
         for idx,(line,variant,line_total,line_tax) in enumerate(validated[1:],start=2):
             db.add(TransactionLine(tenant_id=tenant_id,transaction_id=tx.id,line_no=idx,line_type="PRODUCT",product_variant_id=variant.id,description=variant.name,quantity=line.quantity,unit_price=line.unit_price,line_total=line_total,currency_code=currency,discount_amount=line.discount_amount,tax_rate=line.tax_rate,tax_amount=line_tax,metadata_json={}))
         db.execute(text("""INSERT INTO sales(tenant_id,transaction_id,customer_party_id,branch_id,location_id,currency_code,status,subtotal,discount_total,tax_total,total,amount_paid,amount_due,notes,created_by)
-          VALUES(:t,:tx,:cp,:b,:l,:c,'DRAFT',:s,:d,:tax,:total,0,:due,:notes,:actor)"""),{"t":str(tenant_id),"tx":str(tx.id),"cp":str(body.customer_party_id) if body.customer_party_id else None,"b":str(body.branch_id) if body.branch_id else None,"l":str(body.location_id),"c":currency,"s":str(subtotal),"d":str(discount),"tax":str(tax),"total":str(total),"due":str(total),"notes":body.notes,"actor":str(actor)})
+          VALUES(:t,:tx,:cp,:b,:l,:c,'DRAFT',:s,:d,:tax,:total,0,:due,:notes,:actor)"""),{"t":str(tenant_id),"tx":str(tx.id),"cp":str(body.customer_party_id) if body.customer_party_id else None,"b":str(branch_id),"l":str(body.location_id),"c":currency,"s":str(subtotal),"d":str(discount),"tax":str(tax),"total":str(total),"due":str(total),"notes":body.notes,"actor":str(actor)})
         sale_id=db.execute(text("SELECT id FROM sales WHERE tenant_id=:t AND transaction_id=:tx"),{"t":str(tenant_id),"tx":str(tx.id)}).scalar_one()
         for idx,(line,variant,_,_) in enumerate(validated, start=1):
             invtx=post_ledger(db,tenant_id=tenant_id,actor_user_id=actor,location_id=body.location_id,variant_id=variant.id,quantity_delta=-q(line.quantity),unit_cost=Decimal("0"),transaction_type="SALE",reference_type="sale",reference_id=sale_id,idempotency_key=f"{idempotency_key or tx.id}:inventory:{idx}",metadata={"sale_id":str(sale_id)}) if variant.track_inventory else None
@@ -374,8 +396,12 @@ def list_receivables(ctx=Depends(require_permission("receivables.read"))):
     rows=db.execute(text("""
       SELECT r.id,r.sale_id,r.customer_party_id,p.display_name customer_name,r.original_amount,r.paid_amount,r.adjustment_amount,r.balance,r.status,r.due_at,r.created_at
       FROM receivables r JOIN parties p ON p.id=r.customer_party_id AND p.tenant_id=r.tenant_id
-      WHERE r.tenant_id=:t AND r.status IN ('OPEN','PARTIALLY_PAID') ORDER BY r.created_at DESC LIMIT 500
-    """),{"t":str(tenant_id)}).mappings().all()
+      JOIN sales s ON s.id=r.sale_id AND s.tenant_id=r.tenant_id
+      WHERE r.tenant_id=:t AND r.status IN ('OPEN','PARTIALLY_PAID') AND EXISTS (
+        SELECT 1 FROM membership_branch_assignments mba JOIN tenant_memberships tm ON tm.id=mba.membership_id AND tm.tenant_id=mba.tenant_id
+        WHERE mba.tenant_id=r.tenant_id AND tm.user_id=:u AND tm.status='ACTIVE' AND mba.status='ACTIVE' AND mba.branch_id=s.branch_id
+      ) ORDER BY r.created_at DESC LIMIT 500
+    """),{"t":str(tenant_id),"u":str(ctx[1])}).mappings().all()
     return [out(x) for x in rows]
 
 
@@ -384,8 +410,9 @@ def pay_receivable(receivable_id: UUID, body: PaymentCreate, idempotency_key: st
     db,actor,tenant_id,_=ctx
     idem,cached,_,cached_body=_idempotency(db,tenant_id,idempotency_key,"commerce.receivable.payment",body.model_dump(mode="json") | {"receivable_id":str(receivable_id)})
     if cached: return cached_body
-    receivable=db.execute(text("SELECT r.*,s.currency_code,s.transaction_id,s.customer_party_id FROM receivables r JOIN sales s ON s.id=r.sale_id AND s.tenant_id=r.tenant_id WHERE r.tenant_id=:t AND r.id=:r FOR UPDATE"),{"t":str(tenant_id),"r":str(receivable_id)}).mappings().first()
+    receivable=db.execute(text("SELECT r.*,s.currency_code,s.transaction_id,s.customer_party_id,s.branch_id FROM receivables r JOIN sales s ON s.id=r.sale_id AND s.tenant_id=r.tenant_id WHERE r.tenant_id=:t AND r.id=:r FOR UPDATE"),{"t":str(tenant_id),"r":str(receivable_id)}).mappings().first()
     if not receivable: raise HTTPException(404,"Receivable not found")
+    ensure_branch_access(db, tenant_id=tenant_id, user_id=actor, branch_id=receivable["branch_id"])
     if Decimal(str(receivable["balance"])) <= 0: raise HTTPException(409,"Receivable is already paid")
     if q(body.amount)>q(Decimal(str(receivable["balance"]))): raise HTTPException(422,"Payment exceeds receivable balance")
     ch=_channel(db,tenant_id,body.payment_channel_id,receivable["currency_code"])
@@ -403,6 +430,7 @@ def pay_receivable(receivable_id: UUID, body: PaymentCreate, idempotency_key: st
 @router.get("/reconciliations")
 def list_reconciliations(business_date: date | None = None, ctx=Depends(require_permission("reconciliation.read"))):
     db,_,tenant_id,_=ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     params={"t":str(tenant_id)}; clause=""
     if business_date: clause=" AND h.business_date=:d"; params["d"]=business_date
     rows=db.execute(text(f"""
@@ -422,6 +450,7 @@ def list_reconciliations(business_date: date | None = None, ctx=Depends(require_
 @router.post("/reconciliations", status_code=201)
 def create_reconciliation(body: ReconciliationCreate, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.manage"))):
     db,actor,tenant_id,_=ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     idem,cached,_,cached_body=_idempotency(db,tenant_id,idempotency_key,"commerce.reconciliation.create",body.model_dump(mode="json"))
     if cached: return cached_body
     try:
@@ -441,6 +470,7 @@ def create_reconciliation(body: ReconciliationCreate, idempotency_key: str | Non
 @router.post("/reconciliation-lines/{line_id}/actual")
 def set_actual(line_id: UUID, body: ActualIn, request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.manage"))):
     db,actor,tenant_id,_=ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     try:
         db.execute(text("SELECT set_reconciliation_line_actual(:id,:a,:n,:u)"),{"id":str(line_id),"a":str(q(body.actual_amount)),"n":body.notes,"u":str(actor)})
         row=db.execute(text("SELECT id,reconciliation_id,payment_channel_id,expected_amount,actual_amount,variance,status,notes,reviewed_by,updated_at FROM daily_reconciliation_lines WHERE tenant_id=:t AND id=:id"),{"t":str(tenant_id),"id":str(line_id)}).mappings().first()
@@ -453,6 +483,7 @@ def set_actual(line_id: UUID, body: ActualIn, request_id: str | None = Header(de
 @router.post("/reconciliation-lines/{line_id}/resolve")
 def resolve_line(line_id: UUID, body: ResolveIn, request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.resolve"))):
     db,actor,tenant_id,_=ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     try:
         db.execute(text("SELECT resolve_reconciliation_line(:id,:s,:u,:n)"),{"id":str(line_id),"s":body.status,"u":str(actor),"n":body.notes})
         row=db.execute(text("SELECT id,reconciliation_id,payment_channel_id,expected_amount,actual_amount,variance,status,notes,reviewed_by,updated_at FROM daily_reconciliation_lines WHERE tenant_id=:t AND id=:id"),{"t":str(tenant_id),"id":str(line_id)}).mappings().first()
@@ -465,6 +496,7 @@ def resolve_line(line_id: UUID, body: ResolveIn, request_id: str | None = Header
 @router.post("/reconciliations/{reconciliation_id}/close")
 def close_reconciliation(reconciliation_id: UUID, request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.close"))):
     db,actor,tenant_id,_=ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     try:
         db.execute(text("SELECT close_daily_reconciliation(:id)"),{"id":str(reconciliation_id)})
         db.execute(text("UPDATE daily_reconciliations SET closed_by=:u,updated_at=now() WHERE tenant_id=:t AND id=:id"),{"u":str(actor),"t":str(tenant_id),"id":str(reconciliation_id)})
@@ -506,6 +538,7 @@ def create_return(sale_id: UUID, body: ReturnCreate, idempotency_key: str | None
     try:
         sale=db.execute(text("SELECT * FROM sales WHERE tenant_id=:t AND id=:s FOR UPDATE"),{"t":str(tenant_id),"s":str(sale_id)}).mappings().first()
         if not sale: raise HTTPException(404,"Sale not found")
+        ensure_branch_access(db, tenant_id=tenant_id, user_id=actor, branch_id=sale["branch_id"])
         if sale["status"]!='COMPLETED': raise HTTPException(409,"Only completed sales can be returned")
         if body.settlement_type=='REFUND':
             if body.refund_channel_id is None: raise HTTPException(400,"A refund channel is required for refunds")
@@ -514,6 +547,9 @@ def create_return(sale_id: UUID, body: ReturnCreate, idempotency_key: str | None
         return_location=body.inventory_location_id or sale["location_id"]
         if return_location is None: raise HTTPException(400,"An inventory location is required for an inventory return")
         tenant_location(db,tenant_id,return_location)
+        return_branch_id = ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=return_location)
+        if return_branch_id != sale["branch_id"]:
+            ensure_branch_access(db, tenant_id=tenant_id, user_id=actor, branch_id=return_branch_id)
         validated=[]; total=Decimal("0")
         for req_line in body.lines:
             line=db.execute(text("SELECT * FROM transaction_lines WHERE tenant_id=:t AND id=:id AND transaction_id=:tx"),{"t":str(tenant_id),"id":str(req_line.sale_line_id),"tx":str(sale["transaction_id"])}).mappings().first()
