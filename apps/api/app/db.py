@@ -1,6 +1,6 @@
 import re
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
@@ -42,8 +42,22 @@ if settings.database_app_role and not re.fullmatch(r"[a-z_][a-z0-9_]*", settings
 
 @event.listens_for(Session, "after_begin")
 def _set_application_role_per_transaction(session, transaction, connection):
-    # SET LOCAL works with transaction pooling and avoids startup packet GUCs.
+    # Reapply request-scoped RLS context at every transaction start. SET LOCAL
+    # context is cleared by commit, so a later ORM refresh would otherwise be
+    # filtered by forced RLS.
     apply_application_role(connection)
+    tenant_id = session.info.get("lexa_tenant_id")
+    if tenant_id is not None:
+        connection.execute(
+            text(
+                "SELECT set_config('app.tenant_id', :tenant_id, true), "
+                "set_config('app.user_id', :user_id, true)"
+            ),
+            {
+                "tenant_id": str(tenant_id),
+                "user_id": str(session.info.get("lexa_user_id") or ""),
+            },
+        )
     connection.exec_driver_sql("SET LOCAL statement_timeout = '15s'")
     connection.exec_driver_sql("SET LOCAL lock_timeout = '3s'")
     connection.exec_driver_sql("SET LOCAL idle_in_transaction_session_timeout = '30s'")

@@ -27,7 +27,14 @@ def current_context(credentials: HTTPAuthorizationCredentials | None = Depends(b
 
 def tenant_db(db: Session = Depends(get_db), context=Depends(current_context)):
     user_id, tenant_id, session_id = context
-    db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true), set_config('app.user_id', :user_id, true)"), {"tenant_id": str(tenant_id), "user_id": str(user_id)})
+    # Session.info persists the request context across commit boundaries. The
+    # after_begin hook reapplies these local GUCs before any next transaction.
+    db.info["lexa_tenant_id"] = str(tenant_id)
+    db.info["lexa_user_id"] = str(user_id)
+    db.execute(
+        text("SELECT set_config('app.tenant_id', :tenant_id, true), set_config('app.user_id', :user_id, true)"),
+        {"tenant_id": str(tenant_id), "user_id": str(user_id)},
+    )
     session = db.scalar(select(AuthSession).where(AuthSession.id == session_id, AuthSession.tenant_id == tenant_id, AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None)))
     if not session:
         raise HTTPException(status_code=401, detail="Session is revoked or invalid")
