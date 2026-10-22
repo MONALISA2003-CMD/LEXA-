@@ -41,8 +41,8 @@ def test_frontend_catalog_exit_condition_is_visible():
     page = (ROOT / "apps/web/app/products/page.tsx").read_text()
     api = (ROOT / "apps/web/lib/api.ts").read_text()
     assert "Products" in page
-    assert "Variants" in page
-    assert "SKU" in page
+    assert "Pack sizes & options" in page
+    assert "product code" in page.lower()
     assert "Pricing" in page
     assert "Barcodes" in page
     assert "getProducts" in page

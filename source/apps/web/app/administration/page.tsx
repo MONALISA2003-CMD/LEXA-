@@ -39,6 +39,8 @@ function EmptyState({ children }: { children: ReactNode }) {
   return <div className="empty-state compact"><span>{children}</span></div>;
 }
 
+const businessStatusLabel = (value: string) => ({ ACTIVE: "Available", INACTIVE: "Not available", DISABLED: "Paused", ARCHIVED: "Archived" }[value] || value.replaceAll("_", " ").toLowerCase());
+
 export default function AdministrationPage() {
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
   const [profileForm, setProfileForm] = useState<ProfileForm>(emptyProfile);
@@ -78,7 +80,7 @@ export default function AdministrationPage() {
     if (warehouseResult.status === "fulfilled") setWarehouses(warehouseResult.value); else partial = true;
     if (locationResult.status === "fulfilled") setLocations(locationResult.value); else partial = true;
     setLoadState(partial ? "partial" : "ready");
-    if (partial) setLoadError("Some workspace settings could not be loaded. Check access or service readiness, then retry.");
+    if (partial) setLoadError("Some business settings could not be loaded. Check your connection or ask the business owner to review access, then try again.");
   }, []);
 
   useEffect(() => { void reload(); }, [reload]);
@@ -159,7 +161,7 @@ export default function AdministrationPage() {
     }, "Stock location created.");
   }
 
-  return <AppShell title="Administration" eyebrow="Workspace Control">
+  return <AppShell title="Business details" eyebrow="Your business setup">
     <div className="command-toolbar">
       <div>
         <strong>Business setup and workspace administration</strong>
@@ -174,7 +176,7 @@ export default function AdministrationPage() {
     {loadError && <div className="inline-message" role="alert">{loadError}</div>}
     {mutationError && <div className="notice notice-error" role="alert" aria-live="assertive">{mutationError}</div>}
     {notice && <div className="inline-message" role="status" aria-live="polite">{notice}</div>}
-    {!loadError && loadState === "ready" && !profile && <div className="inline-message">Start by saving the legal and display name for this workspace. Profile changes are tenant-scoped and audited.</div>}
+    {!loadError && loadState === "ready" && !profile && <div className="inline-message">Start by adding the business’s legal name and display name.</div>}
 
     <section className="workspace-section" aria-labelledby="business-profile-heading">
       <div className="section-head"><div><p className="eyebrow">BUSINESS IDENTITY</p><h2 id="business-profile-heading">Business profile</h2></div><span className={`status ${profile ? "good" : "neutral"}`}>{profile ? "Configured" : "Setup required"}</span></div>
@@ -210,7 +212,7 @@ export default function AdministrationPage() {
         <div className="workflow-list" aria-label="Configured branches">
           {branches.length === 0 ? <EmptyState>No branches were returned for this workspace.</EmptyState> : branches.map(branch => <div className="foundation-row" key={branch.id}>
             <div><strong>{branch.name}</strong><small className="workflow-color">{branch.code}</small></div>
-            <div className="row-actions"><span className={`status ${branch.status === "ACTIVE" ? "good" : "neutral"}`}>{branch.status}</span><button type="button" onClick={() => beginEditBranch(branch)} disabled={Boolean(busy) || loadState !== "ready"} aria-label={`Edit ${branch.name}`}>Edit</button></div>
+            <div className="row-actions"><span className={`status ${branch.status === "ACTIVE" ? "good" : "neutral"}`}>{businessStatusLabel(branch.status)}</span><button type="button" onClick={() => beginEditBranch(branch)} disabled={Boolean(busy) || loadState !== "ready"} aria-label={`Edit ${branch.name}`}>Edit</button></div>
           </div>)}
         </div>
         {editBranchId && <form className="command-form compact" onSubmit={saveBranchChanges} aria-label="Edit branch">
@@ -240,7 +242,7 @@ export default function AdministrationPage() {
         <div className="workflow-list" aria-label="Configured warehouses">
           {warehouses.length === 0 ? <EmptyState>No warehouses were returned for this workspace.</EmptyState> : warehouses.map(warehouse => <div className="foundation-row" key={warehouse.id}>
             <div><strong>{warehouse.name}</strong><small className="workflow-color">{warehouse.code}{warehouse.branch_id ? ` · ${branches.find(branch => branch.id === warehouse.branch_id)?.name ?? "Assigned branch"}` : " · No branch assignment"}</small></div>
-            <span className={`status ${warehouse.status === "ACTIVE" ? "good" : "neutral"}`}>{warehouse.status}</span>
+            <span className={`status ${warehouse.status === "ACTIVE" ? "good" : "neutral"}`}>{businessStatusLabel(warehouse.status)}</span>
           </div>)}
         </div>
       </section>
@@ -264,7 +266,7 @@ export default function AdministrationPage() {
           {locations.length === 0 ? <EmptyState>No stock locations were returned for this workspace.</EmptyState> : locations.map(location => {
             const warehouse = warehouses.find(item => item.id === location.warehouse_id);
             return <article className="location-card" key={location.id}>
-              <div className="panel-head"><h3>{location.name}</h3><span className={`status ${location.status === "ACTIVE" ? "good" : "neutral"}`}>{location.status}</span></div>
+              <div className="panel-head"><h3>{location.name}</h3><span className={`status ${location.status === "ACTIVE" ? "good" : "neutral"}`}>{businessStatusLabel(location.status)}</span></div>
               <p>{location.code}</p><small>{warehouse ? `${warehouse.name} · ${warehouse.code}` : "Warehouse details unavailable"}</small>
             </article>;
           })}

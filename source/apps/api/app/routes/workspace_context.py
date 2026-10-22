@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 
 from ..auth import create_access_token, new_refresh_token, hash_refresh_token, _set_refresh_cookie
 from ..catalog import emit_event, write_audit
-from ..dependencies import current_context, get_db, tenant_db
+from ..dependencies import current_context, get_db, require_permission, tenant_db
 from ..models import (
-    Branch, BusinessProfile, Location, Session as AuthSession, Tenant, TenantMembership,
+    Branch, BusinessProfile, Location, MembershipRole, Role, Session as AuthSession, Tenant, TenantMembership,
     User, Warehouse,
 )
 from ..workspace_domain import setup_progress
@@ -188,3 +188,161 @@ def complete_setup(ctx=Depends(require_active_workspace)):
     # Completion is derived from real persisted configuration instead of a shadow flag
     # that can become stale when branches, warehouses, or locations are removed.
     return {"status": "COMPLETE", "complete": True, "workspace_id": str(tenant_id)}
+
+
+@router.post("/setup/initialize")
+def initialize_workspace_setup(request: Request, ctx=Depends(require_permission("organization.manage"))):
+    """Fill only missing first-run defaults for the active workspace.
+
+    This is deliberately idempotent: it never renames, deletes, or replaces any
+    existing branch, warehouse, stock location, payment method, or account.
+    """
+    db, actor_id, tenant_id, _session_id = ctx
+    tenant = db.scalar(select(Tenant).where(Tenant.id == tenant_id, Tenant.status == "ACTIVE").with_for_update())
+    if not tenant:
+        raise HTTPException(status_code=403, detail="This business is not active.")
+
+    profile = db.scalar(select(BusinessProfile).where(BusinessProfile.tenant_id == tenant_id))
+    if not profile:
+        raise HTTPException(status_code=409, detail={
+            "code": "BUSINESS_PROFILE_REQUIRED",
+            "message": "Save your business name and currency before completing setup.",
+        })
+    currency = (profile.currency_code or "UGX").upper()
+
+    created: list[str] = []
+
+    def next_code(model, base: str) -> str:
+        existing = set(db.scalars(select(model.code).where(model.tenant_id == tenant_id)).all())
+        if base not in existing:
+            return base
+        suffix = 2
+        while f"{base}-{suffix:02d}" in existing:
+            suffix += 1
+        return f"{base}-{suffix:02d}"
+
+    branches = list(db.scalars(select(Branch).where(
+        Branch.tenant_id == tenant_id, Branch.status == "ACTIVE"
+    ).order_by(Branch.created_at, Branch.id)).all())
+    if not branches:
+        branch = Branch(tenant_id=tenant_id, name="Main branch", code=next_code(Branch, "MAIN"), status="ACTIVE")
+        db.add(branch)
+        db.flush()
+        branches = [branch]
+        created.append("main_branch")
+
+    # Workspaces created before the current onboarding flow can have a branch but
+    # no warehouse. Repair only the missing pieces; don't touch business data.
+    branch_ids = [branch.id for branch in branches]
+    warehouses = list(db.scalars(select(Warehouse).where(
+        Warehouse.tenant_id == tenant_id,
+        Warehouse.status == "ACTIVE",
+        Warehouse.branch_id.in_(branch_ids),
+    ).order_by(Warehouse.created_at, Warehouse.id)).all()) if branch_ids else []
+    if not warehouses:
+        warehouse = Warehouse(
+            tenant_id=tenant_id, branch_id=branches[0].id,
+            name="Main warehouse", code=next_code(Warehouse, "MAIN"), status="ACTIVE",
+        )
+        db.add(warehouse)
+        db.flush()
+        warehouses = [warehouse]
+        created.append("main_warehouse")
+
+    # A legacy unassigned warehouse is safe to attach automatically only where
+    # there's exactly one active branch. Multiple branches need an owner decision.
+    if len(branches) == 1:
+        unassigned_warehouse = db.scalar(select(Warehouse).where(
+            Warehouse.tenant_id == tenant_id, Warehouse.status == "ACTIVE",
+            Warehouse.branch_id.is_(None),
+        ).order_by(Warehouse.created_at).limit(1).with_for_update())
+        if unassigned_warehouse:
+            unassigned_warehouse.branch_id = branches[0].id
+            db.flush()
+            if all(item.id != unassigned_warehouse.id for item in warehouses):
+                warehouses.insert(0, unassigned_warehouse)
+
+    warehouse_ids = [warehouse.id for warehouse in warehouses]
+    locations = list(db.scalars(select(Location).where(
+        Location.tenant_id == tenant_id, Location.status == "ACTIVE",
+        Location.warehouse_id.in_(warehouse_ids),
+    ).order_by(Location.created_at, Location.id)).all()) if warehouse_ids else []
+    if not locations:
+        location = Location(
+            tenant_id=tenant_id, warehouse_id=warehouses[0].id,
+            name="Main location", code=next_code(Location, "MAIN"), status="ACTIVE",
+        )
+        db.add(location)
+        db.flush()
+        created.append("main_stock_location")
+
+    # Ensure Owner/Administrator records remain usable after historic branch
+    # creation. The helper grants these roles workspace-wide scope; assignments
+    # are added as transparent, auditable metadata, not used as a hidden bypass.
+    membership = db.scalar(select(TenantMembership).where(
+        TenantMembership.tenant_id == tenant_id,
+        TenantMembership.user_id == actor_id,
+        TenantMembership.status == "ACTIVE",
+    ))
+    if membership:
+        actor_roles = set(db.scalars(
+            select(Role.name)
+            .join(MembershipRole, MembershipRole.role_id == Role.id)
+            .where(MembershipRole.membership_id == membership.id, Role.tenant_id == tenant_id)
+        ).all())
+        if actor_roles.intersection({"Owner", "Administrator", "Admin"}):
+            existing_assignments = set(db.scalars(select(MembershipBranchAssignment.branch_id).where(
+                MembershipBranchAssignment.tenant_id == tenant_id,
+                MembershipBranchAssignment.membership_id == membership.id,
+                MembershipBranchAssignment.status == "ACTIVE",
+            )).all())
+            for branch in branches:
+                if branch.id not in existing_assignments:
+                    db.add(MembershipBranchAssignment(
+                        tenant_id=tenant_id, membership_id=membership.id, branch_id=branch.id,
+                        assigned_by_user_id=actor_id, status="ACTIVE",
+                    ))
+                    created.append(f"branch_access:{branch.code}")
+
+    # Rebuild missing accounting defaults only when the existing migration has
+    # installed the idempotent seed function. Tax rates remain owner-configured.
+    seed_function_exists = bool(db.scalar(text(
+        "SELECT to_regprocedure('public.seed_accounting_foundation(uuid)') IS NOT NULL"
+    )))
+    if seed_function_exists:
+        db.execute(text("SELECT public.seed_accounting_foundation(:tenant_id)"), {"tenant_id": str(tenant_id)})
+
+    # Cash is the sole automatic payment method. Owners can add their own names
+    # (for example, MTN Line 1 or Stanbic); no credentials or account details are used.
+    cash_exists = db.execute(text(
+        "SELECT 1 FROM public.payment_channels WHERE tenant_id=:tenant_id AND lower(name)='cash' LIMIT 1"
+    ), {"tenant_id": str(tenant_id)}).first()
+    if not cash_exists:
+        db.execute(text("""
+            INSERT INTO public.payment_channels(tenant_id,name,channel_type,provider,currency_code,active)
+            VALUES(:tenant_id,'Cash','CASH',NULL,:currency,true)
+        """), {"tenant_id": str(tenant_id), "currency": currency})
+        created.append("cash_payment_method")
+
+    request_id = getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID")
+    if created:
+        write_audit(
+            db, tenant_id=tenant_id, actor_user_id=actor_id,
+            action="workspace.setup.initialize", target_type="tenant", target_id=tenant_id,
+            correlation_id=request_id,
+        )
+        emit_event(
+            db, tenant_id=tenant_id, event_type="workspace.setup.initialized",
+            aggregate_type="tenant", aggregate_id=tenant_id, actor_user_id=actor_id,
+            payload={"created_defaults": created}, correlation_id=request_id,
+        )
+    # Derive progress before commit: commit clears transaction-local RLS settings,
+    # so a query after commit would incorrectly see an empty workspace under lexa_app.
+    progress = _setup_progress_for_tenant(db, tenant_id)
+    db.commit()
+    return {
+        "status": "COMPLETE" if progress["complete"] else "IN_PROGRESS",
+        "created_defaults": created,
+        "message": "Your business setup is ready." if not created else "Missing setup items have been added. Your existing records were kept.",
+        "progress": progress,
+    }

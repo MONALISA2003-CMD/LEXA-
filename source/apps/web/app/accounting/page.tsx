@@ -3,6 +3,7 @@
 import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "../../components/app-shell";
+import { SalesTrendChart } from "../../components/dashboard-charts";
 import { localDateISO, localMonthStartISO } from "../../lib/date.mjs";
 import {
   closeReconciliation,
@@ -61,14 +62,18 @@ function typeLabel(value: string) {
 }
 function statusLabel(value: string) {
   const map: Record<string, string> = {
-    DRAFT: "Needs review", POSTED: "Included in records", VOIDED: "Cancelled before posting", REVERSED: "Corrected",
+    DRAFT: "Needs review", POSTED: "Included in records", VOIDED: "Cancelled before recording", REVERSED: "Corrected",
     OPEN: "Not finished", PARTIALLY_PAID: "Partly paid", PAID: "Paid", CLOSED: "Completed",
     RECONCILIATION_PENDING: "Amounts still needed", VARIANCE_DETECTED: "Difference to review", UNDER_REVIEW: "Being reviewed",
     RECONCILED: "Checked", RESOLVED: "Resolved", ACKNOWLEDGED: "Reviewed",
   };
   return map[value] || value.replaceAll("_", " ").toLowerCase();
 }
-function errorMessage(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
+function errorMessage(error: unknown, fallback: string) {
+  const raw = error instanceof Error ? error.message : "";
+  if (!raw || /UndefinedTable|UndefinedColumn|ProgrammingError|OperationalError|psycopg|sqlalchemy|Traceback|relation .* does not exist|column .* does not exist|public\.[a-z_]+|SELECT .* FROM|INSERT INTO/i.test(raw)) return fallback;
+  return raw.length > 220 ? fallback : raw;
+}
 function statusClass(value: string) { return value === "POSTED" || value === "CLOSED" || value === "RESOLVED" ? "status status-good" : value === "REVERSED" || value === "VOIDED" ? "status status-muted" : "status"; }
 
 export default function AccountingPage() {
@@ -129,7 +134,7 @@ export default function AccountingPage() {
   const totalReceivables = useMemo(() => openReceivables.reduce((sum, r) => sum + Number(r.balance || 0), 0), [openReceivables]);
   const totalSupplierPayables = useMemo(() => supplierBalances.filter(r => r.currency_code === currencyCode).reduce((sum, r) => sum + Number(r.payable || 0), 0), [supplierBalances, currencyCode]);
   const relevantExpenses = useMemo(() => expenses.filter(e => e.currency_code === currencyCode), [expenses, currencyCode]);
-  const postedExpenses = useMemo(() => relevantExpenses.filter(e => e.status === "POSTED"), [relevantExpenses]);
+  const recordedExpenses = useMemo(() => relevantExpenses.filter(e => e.status === "POSTED"), [relevantExpenses]);
   const reportCurrency = report?.currency_code || currencyCode;
   const productCogs = useMemo(() => productSummary.reduce((sum, p) => sum + Number(p.cogs || 0), 0), [productSummary]);
   const productMargin = useMemo(() => productSummary.reduce((sum, p) => sum + Number(p.gross_margin || 0), 0), [productSummary]);
@@ -223,7 +228,7 @@ export default function AccountingPage() {
   function expenseHistoryLabel(eventType: string) {
     const labels: Record<string, string> = {
       EXPENSE_DRAFT_CREATED: "Draft saved",
-      EXPENSE_POSTED: "Added to official records",
+      EXPENSE_POSTED: "Added to business records",
       EXPENSE_DRAFT_CANCELLED: "Draft cancelled",
       EXPENSE_REVERSED: "Expense corrected",
     };
@@ -240,33 +245,33 @@ export default function AccountingPage() {
     try {
       const created = await createExpense({ expense_date: expenseDate, reference: expenseReference.trim(), description: expenseDescription.trim(), expense_account_id: expenseAccountId, payment_channel_id: expenseChannelId, currency_code: currencyCode, subtotal: String(subtotal), tax_amount: String(tax) });
       setExpenseReference(""); setExpenseDescription(""); setExpenseSubtotal(""); setExpenseTax("0");
-      setMessage(`Expense saved as a draft (${money(created.total, created.currency_code || currencyCode)}). Review it below and add it to the official records when correct.`);
+      setMessage(`Expense saved as a draft (${money(created.total, created.currency_code || currencyCode)}). Review it below and add it to the business records when correct.`);
       await load(); setTab("Expenses");
     } catch (reason) { setError(errorMessage(reason, "The expense was not saved. Check the details and try again.")); }
     finally { setSaving(false); }
   }
 
   async function handlePostExpense(expense: ExpenseRecord) {
-    if (!window.confirm(`Add “${expense.description}” (${money(expense.total, expense.currency_code)}) to the official records?`)) return;
+    if (!window.confirm(`Add “${expense.description}” (${money(expense.total, expense.currency_code)}) to the business records?`)) return;
     setSaving(true); setError(""); setMessage("");
     try {
       await postExpense(expense.id);
       setExpenseHistory(current => { const next = { ...current }; delete next[expense.id]; return next; });
       setExpandedExpenseId("");
-      setMessage("Expense added to the official records."); await load();
+      setMessage("Expense added to the business records."); await load();
     }
     catch (reason) { setError(errorMessage(reason, "The expense could not be recorded. Check the details and try again.")); }
     finally { setSaving(false); }
   }
 
   async function handleVoidExpense(expense: ExpenseRecord) {
-    if (!window.confirm("Cancel this draft? It has not been included in the official records.")) return;
+    if (!window.confirm("Cancel this draft? It has not been included in the business records.")) return;
     setSaving(true); setError(""); setMessage("");
     try {
-      await voidExpense(expense.id, "Draft cancelled before being added to official records");
+      await voidExpense(expense.id, "Draft cancelled before being added to business records");
       setExpenseHistory(current => { const next = { ...current }; delete next[expense.id]; return next; });
       setExpandedExpenseId("");
-      setMessage("Draft expense cancelled. It was not included in the official records."); await load();
+      setMessage("Draft expense cancelled. It was not included in the business records."); await load();
     }
     catch (reason) { setError(errorMessage(reason, "The draft could not be cancelled.")); }
     finally { setSaving(false); }
@@ -377,7 +382,7 @@ export default function AccountingPage() {
 
   async function loadReports(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
-    if (!fromDate || !toDate || fromDate > toDate) { setError("Choose a valid reporting period: the start date must be on or before the end date."); return; }
+    if (!fromDate || !toDate || fromDate > toDate) { setError("Choose a valid date range. The start date must be before the end date."); return; }
     if (!currencyCode) { setError("Business currency is not available. Check your business settings."); return; }
     setReportBusy(true); setError(""); setMessage("");
     try {
@@ -415,7 +420,7 @@ export default function AccountingPage() {
         {tabs.map(item => <button key={item} type="button" className={tab === item ? "active" : ""} onClick={() => { setTab(item); setError(""); setMessage(""); }}>{item}</button>)}
       </nav>
 
-      {loading && <p role="status" className="muted">Loading your finance records…</p>}
+      {loading && <p role="status" className="muted">Loading your money records…</p>}
 
       {tab === "Summary" && <>
         <section className="metric-strip" aria-label="Today's finance summary">
@@ -426,8 +431,8 @@ export default function AccountingPage() {
         </section>
         <div className="two-column">
           <section className="workspace-section">
-            <div className="section-head"><div><span className="section-label">MONEY SPENT</span><h2>Recent expenses</h2><p>Only expenses added to the official records count here.</p></div><button type="button" className="button button-soft" onClick={() => setTab("Expenses")}>View expenses</button></div>
-            <div className="workflow-list">{postedExpenses.slice(0, 5).map(expense => <div className="workflow-row" key={expense.id}><div><strong>{expense.description}</strong><small>{expense.expense_date} · {expense.reference} · {expense.payment_channel_name || "Payment method not available"}</small></div><span>{money(expense.total, expense.currency_code)}</span></div>)}{!postedExpenses.length && <p className="empty-inline">No expenses have been added to the official records yet.</p>}</div>
+            <div className="section-head"><div><span className="section-label">MONEY SPENT</span><h2>Recent expenses</h2><p>Only expenses added to the business records count here.</p></div><button type="button" className="button button-soft" onClick={() => setTab("Expenses")}>View expenses</button></div>
+            <div className="workflow-list">{recordedExpenses.slice(0, 5).map(expense => <div className="workflow-row" key={expense.id}><div><strong>{expense.description}</strong><small>{expense.expense_date} · {expense.reference} · {expense.payment_channel_name || "Payment method not available"}</small></div><span>{money(expense.total, expense.currency_code)}</span></div>)}{!recordedExpenses.length && <p className="empty-inline">No expenses have been added to the business records yet.</p>}</div>
           </section>
           <section className="workspace-section">
             <div className="section-head"><div><span className="section-label">CUSTOMERS</span><h2>Balances to follow up</h2><p>Amounts still owed by customers.</p></div><button type="button" className="button button-soft" onClick={() => setTab("Customer balances")}>View balances</button></div>
@@ -445,7 +450,7 @@ export default function AccountingPage() {
       {tab === "Expenses" && <>
         <section className="workspace-section">
           <div className="section-head"><div><span className="section-label">RECORD MONEY SPENT</span><h2>Add an expense</h2><p>This form is for money already paid by the business. For an unpaid supplier invoice, use <Link href="/purchasing">Supplier bills</Link> so it appears in the correct balance.</p></div></div>
-          {expenseAccounts.length === 0 && <div className="notice notice-error">No expense categories are available yet. Ask your finance administrator to check the business's finance setup.</div>}
+          {expenseAccounts.length === 0 && <div className="notice notice-error">Expense categories are not set up yet. Finish business setup or ask the business owner to review finance settings.</div>}
           {activeChannels.length === 0 && <div className="notice notice-error">Add an active payment method before recording an expense. <button type="button" className="button button-soft" onClick={() => setTab("Payment methods")}>Set up payment methods</button></div>}
           <form onSubmit={handleCreateExpense}>
             <div className="form-grid">
@@ -461,7 +466,7 @@ export default function AccountingPage() {
             <div className="form-grid" style={{ marginTop: 14 }}>
               <label htmlFor="expense-tax">Tax amount, if any<input id="expense-tax" type="number" min="0" step="0.01" value={expenseTax} onChange={e => setExpenseTax(e.target.value)} /></label>
               <div><span className="muted">Total expense</span><strong style={{ display: "block", marginTop: 10 }}>{money((Number(expenseSubtotal) || 0) + (Number(expenseTax) || 0), currencyCode)}</strong></div>
-              <div className="muted">Saving creates a draft only. You can review it before adding it to the official records.</div>
+              <div className="muted">Saving creates a draft only. You can review it before adding it to the business records.</div>
             </div>
             <div className="header-actions" style={{ justifyContent: "flex-end", marginTop: 18 }}><button type="submit" className="button button-dark" disabled={saving || !currencyCode || !expenseAccounts.length || !activeChannels.length}>{saving ? "Saving…" : "Save expense draft"}</button></div>
           </form>
@@ -469,7 +474,7 @@ export default function AccountingPage() {
         <section className="workspace-section"><div className="section-head"><div><span className="section-label">EXPENSE HISTORY</span><h2>Expenses</h2><p>Drafts do not affect official totals until they are added. Cancelled drafts and corrected entries remain visible for traceability.</p></div></div>
           <div className="table-wrap"><table><thead><tr><th>Date</th><th>Expense</th><th>Paid using</th><th>Total</th><th>Status</th><th>Next step</th></tr></thead><tbody>
             {relevantExpenses.map(expense => <tr key={expense.id}><td>{expense.expense_date}</td><td><b>{expense.description}</b><small>{expense.reference} · {expense.expense_account_name}</small></td><td>{expense.payment_channel_name || "Unavailable"}</td><td>{money(expense.total, expense.currency_code)}</td><td><span className={statusClass(expense.status)}>{statusLabel(expense.status)}</span></td><td>
-              {expense.status === "DRAFT" && <div className="row-actions wrap-actions"><button type="button" className="button button-dark button-small" disabled={saving} onClick={() => void handlePostExpense(expense)}>Add to official records</button><button type="button" className="button button-soft button-small" disabled={saving} onClick={() => void handleVoidExpense(expense)}>Cancel draft</button></div>}
+              {expense.status === "DRAFT" && <div className="row-actions wrap-actions"><button type="button" className="button button-dark button-small" disabled={saving} onClick={() => void handlePostExpense(expense)}>Add to business records</button><button type="button" className="button button-soft button-small" disabled={saving} onClick={() => void handleVoidExpense(expense)}>Cancel draft</button></div>}
               {expense.status === "POSTED" && <button type="button" className="button button-soft button-small" disabled={saving} onClick={() => { setCorrectingExpenseId(expense.id); setCorrectionReason(""); }}>Correct this expense</button>}
               {expense.status === "REVERSED" && <small>Corrected. The earlier entry is kept for history.</small>}
               {expense.status === "VOIDED" && <small>Kept for history</small>}
@@ -536,6 +541,7 @@ export default function AccountingPage() {
           <form onSubmit={loadReports}><div className="form-grid"><label htmlFor="finance-from">From<input id="finance-from" type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} required /></label><label htmlFor="finance-to">To<input id="finance-to" type="date" value={toDate} onChange={e => setToDate(e.target.value)} required /></label><div><span className="muted">Reporting currency</span><strong style={{ display: "block", marginTop: 10 }}>{currencyCode || "Unavailable"}</strong></div></div><div className="header-actions" style={{ justifyContent: "flex-end", marginTop: 16 }}><Link className="button button-soft" href="/reports">Open detailed business reports</Link><button type="submit" className="button button-dark" disabled={reportBusy || !currencyCode}>{reportBusy ? "Updating figures…" : "Update report figures"}</button></div></form>
         </section>
         {report && <>
+          <section className="workspace-section"><div className="section-head"><div><span className="section-label">DAY BY DAY</span><h2>Sales and money recorded</h2><p>Sales and recorded payments are shown separately. This is not a bank balance.</p></div></div><SalesTrendChart daily={report.daily || []} startDate={report.from_date || fromDate} endDate={report.to_date || toDate} currencyCode={reportCurrency} /></section>
           <section className="metric-strip"><div><span>Sales before returns</span><strong>{money(report.totals.sales_total, reportCurrency)}</strong></div><div><span>Sales after returns</span><strong>{money(report.totals.net_sales, reportCurrency)}</strong></div><div><span>Money recorded as received</span><strong>{money(report.totals.payments_collected, reportCurrency)}</strong></div><div><span>Expenses paid</span><strong>{money(report.totals.expenses_total, reportCurrency)}</strong></div><div><span>Expense corrections recorded (accounting only)</span><strong>{money(report.totals.expense_reversals_total, reportCurrency)}</strong><small>Correction records are not proof that money came back.</small></div><div><span>Net recorded money movement</span><strong>{money(report.totals.net_cash_movement, reportCurrency)}</strong><small>Recorded receipts minus refunds and expense amounts originally recorded as paid. A correction does not prove money returned; this is not a bank balance.</small></div><div><span>New customer balances from credit sales</span><strong>{money(report.totals.credit_created, reportCurrency)}</strong></div></section>
           <div className="header-actions" aria-label="Open supporting records" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
             <Link className="button button-soft button-small" href="/sales">View sales and payments</Link>
@@ -546,8 +552,8 @@ export default function AccountingPage() {
           </div>
           <section className="workspace-section"><div className="section-head"><div><span className="section-label">PRODUCT COSTS</span><h2>Sales after product costs</h2><p>This is sales after returns minus the recorded cost of the products sold. It does not subtract staff, rent, transport or other running costs.</p></div></div><div className="metric-strip"><div><span>Cost of products sold</span><strong>{money(productCogs, reportCurrency)}</strong></div><div><span>Sales left after product costs</span><strong>{money(productMargin, reportCurrency)}</strong></div></div><div className="table-wrap"><table><thead><tr><th>Product</th><th>Units sold</th><th>Sales after returns</th><th>Product cost</th><th>Sales left after product cost</th></tr></thead><tbody>{productSummary.map((item, i) => <tr key={`${item.variant_id}-${i}`}><td><b>{item.product_name || "Product"}</b><small>{item.variant_name || item.sku || ""}</small></td><td>{Number(item.units_sold).toLocaleString("en-UG")}</td><td>{money(item.net_sales, item.currency_code)}</td><td>{money(item.cogs, item.currency_code)}</td><td>{money(item.gross_margin, item.currency_code)}</td></tr>)}{!productSummary.length && <tr><td colSpan={5}>No product cost figures are available for this period. Refresh the figures or choose another period.</td></tr>}</tbody></table></div></section>
         </>}
-        <div className="two-column"><section className="workspace-section"><div className="section-head"><div><span className="section-label">INCOME AND SPENDING</span><h2>Recorded financial entries</h2><p>Amounts come from saved business records for the selected dates.</p></div></div><div className="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Amount</th></tr></thead><tbody>{incomeRows.map(row => <tr key={row.account_id}><td>{row.name}</td><td>{row.account_type === "REVENUE" ? "Income" : "Expense"}</td><td>{money(row.amount, currencyCode)}</td></tr>)}{!incomeRows.length && <tr><td colSpan={3}>No financial entries are available for this period.</td></tr>}</tbody></table></div></section>
-          <section className="workspace-section"><div className="section-head"><div><span className="section-label">WHAT THE BUSINESS OWNS AND OWES</span><h2>Financial position as of {toDate}</h2><p>Based on financial entries saved in the business records.</p></div></div><div className="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Amount</th></tr></thead><tbody>{balanceRows.map(row => <tr key={row.account_id}><td>{row.name}</td><td>{({ ASSET: "Owned by the business", LIABILITY: "Owed by the business", EQUITY: "Owner's share" } as Record<string, string>)[row.account_type] || row.account_type}</td><td>{money(row.amount, currencyCode)}</td></tr>)}{!balanceRows.length && <tr><td colSpan={3}>No figures are available for this date.</td></tr>}</tbody></table></div></section></div>
+        <div className="two-column"><section className="workspace-section"><div className="section-head"><div><span className="section-label">INCOME AND SPENDING</span><h2>Recorded financial records</h2><p>Amounts come from saved business records for the selected dates.</p></div></div><div className="table-wrap"><table><thead><tr><th>Name</th><th>Category</th><th>Amount</th></tr></thead><tbody>{incomeRows.map(row => <tr key={row.account_id}><td>{row.name}</td><td>{row.account_type === "REVENUE" ? "Income" : "Expense"}</td><td>{money(row.amount, currencyCode)}</td></tr>)}{!incomeRows.length && <tr><td colSpan={3}>No financial records yet are available for this period.</td></tr>}</tbody></table></div></section>
+          <section className="workspace-section"><div className="section-head"><div><span className="section-label">WHAT THE BUSINESS OWNS AND OWES</span><h2>Financial position as of {toDate}</h2><p>Based on financial entries saved in the business records.</p></div></div><div className="table-wrap"><table><thead><tr><th>Name</th><th>Category</th><th>Amount</th></tr></thead><tbody>{balanceRows.map(row => <tr key={row.account_id}><td>{row.name}</td><td>{({ ASSET: "Owned by the business", LIABILITY: "Owed by the business", EQUITY: "Owner's share" } as Record<string, string>)[row.account_type] || row.account_type}</td><td>{money(row.amount, currencyCode)}</td></tr>)}{!balanceRows.length && <tr><td colSpan={3}>No figures are available for this date.</td></tr>}</tbody></table></div></section></div>
         <section className="workspace-section"><div className="section-head"><div><span className="section-label">RELATED WORK</span><h2>Follow up on the underlying records</h2></div></div><div className="foundation-grid"><Link className="panel foundation-panel" href="/sales"><div className="panel-head"><div><h2>Sales and customer payments</h2><p>Open a sale and see its recorded payments, returns and balance.</p></div><span>→</span></div></Link><Link className="panel foundation-panel" href="/purchasing"><div className="panel-head"><div><h2>Supplier bills and payments</h2><p>Review supplier bills, payments and amounts still payable.</p></div><span>→</span></div></Link><Link className="panel foundation-panel" href="/reports"><div className="panel-head"><div><h2>Business reports</h2><p>Review performance by product, customer and branch.</p></div><span>→</span></div></Link></div></section>
       </>}
     </main>

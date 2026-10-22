@@ -30,20 +30,34 @@ export class ApiError extends Error {
   }
 }
 
+/** Turn unexpected module failures into safe, everyday wording for business users. */
+export function userFacingError(error: unknown, fallback: string): string {
+  const raw = error instanceof Error ? error.message : "";
+  if (!raw) return fallback;
+  if (/UndefinedTable|UndefinedColumn|ProgrammingError|OperationalError|psycopg|sqlalchemy|Traceback|relation .* does not exist|column .* does not exist|public\.[a-z_]+|SELECT .* FROM|INSERT INTO|UPDATE .* SET|permission required:/i.test(raw)) {
+    return fallback;
+  }
+  return raw.length > 220 ? fallback : raw;
+}
+
 function friendlyMessage(status: number, payload: unknown, path = ""): string {
   const detail = typeof payload === "object" && payload !== null && "detail" in payload ? (payload as { detail?: unknown }).detail : null;
   const code = typeof detail === "object" && detail !== null && "code" in detail ? String((detail as { code?: unknown }).code) : "";
   const raw = typeof detail === "string" ? detail : "";
   if (code === "WORKSPACE_SELECTION_REQUIRED") return "Choose a workspace to continue.";
-  if (code === "NO_ACTIVE_WORKSPACE") return "Your sign-in worked, but this account has no active workspace yet. Ask your workspace administrator for access.";
+  if (code === "WORKSPACE_SETUP_REQUIRED" || code === "SETUP_INCOMPLETE") return "Finish setting up your business locations to open this view.";
+  if (code === "BRANCH_ACCESS_REQUIRED") return "Your access needs to include the locations shown here. Ask the business owner to review your access.";
+  if (code === "BUSINESS_PROFILE_REQUIRED") return "Save your business name and currency before completing setup.";
+  if (status === 403 && /(spans the workspace|every active branch|branch scope|business locations)/i.test(raw)) return "Finish setting up your business locations to open this view.";
+  if (code === "NO_ACTIVE_WORKSPACE") return "Your sign-in worked, but this account is not linked to an active business yet. Ask the business owner to check your access.";
   if (status === 401 && path === "/api/v1/auth/login") return "We couldn't sign you in. Check your email and password, then try again.";
   if (status === 401 && path === "/api/v1/auth/register") return "We could not verify that registration. Check the details and try again.";
   if (status === 401) return "Your session may have expired. Sign in again to continue.";
-  if (status === 403) return "You don't have permission to do this. Ask your workspace administrator to review your access.";
-  if (status === 404) return "We couldn't find that record. It may have been removed or you may not have access.";
+  if (status === 403) return "You can't open this part of the business with your current access. Ask the business owner or manager to review it.";
+  if (status === 404) return "We couldn't find that item. It may have been removed or may not be available to your business.";
   if (status === 409 && raw === "User already exists") return "An account with this email already exists. Sign in to continue.";
   if (status === 409 && raw.toLowerCase().includes("business")) return "That business information conflicts with an existing workspace.";
-  if (status === 409 && code !== "WORKSPACE_SELECTION_REQUIRED") return "This change conflicts with the latest record. Refresh the page and review it before trying again.";
+  if (status === 409 && code !== "WORKSPACE_SELECTION_REQUIRED") return "This record has changed since you opened it. Refresh the page and review the latest details before trying again.";
   if (status === 400 && raw === "Business name is required") return "Enter your business name to continue.";
   if (status === 422) return "Please check the required fields and correct any invalid information.";
   if (status === 429) return "Too many attempts. Please wait a moment before trying again.";
@@ -416,6 +430,7 @@ export async function selectWorkspace(tenantId: string) {
 }
 export function getWorkspaceContext() { return getJson<WorkspaceContext>("/api/v1/workspace/context"); }
 export function getSetupProgress() { return getJson<SetupProgress>("/api/v1/workspace/setup/progress"); }
+export function initializeWorkspaceSetup() { return getJson<{status:string;created_defaults:string[];message:string;progress:SetupProgress}>("/api/v1/workspace/setup/initialize", {method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:"{}"}); }
 
 // Phase 3 Increment 03: member lifecycle, invitation lifecycle and branch scope.
 export type WorkspaceRole = { id: string; tenant_id: string; name: string; description?: string | null };

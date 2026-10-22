@@ -125,7 +125,7 @@ export default function SettingsPage() {
           <p>Keep your business name, country and currency correct for everyday work and reports.</p>
         </div>
         <div className="header-actions">
-          <Link href="/onboarding" className="button button-soft">Workspace setup</Link>
+          <Link href="/onboarding" className="button button-soft">Business setup</Link>
           <button type="button" className="button button-soft" onClick={() => void load()} disabled={loading || saving}>Refresh</button>
         </div>
       </div>
@@ -171,10 +171,10 @@ export default function SettingsPage() {
       </section>
 
       <section className="workspace-section">
-        <div className="section-head"><div><span className="section-label">KEEP THINGS IN ORDER</span><h2>Manage your workspace</h2><p>Continue with the areas your team uses every day.</p></div></div>
+        <div className="section-head"><div><span className="section-label">KEEP THINGS IN ORDER</span><h2>Manage business settings</h2><p>Continue with the areas your team uses every day.</p></div></div>
         <div className="foundation-grid">
-          <Link className="panel foundation-panel" href="/onboarding"><div className="panel-head"><div><h2>Workspace setup</h2><p>Review your branches, stock locations and required setup.</p></div><span aria-hidden="true">→</span></div></Link>
-          <Link className="panel foundation-panel" href="/administration/members"><div className="panel-head"><div><h2>Team and access</h2><p>Manage team members and who can access the workspace.</p></div><span aria-hidden="true">→</span></div></Link>
+          <Link className="panel foundation-panel" href="/onboarding"><div className="panel-head"><div><h2>Business setup</h2><p>Review your branches, stock locations and required setup.</p></div><span aria-hidden="true">→</span></div></Link>
+          <Link className="panel foundation-panel" href="/administration/members"><div className="panel-head"><div><h2>Team and access</h2><p>Manage team members and who can access the business.</p></div><span aria-hidden="true">→</span></div></Link>
           <Link className="panel foundation-panel" href="/reports"><div className="panel-head"><div><h2>Business reports</h2><p>Review performance using your saved business details.</p></div><span aria-hidden="true">→</span></div></Link>
         </div>
       </section>

@@ -10,7 +10,7 @@ const proxy = fs.readFileSync(new URL('../app/api/lexa/[...path]/route.ts', impo
 const invite = fs.readFileSync(new URL('../app/invite/page.tsx', import.meta.url), 'utf8');
 
 assert.match(api, /fetch\(`\/api\/lexa\$\{path\}`/);
-assert.match(page, /Command Centre/);
+assert.match(page, /Business overview/);
 assert.match(page, /TODAY'S WORK/);
 assert.match(page, /NEEDS ATTENTION/);
 assert.match(products, /Variants/);
@@ -21,11 +21,11 @@ assert.match(inventory, /Adjustments/);
 assert.match(inventory, /Counts/);
 assert.match(inventory, /Transfers/);
 assert.match(inventory, /Locations/);
-assert.match(shell, /Business insights/);
-assert.match(shell, /\["\/sales", "Sell"/);
-assert.match(shell, /More workspaces/);
+assert.match(shell, /Business reports/);
+assert.match(shell, /\["\/sales", "Sales"/);
+assert.match(shell, /Business settings/);
 assert.match(shell, /aria-label="Quick navigation"/);
-assert.match(shell, /Purchasing/);
+assert.match(shell, /Purchases/);
 assert.match(shell, /Ctrl|Meta|key\.toLowerCase/);
 assert.match(shell, /Search your business/);
 assert.doesNotMatch(page, /PREVIEW-SKU/);

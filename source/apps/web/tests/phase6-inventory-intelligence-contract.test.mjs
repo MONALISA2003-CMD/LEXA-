@@ -13,9 +13,9 @@ const migration = fs.readFileSync(path.join(root, 'migrations/036_phase6_invento
 
 test('Phase 6 inventory intelligence is connected end-to-end without auto-posting stock or purchasing actions', () => {
   assert.match(page, /"Replenishment"/);
-  assert.match(page, /Replenishment policy/);
-  assert.match(page, /EXPLAINABLE SUGGESTIONS/);
-  assert.match(page, /This saves a policy only; it does not order or move stock/);
+  assert.match(page, /RESTOCK SETTINGS/);
+  assert.match(page, /WHY THESE ITEMS NEED ATTENTION/);
+  assert.match(page, /This only gives suggestions; it will not place an order/);
   assert.match(api, /\/api\/v1\/inventory\/replenishment\/policies/);
   assert.match(api, /\/api\/v1\/inventory\/replenishment\/recommendations/);
   assert.match(api, /advisory_only/);

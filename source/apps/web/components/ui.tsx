@@ -105,7 +105,7 @@ const stateCopy: Record<Exclude<DataStateKind, "success">, { title: string; desc
   loading: { title: "Loading your data", description: "We are checking the latest information from LEXA.", icon: "◌" },
   empty: { title: "Nothing here yet", description: "When a record is created, it will appear here.", icon: "＋" },
   error: { title: "We could not load this data", description: "Your records have not been reported as changed. Retry to check the latest state.", icon: "!" },
-  forbidden: { title: "You do not have access", description: "Ask your workspace administrator to review your access for this task.", icon: "⊘" },
+  forbidden: { title: "You do not have access", description: "Ask the business owner or manager to check your access for this task.", icon: "⊘" },
   unavailable: { title: "LEXA is temporarily unavailable", description: "Check your connection and retry. We will not treat missing data as zero.", icon: "↻" },
 };
 

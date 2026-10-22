@@ -38,17 +38,18 @@ test("business insights use saved sales and inventory information with clear emp
   assert.doesNotMatch(insights, /Planned depth|Next vertical|will be implemented/i);
 });
 
-test("navigation has a usable destination for Business insights and contains no stale app version", () => {
+test("navigation exposes core business work and keeps AI out of the pre-Phase 9 interface", () => {
   const shell = read("components/app-shell.tsx");
-  assert.match(shell, /\["\/intelligence", "Business insights"/);
-  assert.match(shell, /Business insights/);
+  assert.match(shell, /\["\/reports", "Reports"/);
+  assert.match(shell, /Business reports/);
+  assert.doesNotMatch(shell, /\["\/intelligence"/);
   assert.doesNotMatch(shell, /v2\.9\.0/);
-  assert.match(shell, /saved business records/);
+  assert.match(shell, /Search takes you to the right part of LEXA using saved business records|Search takes you to the right part of your business using your saved records/);
 });
 
 test("customer pages do not contain the removed foundation placeholder", () => {
   assert.equal(existsSync(resolve(webRoot, "components/module-foundation.tsx")), false);
   const purchasing = read("app/purchasing/page.tsx");
-  assert.match(purchasing, /Orders are prepared for your team to review/);
+  assert.match(purchasing, /Your team reviews each order/);
   assert.doesNotMatch(purchasing, /Phase 7 controls:/);
 });

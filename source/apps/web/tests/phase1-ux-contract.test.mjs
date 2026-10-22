@@ -17,11 +17,11 @@ const auth = read("../api/app/routes/auth.py");
 for (const token of ["--type-body", "--space-4", "--focus-ring"]) assert.match(css, new RegExp(token));
 assert.match(css, /env\(safe-area-inset-bottom\)/);
 assert.match(css, /prefers-reduced-motion/);
-assert.match(shell, /\["\/sales", "Sell"/);
-assert.match(shell, /More workspaces/);
+assert.match(shell, /\["\/sales", "Sales"/);
+assert.match(shell, /Business settings/);
 assert.match(shell, /aria-label="Quick navigation"/);
 assert.match(shell, /getReadiness\(\)/);
-assert.match(shell, /Checking services/);
+assert.match(shell, /Checking connection/);
 assert.match(shell, /PageHeader/);
 
 // Shared components and list states are actually consumed by the primary lists.

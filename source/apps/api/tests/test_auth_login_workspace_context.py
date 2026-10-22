@@ -196,3 +196,41 @@ def test_wrong_password_never_resolves_workspaces_or_creates_session(monkeypatch
     assert db.user_context is None
     assert db.commits == 0
     assert not db.added
+
+
+
+def test_registration_context_sets_exact_email_and_idempotency_key():
+    """The forced-RLS registration policy must be scoped before its first write."""
+    class RecordingDb:
+        def __init__(self):
+            self.statement = None
+            self.params = None
+
+        def execute(self, statement, params=None):
+            self.statement = str(statement)
+            self.params = params or {}
+
+    db = RecordingDb()
+    auth._set_registration_rls_context(
+        db,
+        email="new-member@example.com",
+        registration_key="registration-key-for-test",
+    )
+
+    assert "set_config('app.pre_tenant_access', 'registration', true)" in db.statement
+    assert "set_config('app.pre_tenant_email', :email, true)" in db.statement
+    assert "set_config('app.registration_key', :registration_key, true)" in db.statement
+    assert db.params == {
+        "email": "new-member@example.com",
+        "registration_key": "registration-key-for-test",
+    }
+
+
+def test_registration_route_establishes_rls_context_before_first_insert():
+    """Protect against reintroducing the 503 seen when registration runs under FORCE RLS."""
+    from pathlib import Path
+
+    source = Path(auth.__file__).read_text(encoding="utf-8")
+    register_source = source.split('@router.post("/register")', 1)[1].split('@router.post("/login")', 1)[0]
+    assert register_source.index("_set_registration_rls_context(db, email=email, registration_key=key)") < register_source.index("db.execute(stmt)")
+    assert "set_config('app.user_id', :user_id, true)" in register_source

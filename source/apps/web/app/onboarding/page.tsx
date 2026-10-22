@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "../../components/app-shell";
-import { getSetupProgress, type SetupProgress } from "../../lib/api";
+import { getSetupProgress, initializeWorkspaceSetup, type SetupProgress } from "../../lib/api";
 
 export default function OnboardingPage() {
   const [progress, setProgress] = useState<SetupProgress | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [preparing, setPreparing] = useState(false);
+  const [message, setMessage] = useState("");
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try { setProgress(await getSetupProgress()); }
@@ -16,22 +18,30 @@ export default function OnboardingPage() {
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
-  return <AppShell title="Workspace setup" eyebrow="Resume where you left off">
+  async function prepareBusiness() {
+    if (preparing) return;
+    setPreparing(true); setError(""); setMessage("");
+    try { const result = await initializeWorkspaceSetup(); setMessage(result.message); setProgress(result.progress); }
+    catch (e) { setError(e instanceof Error ? e.message : "We couldn't finish setting up your business. Please try again."); }
+    finally { setPreparing(false); }
+  }
+  return <AppShell title="Business setup" eyebrow="A few essentials before you begin">
     <section className="panel" style={{ maxWidth: 850, padding: "1.25rem" }}>
-      <div className="panel-head"><div><p className="eyebrow">BUSINESS SETUP</p><h2>{progress?.complete ? "The required setup is complete" : "Set up your workspace"}</h2></div></div>
-      <p>LEXA derives progress from your saved business profile, branches, warehouses and stock locations. Refreshing this page will not lose completed steps.</p>
-      {loading && <p role="status">Checking saved setup…</p>}
+      <div className="panel-head"><div><p className="eyebrow">BUSINESS SETUP</p><h2>{progress?.complete ? "The required setup is complete" : "Set up your business"}</h2></div></div>
+      <p>Make sure your business name, main branch and stock location are saved. This helps sales, stock and reports use the same business records.</p>
+      {loading && <p role="status">Checking your business setup…</p>}
+      {message && <div className="notice notice-success" role="status">{message}</div>}
       {error && <div className="notice notice-error" role="alert">{error}<button className="button button-soft" type="button" onClick={() => void load()}>Retry</button></div>}
       {progress && <>
-        <p><strong>{progress.completed_required_steps} of {progress.required_steps}</strong> required steps complete</p>
-        <div role="progressbar" aria-valuemin={0} aria-valuemax={progress.required_steps} aria-valuenow={progress.completed_required_steps} aria-label="Required workspace setup progress" style={{ height: 8, background: "var(--border, #ddd)", borderRadius: 8, overflow: "hidden" }}><div style={{ height: "100%", width: `${progress.required_steps ? progress.completed_required_steps / progress.required_steps * 100 : 100}%`, background: "var(--accent, #2563eb)" }} /></div>
+        <p><strong>{progress.completed_required_steps} of {progress.required_steps}</strong> setup steps complete</p>
+        <div role="progressbar" aria-valuemin={0} aria-valuemax={progress.required_steps} aria-valuenow={progress.completed_required_steps} aria-label="Required business setup progress" style={{ height: 8, background: "var(--border, #ddd)", borderRadius: 8, overflow: "hidden" }}><div style={{ height: "100%", width: `${progress.required_steps ? progress.completed_required_steps / progress.required_steps * 100 : 100}%`, background: "var(--accent, #2563eb)" }} /></div>
         <ol style={{ paddingLeft: "1.25rem", marginTop: "1.25rem" }}>
           {progress.steps.map(step => <li key={step.key} style={{ marginBottom: ".9rem" }}>
-            <span aria-label={step.complete ? "Complete" : "Incomplete"}>{step.complete ? "✓ " : "○ "}</span><strong>{step.label}</strong> <small>{step.complete ? "Saved" : "Needs attention"}</small>
+            <span aria-label={step.complete ? "Complete" : "Incomplete"}>{step.complete ? "✓ " : "○ "}</span><strong>{step.label}</strong> <small>{step.complete ? "Saved" : "Still needed"}</small>
             {!step.complete && <> · <Link href={step.href} className="text-link">Continue</Link></>}
           </li>)}
         </ol>
-        <div className="header-actions"><Link href={progress.resume_path} className="button button-dark">{progress.complete ? "Open workspace" : "Resume setup"}</Link><Link href="/workspace" className="button button-soft">Switch workspace</Link></div>
+        <div className="header-actions">{!progress.complete && <button className="button button-dark" type="button" onClick={() => void prepareBusiness()} disabled={preparing}>{preparing ? "Preparing your business…" : "Prepare my business"}</button>}<Link href={progress.resume_path} className="button button-dark">{progress.complete ? "Open my business" : "Continue setup"}</Link><Link href="/workspace" className="button button-soft">Switch business</Link></div>
       </>}
     </section>
   </AppShell>;

@@ -46,7 +46,7 @@ test("expense lifecycle supports draft, official record, cancellation and correc
   assert.match(api, /export function voidExpense/);
   assert.match(api, /export function reverseExpense/);
   assert.match(page, /Save expense draft/);
-  assert.match(page, /Add to official records/);
+  assert.match(page, /Add to business records/);
   assert.match(page, /Cancel draft/);
   assert.match(page, /Correct this expense/);
   assert.match(page, /The original record remains in history|The earlier entry remains available in its history/);
@@ -75,7 +75,7 @@ test("expense history is readable in everyday language and refreshed after chang
   const api = read("lib/api.ts");
   assert.match(page, /View history/);
   assert.match(page, /Draft saved/);
-  assert.match(page, /Added to official records/);
+  assert.match(page, /Expense added to the business records/);
   assert.match(page, /Expense corrected/);
   assert.match(api, /export function getExpenseHistory/);
   assert.match(page, /setExpenseHistory\(current => \{ const next = \{ \.\.\.current \}; delete next\[expense\.id\]/);
