@@ -162,7 +162,8 @@ def main() -> int:
                        '030_phase3_workspace_memberships','031_phase3_auth_surface_rls',
                        '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                        '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
-                       '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs')
+                       '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs',
+                       '040_phase8_finance_workflows')
                 """)
                 migration_rows = sorted(row[0] for row in cur.fetchall())
                 expected_migrations = sorted([
@@ -171,6 +172,7 @@ def main() -> int:
                     '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                     '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
                     '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs',
+                    '040_phase8_finance_workflows',
                 ])
                 cur.execute("""
                     SELECT to_regclass('public.inventory_replenishment_policies') IS NOT NULL,
@@ -227,6 +229,17 @@ def main() -> int:
                 """)
                 (phase7_rls_forced, phase7_table_count, phase7_policy_count, phase7_cost_index, po_updated_at,
                  bill_match_column, return_supplier_cost, phase7_append_only_grants, phase7_bill_payment_lifecycle_grants) = cur.fetchone()
+                cur.execute("""
+                    SELECT
+                      EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='expense_records' AND column_name='reversal_journal_entry_id'),
+                      EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_expense_records_reversal'),
+                      to_regprocedure('public.post_expense_journal(uuid,uuid)') IS NOT NULL,
+                      EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='analytics_daily_business_metrics' AND column_name='expense_reversals_total'),
+                      EXISTS (SELECT 1 FROM pg_constraint WHERE conname='expense_records_reversal_journal_tenant_fk' AND conrelid='public.expense_records'::regclass),
+                      EXISTS (SELECT 1 FROM pg_constraint WHERE conname='expense_records_status_check' AND conrelid='public.expense_records'::regclass AND pg_get_constraintdef(oid) LIKE '%REVERSED%')
+                """)
+                (phase8_reversal_column, phase8_reversal_index, phase8_expense_posting_function,
+                 phase8_expense_reversal_metric, phase8_reversal_fk, phase8_status_constraint) = cur.fetchone()
                 cur.execute("""
                     SELECT count(*) FROM information_schema.tables
                      WHERE table_schema='public' AND table_type='BASE TABLE'
@@ -285,6 +298,12 @@ def main() -> int:
         if not return_supplier_cost: failures.append("Phase 7 supplier-return credit unit-cost separation is missing")
         if not phase7_append_only_grants: failures.append("Phase 7 landed-cost/allocation/supplier-ledger rows are not protected by append-only runtime grants")
         if not phase7_bill_payment_lifecycle_grants: failures.append("Phase 7 bills/payments lifecycle grants are broader than required or do not permit updates")
+        if not phase8_reversal_column: failures.append("Phase 8 expense reversal reference column is missing")
+        if not phase8_reversal_index: failures.append("Phase 8 expense reversal lookup index is missing")
+        if not phase8_expense_posting_function: failures.append("Phase 8 expense journal posting routine is missing")
+        if not phase8_expense_reversal_metric: failures.append("Phase 8 expense-correction reporting column is missing")
+        if not phase8_reversal_fk: failures.append("Phase 8 expense reversal journal reference is not tenant-safe")
+        if not phase8_status_constraint: failures.append("Phase 8 expense lifecycle does not allow the supported correction status")
 
         evidence = {
             "schema_version": 1,
@@ -316,6 +335,12 @@ def main() -> int:
             "phase7_supplier_return_credit_cost_contract": bool(return_supplier_cost),
             "phase7_append_only_runtime_grants": bool(phase7_append_only_grants),
             "phase7_bill_payment_lifecycle_grants": bool(phase7_bill_payment_lifecycle_grants),
+            "phase8_expense_reversal_reference": bool(phase8_reversal_column),
+            "phase8_expense_reversal_index": bool(phase8_reversal_index),
+            "phase8_expense_posting_routine": bool(phase8_expense_posting_function),
+            "phase8_expense_reversal_reporting_metric": bool(phase8_expense_reversal_metric),
+            "phase8_expense_reversal_tenant_safe_fk": bool(phase8_reversal_fk),
+            "phase8_expense_correction_status": bool(phase8_status_constraint),
             "lexa_app_can_write_permissions_reference": bool(can_write_permissions),
             "lexa_app_can_write_schema_migrations": bool(can_write_migrations),
             "required_phase5_return_routines_found": routine_count,
@@ -339,6 +364,7 @@ def main() -> int:
         print(f"PASS: RLS enabled/forced on all {rls_total} public tables; least-privilege and return/accounting routines verified.")
         print("PASS: runtime role cross-tenant read/write isolation verified; all probe fixtures rolled back.")
         print("PASS: Phase 6 inventory age-analysis index and four movement-health indexes exist and are valid.")
+        print("PASS: Phase 8 expense corrections, reversal references, journal routine, and reporting schema verified.")
         print(f"Evidence: {args.output}")
         return 0
     except Exception as exc:

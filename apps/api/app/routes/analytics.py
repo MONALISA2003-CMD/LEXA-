@@ -151,6 +151,40 @@ def inventory_health(limit: int = Query(default=100, ge=1, le=500), ctx=Depends(
     rows=db.execute(text("""SELECT a.snapshot_date,a.location_id,l.name location_name,a.variant_id,pv.sku,p.name product_name,pv.name variant_name,a.on_hand,a.reserved,a.available,a.stock_value,a.units_sold_30d,a.daily_velocity,a.days_cover FROM analytics_inventory_health_metrics a JOIN locations l ON l.tenant_id=a.tenant_id AND l.id=a.location_id JOIN product_variants pv ON pv.tenant_id=a.tenant_id AND pv.id=a.variant_id JOIN products p ON p.tenant_id=a.tenant_id AND p.id=pv.product_id WHERE a.tenant_id=:t AND a.location_id IN (SELECT loc.id FROM locations loc JOIN warehouses w ON w.id=loc.warehouse_id AND w.tenant_id=loc.tenant_id JOIN membership_branch_assignments mba ON mba.tenant_id=loc.tenant_id AND mba.branch_id=w.branch_id JOIN tenant_memberships tm ON tm.id=mba.membership_id AND tm.tenant_id=mba.tenant_id WHERE loc.tenant_id=:t AND tm.user_id=:u AND tm.status='ACTIVE' AND mba.status='ACTIVE' AND loc.status='ACTIVE' AND w.status='ACTIVE') ORDER BY a.days_cover NULLS LAST,a.stock_value DESC LIMIT :limit"""),{"t":str(tenant_id),"u":str(actor_id),"limit":limit}).mappings().all()
     return [out(r) for r in rows]
 
+@router.get("/inventory-value-by-location")
+def inventory_value_by_location(ctx=Depends(require_permission("analytics.read"))):
+    """Aggregate the latest complete stock valuation snapshot by accessible location."""
+    db, actor_id, tenant_id, _ = ctx
+    rows = db.execute(text("""
+        SELECT a.snapshot_date, a.location_id, l.name AS location_name,
+               SUM(a.stock_value) AS stock_value,
+               COUNT(DISTINCT a.variant_id) AS product_count
+        FROM analytics_inventory_health_metrics a
+        JOIN locations l ON l.tenant_id = a.tenant_id AND l.id = a.location_id
+        JOIN warehouses w ON w.tenant_id = l.tenant_id AND w.id = l.warehouse_id
+        WHERE a.tenant_id = :tenant_id
+          AND a.snapshot_date = (
+              SELECT MAX(latest.snapshot_date)
+              FROM analytics_inventory_health_metrics latest
+              WHERE latest.tenant_id = :tenant_id
+          )
+          AND l.status = 'ACTIVE' AND w.status = 'ACTIVE'
+          AND EXISTS (
+              SELECT 1 FROM membership_branch_assignments mba
+              JOIN tenant_memberships tm ON tm.id = mba.membership_id AND tm.tenant_id = mba.tenant_id
+              JOIN branches b ON b.tenant_id = mba.tenant_id AND b.id = mba.branch_id
+              WHERE mba.tenant_id = a.tenant_id
+                AND mba.branch_id = w.branch_id
+                AND mba.status = 'ACTIVE' AND tm.user_id = :actor_id
+                AND tm.status = 'ACTIVE' AND b.status = 'ACTIVE'
+          )
+        GROUP BY a.snapshot_date, a.location_id, l.name
+        ORDER BY SUM(a.stock_value) DESC, l.name ASC
+        LIMIT 200
+    """), {"tenant_id": str(tenant_id), "actor_id": str(actor_id)}).mappings().all()
+    return [out(row) for row in rows]
+
+
 @router.get("/branches")
 def branches(start_date: date, end_date: date, currency_code: str = Query(..., min_length=3, max_length=3), ctx=Depends(require_permission("analytics.read"))):
     db, actor_id, tenant_id, _ = ctx

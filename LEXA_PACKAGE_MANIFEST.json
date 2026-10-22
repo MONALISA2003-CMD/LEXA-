@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Phase 7 Purchasing and Supplier Management — Deeper Backend/Release Audit Increment 03",
-  "version": "2.12.0+phase7.increment03",
+  "package": "LEXA Stage 4 Reporting + Stage 5 Acceptance Candidate",
+  "version": "2.13.0+stage4-5.candidate.20261022",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -145,7 +145,13 @@
     "Phase 8 finance workspace with plain-language collections, supplier payables, expenses, manual end-of-day checking and reporting",
     "Owner-configured payment channels remain recording-only; no payment-provider connections or credentials",
     "Expense draft/post/cancel/correct lifecycle with traceable history and separate correction reporting",
-    "Phase 8 migration 040 and backend/frontend contract tests; production status remains unchanged"
+    "Phase 8 migration 040 and backend/frontend contract tests; production status remains unchanged",
+    "Stage 4: added common report date presets, panel-level loading/error/empty states, exact-value tables for charts, report-to-record drill-through and safe CSV export.",
+    "Stage 4: CSV export now labels selected date-range vs all-date customer balances/current inventory snapshots accurately and includes per-section availability.",
+    "Stage 4: added stock-cost value by location, customer balance, business-location sales and payment-method charts backed by authorized application data.",
+    "Stage 5: clean replay manifest extended to migration 040 and postcondition checks cover Phase 8 expense correction/posting/reporting schema.",
+    "Stage 5: evidence checker requires Phase 8 postconditions and immutable source SHA; acceptance runner contains separate opt-in read-only reports and staging-only sales/purchasing journeys.",
+    "Stage 5: canonical source paths and ZIP wrapper normalization are preserved; no production SQL or live deployment is performed by this package."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -155,10 +161,10 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Full-source LEXA Phase 7 finalization candidate. Includes two fixes for TypeScript errors observed in the current Vercel baseline and regression contracts. GitHub write access was denied; current main does not contain the packaged CI workflow; disposable replay, authenticated staging E2E, candidate deployment parity and production rollout remain pending. Historical six-source replacement disposition remains closed.",
-  "package_version": "2.12.0",
-  "phase": "7",
-  "phase_name": "Phase 7 — Purchasing and Supplier Management",
-  "phase_status": "SOURCE_ONLY_FINALIZATION_CANDIDATE_GITHUB_WRITE_BLOCKED_RELEASE_GATES_PENDING",
+  "package_version": "2.13.0+stage4-5.candidate.20261022",
+  "phase": 5,
+  "phase_name": "Stage 4 Reporting and Stage 5 Acceptance",
+  "phase_status": "IMPLEMENTED_SOURCE_CANDIDATE_NOT_ACCEPTED",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -194,61 +200,54 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": "206 passed, 1 skipped, 0 failed; the local skip is the Redis-dependent auth-refresh integration test.",
-    "python_compileall": true,
-    "frontend_contract_tests": {
-      "passed": 38,
-      "failed": 0,
-      "runtime": "Node 22.16.0; target package engines require Node 24.x"
-    },
-    "frontend_action_audit": {
-      "status": "PASS",
-      "tsx_files": 29,
-      "button_like_controls": 153,
-      "forms": 35,
-      "links": 33
-    },
-    "migration_recovery_manifest": "PASS",
-    "migration_source_reconciliation": "PASS; six Phase 3 permanent replacements; exact historical byte parity not asserted",
-    "clean_replay_plan": {
-      "status": "PASS_PLAN_ONLY",
-      "sql_input_count": 43,
-      "sql_executed": false,
-      "migration_bundle_sha256": "2d446ba3c0df5903b06ed0dbb92e1c2239f353aa69cc40e80d452ecb78ec1674"
-    },
-    "node24_clean_install_typecheck_production_build": "NOT_VERIFIED: npm registry DNS unavailable during local install and Node 24 is not installed; baseline Vercel build failed with two TypeScript errors fixed in Increment 02 but not reverified.",
-    "clean_disposable_postgres_replay": "NOT_RUN: 43-input replay plan only; no SQL executed.",
-    "authenticated_staging_e2e": "NOT_RUN: isolated staging target, fixture, reset strategy and temporary auth state not configured.",
-    "candidate_deployment": "NOT_COMMITTED_OR_DEPLOYED",
-    "production_migrations_033_038": "NOT_APPLIED",
-    "production_migrations_033_039": "NOT_APPLIED",
     "backend_tests": {
-      "passed": 206,
+      "passed": 262,
       "failed": 0,
-      "skipped": 1,
-      "skip_reason": "Redis-dependent auth-refresh test could not import redis in this local environment; CI must provision Redis and run it."
-    }
+      "skipped": 0,
+      "warning": "One existing Starlette deprecation warning."
+    },
+    "frontend_contract_tests": {
+      "passed": 53,
+      "failed": 0,
+      "skipped": 0,
+      "runtime": "Node 22.16.0; syntax checks use globally installed TypeScript."
+    },
+    "python_compileall": true,
+    "typescript_jsx_syntax_transpile": {
+      "files": 35,
+      "errors": 0,
+      "full_typecheck": false
+    },
+    "migration_replay_plan": {
+      "status": "PASS_PLAN_ONLY",
+      "input_count": 44,
+      "sql_executed": false,
+      "database_connection_opened": false,
+      "bundle_sha256": "15555832b8153b52f412937de6f153e96afb1c6f6187a15b487b5e874ed5ae46"
+    },
+    "node24_clean_install_typecheck_production_build": "NOT_RUN: local Node is v22.16.0; app requires Node 24 and dependencies are not installed.",
+    "clean_disposable_postgres_replay": "NOT_RUN: no local PostgreSQL/psql available; replay apply is guarded for a fresh loopback disposable database only.",
+    "authenticated_browser_acceptance": "NOT_RUN: requires Node 24 dependencies, isolated staging host, QA authentication state and explicit opt-in.",
+    "candidate_deployment": "NOT_DEPLOYED: GitHub write path returned 403; live Vercel/Render do not yet serve this candidate.",
+    "production_database_mutation": false,
+    "production_deployment_performed": false
   },
-  "release": "phase7-finalization-increment-02-2026-10-22",
-  "release_name": "phase-7-purchasing-supplier-management-finalization-increment-02-source-only-not-production-accepted",
-  "source_baseline": "GitHub main observed at dd4069109d5c94143f5c5e28e758128b90dee55a; Increment 02 is a local/source-only patch because create-branch failed with GitHub API 403 Resource not accessible by integration.",
+  "release": "stage4-stage5-candidate-2026-10-22",
+  "release_name": "Stage 4 reports, Stage 5 acceptance harness and Phase 8 migration verification",
+  "source_baseline": "Derived from GitHub main dd8fe8f60310831ef80809fe2e517ae80bafd0b2; canonical source changes remain local/unpublished because GitHub write operations returned 403.",
   "canonical_source_parity": false,
-  "release_status": "Increment 02 fixes two TypeScript diagnostics observed in the current Vercel build and adds regression tests. Local backend 206 passed / 1 Redis-dependent skip; frontend contracts 38 passed; Python compile and strict source reconciliation pass; 43-input migration plan passes plan-only. No successful Node 24 build, actual clean PostgreSQL replay, authenticated disposable staging E2E, candidate parity, commit or production rollout has been observed. Canonical Neon lexa-live remains at 31 migration rows through 031; migration 033–039 records and six Phase 7 supplier-finance tables are absent. No production database or deployment mutation performed. The historical six Phase 3 SQL replacements remain closed.",
+  "release_status": "Source candidate only. Stage 4 reporting changes and Stage 5 acceptance safeguards are implemented and targeted tests pass; clean disposable PostgreSQL replay, Node 24 full build/typecheck, authenticated browser journeys and live Vercel/Render parity remain unverified. No production DB or deployment changes performed.",
   "validation_summary": {
-    "strategy_basis": "FRESH_NEW_PRODUCT_STRATEGY.md, especially Phase 7 Purchasing and Supplier Management; Phases 4–6 contracts preserved",
-    "phase4": "Report-period, currency truth, error states and static control audit carried forward from Phase 4-6 candidate",
-    "phase5": "Sales/return/refund guards carried forward; clean replay/authenticated acceptance remains a release gate",
-    "phase6": "Replenishment, stock-age and stock-health workflows carried forward; migrations 036-038 remain candidate-only",
-    "phase7": "Supplier master/terms/effective prices, PO lifecycle, partial receipts, landed costs, supplier returns/credits, invoice match/explicit review, per-bill payments, append-only supplier ledger and per-currency balances implemented in source; candidate only",
-    "historical_source_decision": "Six lost historical sources permanently replaced; recovery gate closed, not a claim of original-byte recovery",
-    "strict_reconciliation": "PASS without asserting exact original-byte parity",
-    "backend_tests": "206 passed, 1 skipped, 0 failed locally; only skip is auth-refresh integration due missing local Redis Python package; CI provisions Redis",
-    "frontend_tests": "36 passed, 0 failed under local Node 22.16.0",
-    "typescript_syntax": "38 .ts/.tsx files parsed with 0 syntax diagnostics using global TypeScript parser; not a full typecheck",
-    "ui_action_audit": "PASS: 153 button-like controls, 35 forms and 33 links across 29 TS/TSX files",
-    "migration_replay": "43 SQL input paths/hashes pass plan-only; bundle SHA-256 2d446ba3c0df5903b06ed0dbb92e1c2239f353aa69cc40e80d452ecb78ec1674; actual disposable database replay not executed locally",
-    "release_acceptance": "Pending observed Node 24 install/typecheck/build, actual clean PostgreSQL replay, authenticated disposable-staging E2E, exact candidate SHA deployment parity and approved production rollout",
-    "production_changes": "None: no production SQL or deployment changes performed"
+    "strategy_basis": "Stage 4/5 roadmap and approved product blueprint: Home is a concise overview, Finance holds detailed money workflows, Reports provides visual analysis, and AI stays blocked until Phase 8 acceptance.",
+    "stage4": "Implemented common report periods, real loaded data, accessible chart/table pairs, exact values, selected-range display, correct snapshot scope, CSV export and safe drill-through.",
+    "stage5": "Implemented migration 040 manifest/postconditions, source-SHA-bound evidence verification and explicit opt-in browser acceptance lanes. Stage 5 not accepted until real disposable database replay and authenticated staging tests pass.",
+    "payment_boundary": "Recording only; no provider integration, payment transfer, automatic provider verification or credentials.",
+    "backend_tests": "262 passed, 0 failed.",
+    "frontend_contract_tests": "53 passed, 0 failed.",
+    "typescript_syntax": "35 TS/TSX files transpiled, 0 syntax errors; not a full typecheck.",
+    "migration_replay": "44 input paths/hashes pass plan-only; bundle SHA-256 15555832b8153b52f412937de6f153e96afb1c6f6187a15b487b5e874ed5ae46; SQL not executed.",
+    "release_acceptance": "Pending actual clean replay through migration 040, evidence checker, Node 24 typecheck/build, authenticated browser journeys and live source/schema parity.",
+    "production_changes": "None."
   },
   "final_gate_report": "PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md",
   "local_repair_readme": "PHASE5_INCREMENT_03_README_2026-10-21.md",
@@ -388,18 +387,69 @@
     "migration": "migrations/040_phase8_finance_workflows.sql",
     "payment_boundary": "Recording only; no payment processing, provider verification, or provider credentials",
     "verified": {
-      "backend_tests_passed": 233,
-      "frontend_contract_tests_passed": 50,
+      "backend_tests_passed": 262,
+      "frontend_contract_tests_passed": 53,
       "python_compileall": true,
-      "typescript_jsx_syntax_transpile": true
+      "typescript_jsx_syntax_files": 35,
+      "migration_inputs_plan_only": 44
     },
     "open_checks": [
-      "PostgreSQL replay of migration 040 on disposable database",
-      "Node 24 full frontend typecheck and production build",
-      "Authenticated browser/mobile-sized acceptance"
+      "Clean PostgreSQL replay through migration 040 against a new disposable database with semantic checks",
+      "Node 24 npm ci, typecheck and Next.js production build",
+      "Authenticated browser acceptance across reports and main business modules",
+      "Publish and verify the canonical source against live Vercel, Render and database schema"
     ],
     "production_changed": false,
     "deployed": false,
     "paid_resources_created": false
+  },
+  "stage4_reporting": {
+    "status": "IMPLEMENTED_IN_SOURCE_CANDIDATE",
+    "features": [
+      "common date presets and manual ranges",
+      "sales trend and exact-value date table",
+      "sales by location",
+      "recorded money by payment method",
+      "expense categories",
+      "best-selling products and gross margin after product cost",
+      "customer balances",
+      "stock value by location plus exact-value table",
+      "current stock snapshot",
+      "record availability rows and CSV export",
+      "drill-through links into sales, products, customers, expenses and stock locations"
+    ],
+    "trust_rules": [
+      "Unavailable data is not zero",
+      "all-date/customer and current-snapshot scopes are explicit",
+      "money recorded is not provider verification",
+      "CSV spreadsheet formula injection is guarded"
+    ]
+  },
+  "stage5_acceptance": {
+    "status": "HARNESS_IMPLEMENTED_ACCEPTANCE_PENDING",
+    "migration_manifest_inputs": 44,
+    "migration_bundle_sha256": "15555832b8153b52f412937de6f153e96afb1c6f6187a15b487b5e874ed5ae46",
+    "phase8_migration": "migrations/040_phase8_finance_workflows.sql",
+    "replay_mode": "plan-only validated; no database connection opened and no SQL executed",
+    "phase8_replay_postconditions": [
+      "expense reversal reference and index",
+      "expense journal-posting routine",
+      "expense-reversal analytics metric",
+      "tenant-safe journal foreign key",
+      "supported expense correction status"
+    ],
+    "browser_lanes": [
+      "Stage 4 read-only reports/modules",
+      "Stage 5 sales write journeys - opt-in disposable staging only",
+      "Stage 7 purchasing write journeys - opt-in disposable staging only"
+    ],
+    "acceptance_complete": false,
+    "blockers": [
+      "GitHub write/publish blocked by 403",
+      "Node 24 full build not run",
+      "PostgreSQL clean replay not run",
+      "authenticated staging browser journeys not run",
+      "Vercel/Render/database parity not verified"
+    ]
   }
 }

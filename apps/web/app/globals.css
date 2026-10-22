@@ -1321,3 +1321,9 @@ td, .data-table td { color: #2D4059; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 
 .payment-method-track span{background:linear-gradient(90deg,#13B8B0,#10B981)}
+
+/* Stage 4 report controls: visible presets, real export action, and mobile-friendly wrap. */
+.report-period-presets{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}.report-period-presets .button{min-height:38px}.report-record-link{font-weight:750;color:#176c4d;text-decoration:underline;text-decoration-color:#b8e4d3;text-underline-offset:3px}.report-record-link:hover{color:#104f39;text-decoration-color:currentColor}.report-export-note{font-size:11px;color:#68778d;margin:8px 0 0}
+@media(max-width:700px){.report-period-presets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.report-period-presets .button{width:100%;justify-content:center}.workspace-header .header-actions{flex-wrap:wrap;justify-content:flex-start}.workspace-header .header-actions .button{flex:1 1 auto}}
+
+.report-target-row{outline:2px solid #10B981;outline-offset:-2px;background:#edfbf5}.report-target-row td:first-child{border-left:4px solid #10B981}

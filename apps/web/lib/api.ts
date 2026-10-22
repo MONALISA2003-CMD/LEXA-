@@ -312,6 +312,7 @@ export type AnalyticsDailyMetric = { business_date:string; currency_code:string;
 export type AnalyticsProductMetric = { business_date:string; variant_id:string; product_id:string; sku?:string|null; product_name?:string|null; variant_name?:string|null; units_sold:string; sales_amount:string; discount_amount:string; tax_amount:string; returns_units:string; returns_amount:string; net_sales:string; cogs:string; gross_margin:string; currency_code:string };
 export type AnalyticsCustomerMetric = { customer_party_id:string; customer_name?:string|null; first_sale_date?:string|null; last_sale_date?:string|null; sale_count:number; total_sales:string; total_returns:string; net_sales:string; total_paid:string; outstanding_balance:string; average_sale_value:string };
 export type AnalyticsInventoryHealth = { snapshot_date:string; location_id:string; location_name?:string|null; variant_id:string; sku?:string|null; product_name?:string|null; variant_name?:string|null; on_hand:string; reserved:string; available:string; stock_value:string; units_sold_30d:string; daily_velocity:string; days_cover?:string|null };
+export type AnalyticsInventoryLocationValue = { snapshot_date:string; location_id:string; location_name:string; stock_value:string; product_count:number };
 export type AnalyticsBranchMetric = { branch_id:string; branch_name?:string|null; business_date:string; currency_code:string; sales_total:string; returns_total:string; net_sales:string; payments_collected:string; credit_created:string; sale_count:number };
 export type AnalyticsOverview = { from_date:string; to_date:string; currency_code:string; totals:{sales_total:string;returns_total:string;net_sales:string;payments_collected:string;refunds_total:string;credit_created:string;expenses_total:string;expense_reversals_total:string;net_cash_movement:string;sale_count:number}; daily:AnalyticsDailyMetric[] };
 export function getAnalyticsOverview(fromDate:string,toDate:string,currency:string){return getJson<AnalyticsOverview>(`/api/v1/analytics/overview?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}`);}
@@ -323,6 +324,7 @@ export type AnalyticsProductSummary = { variant_id:string; product_id:string; sk
 export function getAnalyticsProductSummary(fromDate:string,toDate:string,currency:string,limit=5){return getJson<AnalyticsProductSummary[]>(`/api/v1/analytics/products/summary?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}&limit=${encodeURIComponent(String(limit))}`);}
 export function getAnalyticsCustomers(){return getJson<AnalyticsCustomerMetric[]>('/api/v1/analytics/customers?limit=100');}
 export function getAnalyticsInventoryHealth(){return getJson<AnalyticsInventoryHealth[]>('/api/v1/analytics/inventory-health?limit=100');}
+export function getAnalyticsInventoryValueByLocation(){return getJson<AnalyticsInventoryLocationValue[]>('/api/v1/analytics/inventory-value-by-location');}
 export function getAnalyticsBranches(fromDate:string,toDate:string,currency:string){return getJson<AnalyticsBranchMetric[]>(`/api/v1/analytics/branches?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}`);}
 export function refreshAnalytics(fromDate:string,toDate:string){return getJson<{run_id:string;status:string}>(`/api/v1/analytics/refresh?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}`,{method:'POST',headers:{'Idempotency-Key':key()}});}
 
@@ -349,10 +351,10 @@ export function getPaymentChannels(){return getJson<PaymentChannel[]>('/api/v1/c
 export function createPaymentChannel(body:{name:string;channel_type:string;provider?:string;currency_code:string}){return postIdempotent<PaymentChannel>('/api/v1/commerce/payment-channels',body);}
 export function deactivatePaymentChannel(id:string,reason='No longer used'){return postIdempotent<PaymentChannel>(`/api/v1/commerce/payment-channels/${encodeURIComponent(id)}/deactivate`,{reason});}
 export function getCommerceProducts(){return getJson<CommerceProduct[]>('/api/v1/commerce/products');}
-export type CommerceSalesQuery = { limit?:number; offset?:number; search?:string; status?:string; start_date?:string; end_date?:string; branch_id?:string };
+export type CommerceSalesQuery = { limit?:number; offset?:number; search?:string; status?:string; start_date?:string; end_date?:string; branch_id?:string; payment_channel_id?:string };
 export function getCommerceSales(query:CommerceSalesQuery={}){
   const params = new URLSearchParams({limit:String(query.limit ?? 100),offset:String(query.offset ?? 0)});
-  for (const field of ["search","status","start_date","end_date","branch_id"] as const) {
+  for (const field of ["search","status","start_date","end_date","branch_id","payment_channel_id"] as const) {
     const value = query[field];
     if (value && value.trim()) params.set(field,value.trim());
   }

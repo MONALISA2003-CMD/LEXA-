@@ -1,0 +1,32 @@
+{
+  "manifest_version": 1,
+  "project": "LEXA",
+  "candidate": "2.13.0+stage4-5.candidate.20261022",
+  "date": "2026-10-22",
+  "layout": "repository-root-overlay",
+  "stages": {
+    "stage4": "REPORTING_IMPLEMENTED_SOURCE_CANDIDATE",
+    "stage5": "ACCEPTANCE_HARNESS_IMPLEMENTED_NOT_ACCEPTED"
+  },
+  "migration_manifest_inputs": 44,
+  "migration_bundle_sha256": "15555832b8153b52f412937de6f153e96afb1c6f6187a15b487b5e874ed5ae46",
+  "no_production_changes": true,
+  "deployed": false,
+  "acceptance": {
+    "backend_tests_passed": 262,
+    "frontend_contract_tests_passed": 53,
+    "typescript_tsx_syntax_files": 35,
+    "typescript_tsx_syntax_errors": 0,
+    "python_compileall": true,
+    "clean_db_replay": "NOT_RUN",
+    "full_node24_build": "NOT_RUN",
+    "authenticated_browser_e2e": "NOT_RUN"
+  },
+  "research_sources": [
+    "https://www.tdi.texas.gov/styleguide/style-guide-for-data-visualization-tools.html",
+    "https://www.w3.org/TR/WCAG22/",
+    "https://playwright.dev/docs/auth",
+    "https://render.com/docs/monorepo-support",
+    "https://vercel.com/docs/monorepos"
+  ]
+}

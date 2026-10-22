@@ -50,6 +50,10 @@ export default function CustomersPage() {
     setLoading(false);
   }, [search]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const requestedCustomer = new URLSearchParams(window.location.search).get("customer_id");
+    if (requestedCustomer) setSelected(requestedCustomer);
+  }, []);
 
   const balances = useMemo(() => {
     const map = new Map<string, { balance: number; count: number; lastDate: string }>();

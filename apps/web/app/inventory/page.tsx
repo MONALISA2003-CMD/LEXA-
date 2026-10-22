@@ -179,8 +179,13 @@ export default function InventoryPage() {
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [locationFilter, search, ledgerType]);
   useEffect(() => {
-    const query = new URLSearchParams(window.location.search).get("q");
-    if (query) setSearch(query);
+    const query = new URLSearchParams(window.location.search);
+    const productQuery = query.get("q");
+    const requestedLocation = query.get("location_id");
+    const requestedTab = query.get("tab");
+    if (productQuery) setSearch(productQuery);
+    if (requestedLocation) setLocationFilter(requestedLocation);
+    if (requestedTab === "Stock" || requestedTab === "Ledger" || requestedTab === "Stock Health" || requestedTab === "Stock Age") setTab(requestedTab);
   }, []);
 
   async function loadReplenishment() {

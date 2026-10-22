@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject replay evidence from a stale commit or changed migration source bundle."""
+"""Reject Stage 5 replay evidence from a stale commit or changed migration source bundle."""
 from __future__ import annotations
 
 import argparse
@@ -58,6 +58,18 @@ def main() -> int:
         errors.append("evidence lacks Phase 7 PO, invoice-match or supplier-return cost correctness contracts")
     if evidence.get("phase7_append_only_runtime_grants") is not True or evidence.get("phase7_bill_payment_lifecycle_grants") is not True:
         errors.append("evidence lacks Phase 7 append-only ledger/allocation and least-privilege bill/payment lifecycle grant assertions")
+    if evidence.get("phase8_expense_reversal_reference") is not True:
+        errors.append("evidence lacks the Phase 8 expense correction reference column")
+    if evidence.get("phase8_expense_reversal_index") is not True:
+        errors.append("evidence lacks the Phase 8 expense correction lookup index")
+    if evidence.get("phase8_expense_posting_routine") is not True:
+        errors.append("evidence lacks the Phase 8 expense journal posting routine")
+    if evidence.get("phase8_expense_reversal_reporting_metric") is not True:
+        errors.append("evidence lacks the Phase 8 expense correction reporting metric")
+    if evidence.get("phase8_expense_reversal_tenant_safe_fk") is not True:
+        errors.append("evidence lacks the tenant-safe Phase 8 expense correction journal reference")
+    if evidence.get("phase8_expense_correction_status") is not True:
+        errors.append("evidence lacks the Phase 8 expense correction lifecycle status")
     if evidence.get("required_phase5_return_routines_found") != 4:
         errors.append("evidence is missing one or more required Phase 5 return/accounting routines")
     if evidence.get("migration_bundle_sha256") != expected_bundle:
@@ -82,7 +94,7 @@ def main() -> int:
         for error in errors:
             print("ERROR: " + error, file=sys.stderr)
         return 1
-    print("PASS: clean-replay evidence is tied to the current migration bundle and expected source SHA.")
+    print("PASS: clean-replay evidence through Phase 8 is tied to the current migration bundle and expected source SHA.")
     return 0
 
 

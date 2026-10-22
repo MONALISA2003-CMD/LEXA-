@@ -142,15 +142,15 @@ export function SalesTrendChart({ daily, startDate, endDate, currencyCode }: {
 
 /** Product comparison chart built only from saved report rows. */
 export function ProductPerformanceBars({ rows, currencyCode }: {
-  rows: Array<{ label: string; value: number; detail?: string }>;
+  rows: Array<{ label: string; value: number; detail?: string; href?: string }>;
   currencyCode?: string | null;
 }) {
   const safeRows = rows.filter(row => Number.isFinite(row.value)).slice(0, 8);
   const maxValue = Math.max(1, ...safeRows.map(row => Math.max(0, row.value)));
   if (!safeRows.length) return <div className="chart-empty-state"><strong>No product sales in this period</strong><span>Product comparisons will appear after sales are recorded.</span></div>;
-  return <div className="product-comparison-bars" role="img" aria-label="Product sales comparison">
-    {safeRows.map((row, index) => <div className="product-comparison-row" key={`${row.label}-${index}`}>
-      <div className="product-comparison-label"><strong>{row.label}</strong><small>{row.detail || ""}</small></div>
+  return <div className="product-comparison-bars" role="list" aria-label="Product sales comparison">
+    {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
+      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || ""}</small></div>
       <div className="product-comparison-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
       <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
     </div>)}
@@ -160,15 +160,15 @@ export function ProductPerformanceBars({ rows, currencyCode }: {
 
 /** Clear expense-category comparison built from posted expense records only. */
 export function ExpenseCategoryBars({ rows, currencyCode }: {
-  rows: Array<{ label: string; value: number; detail?: string }>;
+  rows: Array<{ label: string; value: number; detail?: string; href?: string }>;
   currencyCode?: string | null;
 }) {
   const safeRows = rows.filter(row => Number.isFinite(row.value) && row.value >= 0).sort((a, b) => b.value - a.value).slice(0, 8);
   const maxValue = Math.max(1, ...safeRows.map(row => row.value));
   if (!safeRows.length) return <div className="chart-empty-state"><strong>No recorded expenses in this period</strong><span>Expense categories will appear here after an expense is recorded.</span></div>;
-  return <div className="product-comparison-bars" role="img" aria-label="Expenses by category">
-    {safeRows.map((row, index) => <div className="product-comparison-row" key={`${row.label}-${index}`}>
-      <div className="product-comparison-label"><strong>{row.label}</strong><small>{row.detail || "Recorded expenses"}</small></div>
+  return <div className="product-comparison-bars" role="list" aria-label="Expenses by category">
+    {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
+      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || "Recorded expenses"}</small></div>
       <div className="product-comparison-track expense-comparison-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
       <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
     </div>)}
@@ -178,16 +178,68 @@ export function ExpenseCategoryBars({ rows, currencyCode }: {
 
 /** Recorded customer receipts by the payment-method names configured by the owner. */
 export function PaymentMethodBars({ rows, currencyCode }: {
-  rows: Array<{ label: string; value: number; detail?: string }>;
+  rows: Array<{ label: string; value: number; detail?: string; href?: string }>;
   currencyCode?: string | null;
 }) {
   const safeRows = rows.filter(row => Number.isFinite(row.value) && row.value >= 0).sort((a, b) => b.value - a.value).slice(0, 8);
   const maxValue = Math.max(1, ...safeRows.map(row => row.value));
   if (!safeRows.length) return <div className="chart-empty-state"><strong>No recorded payments in this period</strong><span>Payment methods will appear here after customer payments are recorded.</span></div>;
-  return <div className="product-comparison-bars" role="img" aria-label="Money recorded by payment method">
-    {safeRows.map((row, index) => <div className="product-comparison-row" key={`${row.label}-${index}`}>
-      <div className="product-comparison-label"><strong>{row.label}</strong><small>{row.detail || "Recorded customer payments"}</small></div>
+  return <div className="product-comparison-bars" role="list" aria-label="Money recorded by payment method">
+    {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
+      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || "Recorded customer payments"}</small></div>
       <div className="product-comparison-track payment-method-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
+      <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
+    </div>)}
+  </div>;
+}
+
+
+/** Location comparison built from current stock snapshots. */
+export function StockValueByLocationBars({ rows, currencyCode }: {
+  rows: Array<{ label: string; value: number; detail?: string; href?: string }>;
+  currencyCode?: string | null;
+}) {
+  const safeRows = rows.filter(row => Number.isFinite(row.value) && row.value >= 0).sort((a, b) => b.value - a.value).slice(0, 8);
+  const maxValue = Math.max(1, ...safeRows.map(row => row.value));
+  if (!safeRows.length) return <div className="chart-empty-state"><strong>No current stock value to compare</strong><span>Location values will appear after stock has been recorded and cost information is available.</span></div>;
+  return <div className="product-comparison-bars" role="list" aria-label="Stock value by location">
+    {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
+      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || "Current stock snapshot"}</small></div>
+      <div className="product-comparison-track stock-value-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
+      <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
+    </div>)}
+  </div>;
+}
+
+/** Current customer balances ranked by the amount still owed. */
+export function CustomerBalanceBars({ rows, currencyCode }: {
+  rows: Array<{ label: string; value: number; detail?: string; href?: string }>;
+  currencyCode?: string | null;
+}) {
+  const safeRows = rows.filter(row => Number.isFinite(row.value) && row.value > 0).sort((a, b) => b.value - a.value).slice(0, 8);
+  const maxValue = Math.max(1, ...safeRows.map(row => row.value));
+  if (!safeRows.length) return <div className="chart-empty-state"><strong>No outstanding customer balances</strong><span>Balances will appear here when customers have an amount remaining to pay.</span></div>;
+  return <div className="product-comparison-bars" role="list" aria-label="Outstanding customer balances">
+    {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
+      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || "Amount remaining"}</small></div>
+      <div className="product-comparison-track customer-balance-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
+      <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
+    </div>)}
+  </div>;
+}
+
+/** Net sales by location over the selected reporting period. */
+export function BranchPerformanceBars({ rows, currencyCode }: {
+  rows: Array<{ label: string; value: number; detail?: string; href?: string }>;
+  currencyCode?: string | null;
+}) {
+  const safeRows = rows.filter(row => Number.isFinite(row.value)).sort((a, b) => b.value - a.value).slice(0, 8);
+  const maxValue = Math.max(1, ...safeRows.map(row => Math.max(0, row.value)));
+  if (!safeRows.length) return <div className="chart-empty-state"><strong>No location sales in this period</strong><span>Location comparisons will appear when completed sales are recorded for accessible locations.</span></div>;
+  return <div className="product-comparison-bars" role="list" aria-label="Sales by business location">
+    {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
+      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || "Sales after returns"}</small></div>
+      <div className="product-comparison-track branch-performance-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, Math.max(0, row.value) / maxValue * 100))}%` }} /></div>
       <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
     </div>)}
   </div>;

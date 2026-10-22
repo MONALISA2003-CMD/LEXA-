@@ -79,6 +79,14 @@ function statusClass(value: string) { return value === "POSTED" || value === "CL
 
 export default function AccountingPage() {
   const [tab, setTab] = useState<Tab>("Summary");
+  const [requestedExpenseId, setRequestedExpenseId] = useState("");
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const requestedTab = query.get("tab");
+    const expenseId = query.get("expense_id") || "";
+    if (requestedTab && tabs.includes(requestedTab as Tab)) setTab(requestedTab as Tab);
+    if (expenseId) { setRequestedExpenseId(expenseId); setTab("Expenses"); }
+  }, []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -135,6 +143,10 @@ export default function AccountingPage() {
   const totalReceivables = useMemo(() => openReceivables.reduce((sum, r) => sum + Number(r.balance || 0), 0), [openReceivables]);
   const totalSupplierPayables = useMemo(() => supplierBalances.filter(r => r.currency_code === currencyCode).reduce((sum, r) => sum + Number(r.payable || 0), 0), [supplierBalances, currencyCode]);
   const relevantExpenses = useMemo(() => expenses.filter(e => e.currency_code === currencyCode), [expenses, currencyCode]);
+  useEffect(() => {
+    if (!requestedExpenseId || !relevantExpenses.some(expense => expense.id === requestedExpenseId)) return;
+    document.getElementById(`expense-${requestedExpenseId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [requestedExpenseId, relevantExpenses]);
   const recordedExpenses = useMemo(() => relevantExpenses.filter(e => e.status === "POSTED"), [relevantExpenses]);
   const reportCurrency = report?.currency_code || currencyCode;
   const productCogs = useMemo(() => productSummary.reduce((sum, p) => sum + Number(p.cogs || 0), 0), [productSummary]);
@@ -474,7 +486,7 @@ export default function AccountingPage() {
         </section>
         <section className="workspace-section"><div className="section-head"><div><span className="section-label">EXPENSE HISTORY</span><h2>Expenses</h2><p>Drafts do not affect official totals until they are added. Cancelled drafts and corrected entries remain visible for traceability.</p></div></div>
           <div className="table-wrap"><table><thead><tr><th>Date</th><th>Expense</th><th>Paid using</th><th>Total</th><th>Status</th><th>Next step</th></tr></thead><tbody>
-            {relevantExpenses.map(expense => <tr key={expense.id}><td>{expense.expense_date}</td><td><b>{expense.description}</b><small>{expense.reference} · {expense.expense_account_name}</small></td><td>{expense.payment_channel_name || "Unavailable"}</td><td>{money(expense.total, expense.currency_code)}</td><td><span className={statusClass(expense.status)}>{statusLabel(expense.status)}</span></td><td>
+            {relevantExpenses.map(expense => <tr key={expense.id} id={`expense-${expense.id}`} className={requestedExpenseId === expense.id ? "report-target-row" : undefined}><td>{expense.expense_date}</td><td><b>{expense.description}</b><small>{expense.reference} · {expense.expense_account_name}</small></td><td>{expense.payment_channel_name || "Unavailable"}</td><td>{money(expense.total, expense.currency_code)}</td><td><span className={statusClass(expense.status)}>{statusLabel(expense.status)}</span></td><td>
               {expense.status === "DRAFT" && <div className="row-actions wrap-actions"><button type="button" className="button button-dark button-small" disabled={saving} onClick={() => void handlePostExpense(expense)}>Add to business records</button><button type="button" className="button button-soft button-small" disabled={saving} onClick={() => void handleVoidExpense(expense)}>Cancel draft</button></div>}
               {expense.status === "POSTED" && <button type="button" className="button button-soft button-small" disabled={saving} onClick={() => { setCorrectingExpenseId(expense.id); setCorrectionReason(""); }}>Correct this expense</button>}
               {expense.status === "REVERSED" && <small>Corrected. The earlier entry is kept for history.</small>}

@@ -101,6 +101,7 @@ export default function CommercePage() {
   const [salesStartDate, setSalesStartDate] = useState("");
   const [salesEndDate, setSalesEndDate] = useState("");
   const [salesBranchId, setSalesBranchId] = useState("");
+  const [salesPaymentChannelId, setSalesPaymentChannelId] = useState("");
   const [salesHistory, setSalesHistory] = useState<CommerceSale[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedSaleDetail, setSelectedSaleDetail] = useState<CommerceSaleDetail | null>(null);
@@ -199,8 +200,27 @@ export default function CommercePage() {
   }, []);
 
   useEffect(() => {
-    if (pathname === "/customers") setTab("Customers");
-    else if (pathname === "/sales") setTab("New sale");
+    if (pathname === "/customers") {
+      setTab("Customers");
+      return;
+    }
+    if (pathname === "/sales") {
+      const query = new URLSearchParams(window.location.search);
+      const startDate = query.get("start_date") || "";
+      const endDate = query.get("end_date") || "";
+      const branchId = query.get("branch_id") || "";
+      const paymentChannelId = query.get("payment_channel_id") || "";
+      const historyRequested = query.get("view") === "history" || Boolean(startDate || endDate || branchId || paymentChannelId);
+      setTab(historyRequested ? "Past sales" : "New sale");
+      if (historyRequested) {
+        setSalesStartDate(startDate); setSalesEndDate(endDate); setSalesBranchId(branchId); setSalesPaymentChannelId(paymentChannelId);
+        setHistoryLoading(true);
+        void getCommerceSales({ limit: 200, start_date: startDate, end_date: endDate, branch_id: branchId, payment_channel_id: paymentChannelId })
+          .then(setSalesHistory)
+          .catch(error => setMessage(userFacingError(error, "Sales history could not be loaded. Try again.")))
+          .finally(() => setHistoryLoading(false));
+      }
+    }
   }, [pathname]);
 
   function updatePayment(index: number, field: keyof PaymentRow, value: string) {
@@ -263,6 +283,7 @@ export default function CommercePage() {
         start_date: salesStartDate,
         end_date: salesEndDate,
         branch_id: salesBranchId,
+        payment_channel_id: salesPaymentChannelId,
       });
       setSalesHistory(result);
       setSelectedSaleDetail(null);
@@ -581,10 +602,11 @@ export default function CommercePage() {
               <label>Search customer or sale reference<input value={salesSearch} onChange={(e) => setSalesSearch(e.target.value)} placeholder="Customer, sale ID or transaction ID" /></label>
               <label>Status<select value={salesStatus} onChange={(e) => setSalesStatus(e.target.value)}><option value="">All statuses</option><option value="COMPLETED">Completed</option><option value="DRAFT">Draft</option><option value="VOIDED">Voided</option></select></label>
               {branches.length > 0 && <label>Branch<select value={salesBranchId} onChange={(e) => setSalesBranchId(e.target.value)}><option value="">All accessible branches</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>}
+              <label>Payment method<select value={salesPaymentChannelId} onChange={(e) => setSalesPaymentChannelId(e.target.value)}><option value="">All methods</option>{channels.filter(channel => channel.active && channel.currency_code === currencyCode).map(channel => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></label>
               <label>From<input type="date" value={salesStartDate} onChange={(e) => setSalesStartDate(e.target.value)} /></label>
               <label>To<input type="date" value={salesEndDate} onChange={(e) => setSalesEndDate(e.target.value)} /></label>
               <button className="secondary" type="submit" disabled={historyLoading}>{historyLoading ? "Searching…" : "Apply filters"}</button>
-              <button className="secondary" type="button" onClick={() => { setSalesSearch(""); setSalesStatus(""); setSalesStartDate(""); setSalesEndDate(""); setSalesBranchId(""); setTimeout(() => void getCommerceSales({limit:200}).then(setSalesHistory).catch((e) => setMessage(userFacingError(e, "Sales history could not be refreshed. Try again."))),0); }} disabled={historyLoading}>Clear</button>
+              <button className="secondary" type="button" onClick={() => { setSalesSearch(""); setSalesStatus(""); setSalesStartDate(""); setSalesEndDate(""); setSalesBranchId(""); setSalesPaymentChannelId(""); setTimeout(() => void getCommerceSales({limit:200}).then(setSalesHistory).catch((e) => setMessage(userFacingError(e, "Sales history could not be refreshed. Try again."))),0); }} disabled={historyLoading}>Clear</button>
             </form>
             <div className="workflow-list">{salesHistory.length ? salesHistory.map((s) => <div className="workflow-row sale-history-row" key={s.id}><div><strong>{s.customer_name || "Walk-in"}</strong><small>{short(s.id)} · {recordStatusLabel(s.status)} · {new Date(s.created_at).toLocaleString()}</small></div><span>{moneyInWorkspace(s.total)}</span><span className={Number(s.amount_due) > 0 ? "status warn" : "status good"}>{Number(s.amount_due) > 0 ? `Due ${moneyInWorkspace(s.amount_due)}` : "PAID"}</span><button className="secondary" type="button" onClick={() => void openSaleDetail(s.id)}>View sale</button></div>) : <div className="empty-inline">No sales match these filters.</div>}</div>
             {saleDetailLoading && <div className="inline-message" role="status">Loading sale details…</div>}

@@ -1,15 +1,29 @@
-# LEXA — Phase 8 Finance Implementation Candidate (22 October 2026)
+# LEXA — Stage 4 Reporting + Stage 5 Acceptance Candidate (22 October 2026)
 
-**Implementation status: source candidate with targeted local acceptance; not production-approved.** This package extends the Phase 7 candidate with plain-language finance workflows: customer collections/balances, supplier payables via the existing supplier ledger, expenses, owner-configured payment methods, manual end-of-day checking and finance reporting.
+**Status: reporting work is implemented in this source candidate; Stage 5 is not accepted yet.** This candidate builds on Stage 2–3 by adding report period controls, accessible chart/table pairs, drill-through, safe CSV export, explicit all-date/current-snapshot scope, and a gated acceptance harness through Phase 8 migration 040.
 
 **Payment boundary:** LEXA records a business user's chosen payment method and amount. It does not initiate, transfer, settle or automatically verify money. No payment gateway or payment-provider credentials are included or requested.
 
+- [Stage 4 + Stage 5 acceptance handoff](STAGE4_STAGE5_REPORTING_AND_ACCEPTANCE.md)
+- [Stage 2–3 implementation report](LEXA_STAGE2_3_IMPLEMENTATION_REPORT_2026-10-22.md)
+- [Stage 1 foundation report](LEXA_STAGE1_FOUNDATION_IMPLEMENTATION_REPORT_2026-10-22.md)
 - [Phase 8 implementation report](PHASE8_IMPLEMENTATION_REPORT_2026-10-22.md)
-- [Phase 8 onwards architecture handoff](LEXA_PHASE8_REVISED_ARCHITECTURE_AND_IMPLEMENTATION_PLAN_2026-10-22.md)
 
-Phase 12 remains the single full production-readiness and launch gate. The report above lists exact test results and the remaining disposable-database, Node 24 build and browser acceptance checks. Historical Phase 7 reports below are retained as baseline evidence and are not Phase 8 completion evidence.
+## Current candidate verification
+
+- Backend Python tests: **262 passed** (one existing Starlette deprecation warning).
+- Frontend Node contracts: **53 passed**.
+- Python compilation: passed.
+- TypeScript/TSX syntax transpilation: **35 files, zero syntax errors**; a full TypeScript typecheck and Next.js build were not run because this environment has Node 22 while the app requires Node 24, and the web dependencies are not installed.
+- Migration plan: **44 hashed input files through `migrations/040_phase8_finance_workflows.sql`**; plan-only made no database connection and executed no SQL.
+- PostgreSQL clean replay and authenticated browser E2E: **not run**; see the handoff for required isolated database, Node 24 and QA staging setup.
+- No production database mutation or live deployment occurred in this packaging job. The connected GitHub write path returned 403, so Vercel/Render remain to be aligned to this canonical source.
+
+Phase 9 remains on hold until the Phase 8 workflows are accepted. The single release/rollback/launch gate remains Phase 12.
 
 ---
+
+> **Historical reference material below:** older phase notes, historical test counts and deployment states are retained for context. They are not proof of Stage 4/5 acceptance for this candidate.
 
 # LEXA — Phase 7 Purchasing & Supplier Management (v2.12.0, Increment 03 — 22 October 2026)
 

@@ -350,6 +350,7 @@ def list_sales(
     start_date: date | None = None,
     end_date: date | None = None,
     branch_id: UUID | None = None,
+    payment_channel_id: UUID | None = None,
     ctx=Depends(require_permission("sales.read")),
 ):
     """List only sales in the caller's assigned branches, with safe bound filters."""
@@ -375,6 +376,9 @@ def list_sales(
     if branch_id is not None:
         filters.append("s.branch_id=:branch_id")
         params["branch_id"] = str(branch_id)
+    if payment_channel_id is not None:
+        filters.append("EXISTS (SELECT 1 FROM payments payment_filter WHERE payment_filter.tenant_id=s.tenant_id AND payment_filter.transaction_id=s.transaction_id AND payment_filter.payment_channel_id=:payment_channel_id AND payment_filter.status='RECORDED')")
+        params["payment_channel_id"] = str(payment_channel_id)
     rows = db.execute(text(f"""
       SELECT s.id,s.transaction_id,s.customer_party_id,p.display_name customer_name,s.branch_id,s.location_id,
              s.currency_code,s.status,s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,
