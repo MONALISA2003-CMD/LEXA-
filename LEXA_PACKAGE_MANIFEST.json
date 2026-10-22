@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Phase 7 Purchasing and Supplier Management Increment 01",
-  "version": "2.12.0+phase7.increment01",
+  "package": "LEXA Phase 7 Purchasing and Supplier Management — Finalization Increment 02",
+  "version": "2.12.0+phase7.increment02",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -130,7 +130,11 @@
     "Bumped source package to 2.12.0 and added Phase 7 acceptance matrix, implementation report and release-gate status",
     "Phase 7 hardening: supplier invoices linked to a PO cannot post before a posted receipt unless an authorised reviewer records an explicit reasoned pre-receipt exception",
     "Phase 7 hardening: supplier-payment bill rows are locked narrowly for concurrent allocation/posting; append-only allocation and ledger grants remain respected",
-    "Added product-strategy Phase 7 coverage map and refreshed current test/gate evidence for 206 backend tests and 36 frontend contracts"
+    "Added product-strategy Phase 7 coverage map and refreshed current test/gate evidence for 206 backend tests and 36 frontend contracts",
+    "Phase 7 Increment 02: supplied businessCurrency to the inventory ledger unit-cost formatter after the current Vercel TypeScript diagnostic.",
+    "Phase 7 Increment 02: added business-currency fallback for supplier return value formatting when currency_code is undefined.",
+    "Added two Phase 7 finalization frontend regression contracts.",
+    "Added dated Phase 7 finalization report and machine-readable release-gate status based on read-only current infrastructure evidence."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -139,11 +143,11 @@
   "database_reset": false,
   "seed_reset": false,
   "product_deletion": false,
-  "description": "Full-source LEXA candidate: Phase 4 reporting/currency hardening, Phase 5 sales/returns controls, Phase 6 inventory intelligence and Phase 7 supplier/purchasing lifecycle. Historical six-source recovery gate is permanently closed. Local tests and source checks pass with cloud release gates still pending.",
+  "description": "Full-source LEXA Phase 7 finalization candidate. Includes two fixes for TypeScript errors observed in the current Vercel baseline and regression contracts. GitHub write access was denied; current main does not contain the packaged CI workflow; disposable replay, authenticated staging E2E, candidate deployment parity and production rollout remain pending. Historical six-source replacement disposition remains closed.",
   "package_version": "2.12.0",
   "phase": "7",
   "phase_name": "Phase 7 — Purchasing and Supplier Management",
-  "phase_status": "LOCAL_SOURCE_CANDIDATE_LOCAL_CHECKS_PASS_CLOUD_RELEASE_GATES_PENDING",
+  "phase_status": "SOURCE_ONLY_FINALIZATION_CANDIDATE_GITHUB_WRITE_BLOCKED_RELEASE_GATES_PENDING",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -179,12 +183,12 @@
     "temporary_validation": "phase5-analytics-validation"
   },
   "verification": {
-    "python_tests": "206 passed, 1 skipped, 0 failed; local skip is Redis-dependent auth-refresh because Redis Python package unavailable offline; CI provisions Redis",
+    "python_tests": "206 passed, 1 skipped, 0 failed; the local skip is the Redis-dependent auth-refresh integration test.",
     "python_compileall": true,
     "frontend_contract_tests": {
-      "passed": 36,
+      "passed": 38,
       "failed": 0,
-      "runtime": "Node 22.16.0"
+      "runtime": "Node 22.16.0; target package engines require Node 24.x"
     },
     "frontend_action_audit": {
       "status": "PASS",
@@ -201,18 +205,24 @@
       "sql_executed": false,
       "migration_bundle_sha256": "2d446ba3c0df5903b06ed0dbb92e1c2239f353aa69cc40e80d452ecb78ec1674"
     },
-    "node24_clean_install_typecheck_production_build": "NOT_VERIFIED_LOCAL_OFFLINE_ENVIRONMENT",
-    "clean_disposable_postgres_replay": "PENDING_CI",
-    "authenticated_staging_e2e": "NOT_RUN_NO_SANITIZED_ISOLATED_STAGING",
+    "node24_clean_install_typecheck_production_build": "NOT_VERIFIED: npm registry DNS unavailable during local install and Node 24 is not installed; baseline Vercel build failed with two TypeScript errors fixed in Increment 02 but not reverified.",
+    "clean_disposable_postgres_replay": "NOT_RUN: 43-input replay plan only; no SQL executed.",
+    "authenticated_staging_e2e": "NOT_RUN: isolated staging target, fixture, reset strategy and temporary auth state not configured.",
     "candidate_deployment": "NOT_COMMITTED_OR_DEPLOYED",
     "production_migrations_033_038": "NOT_APPLIED",
-    "production_migrations_033_039": "NOT_APPLIED"
+    "production_migrations_033_039": "NOT_APPLIED",
+    "backend_tests": {
+      "passed": 206,
+      "failed": 0,
+      "skipped": 1,
+      "skip_reason": "Redis-dependent auth-refresh test could not import redis in this local environment; CI must provision Redis and run it."
+    }
   },
-  "release": "phase7-increment-01-2026-10-21",
-  "release_name": "phase-7-purchasing-supplier-management-increment-01-review-candidate-not-production-accepted",
-  "source_baseline": "Last externally observed healthy baseline SHA a6acc0eb53660ea938a314640bf28283ae2a98a8 on Render/Vercel; this candidate is local and not committed/deployed.",
+  "release": "phase7-finalization-increment-02-2026-10-22",
+  "release_name": "phase-7-purchasing-supplier-management-finalization-increment-02-source-only-not-production-accepted",
+  "source_baseline": "GitHub main observed at dd4069109d5c94143f5c5e28e758128b90dee55a; Increment 02 is a local/source-only patch because create-branch failed with GitHub API 403 Resource not accessible by integration.",
   "canonical_source_parity": false,
-  "release_status": "Local full-source Phase 7 candidate. Six approved lost historical SQL sources remain permanently replaced and recovery is closed. Backend tests: 206 passed, 1 skipped locally; frontend contracts: 36 passed. TypeScript/TSX parser, static action audit, Python compile, strict source reconciliation and 43-input migration plan pass. This candidate has not run actual clean PostgreSQL replay, Node 24 build, authenticated staging E2E or been committed/deployed. No production SQL or deployment changes were made.",
+  "release_status": "Increment 02 fixes two TypeScript diagnostics observed in the current Vercel build and adds regression tests. Local backend 206 passed / 1 Redis-dependent skip; frontend contracts 38 passed; Python compile and strict source reconciliation pass; 43-input migration plan passes plan-only. No successful Node 24 build, actual clean PostgreSQL replay, authenticated disposable staging E2E, candidate parity, commit or production rollout has been observed. Canonical Neon lexa-live remains at 31 migration rows through 031; migration 033–039 records and six Phase 7 supplier-finance tables are absent. No production database or deployment mutation performed. The historical six Phase 3 SQL replacements remain closed.",
   "validation_summary": {
     "strategy_basis": "FRESH_NEW_PRODUCT_STRATEGY.md, especially Phase 7 Purchasing and Supplier Management; Phases 4–6 contracts preserved",
     "phase4": "Report-period, currency truth, error states and static control audit carried forward from Phase 4-6 candidate",
@@ -229,7 +239,7 @@
     "release_acceptance": "Pending observed Node 24 install/typecheck/build, actual clean PostgreSQL replay, authenticated disposable-staging E2E, exact candidate SHA deployment parity and approved production rollout",
     "production_changes": "None: no production SQL or deployment changes performed"
   },
-  "final_gate_report": "PHASE7_IMPLEMENTATION_REPORT_2026-10-21.md",
+  "final_gate_report": "PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md",
   "local_repair_readme": "PHASE5_INCREMENT_03_README_2026-10-21.md",
   "phase5_increment_03_validation": {
     "neon_project_id": "wispy-mud-75323042",
@@ -287,5 +297,32 @@
     "migration_bundle_sha256": "2d446ba3c0df5903b06ed0dbb92e1c2239f353aa69cc40e80d452ecb78ec1674",
     "production_migrations_applied": false,
     "strategy_coverage": "docs/PHASE7_STRATEGY_COVERAGE_2026-10-21.md"
+  },
+  "phase7_finalization_increment_02": {
+    "report": "PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md",
+    "gate_status": "PHASE7_FINALIZATION_RELEASE_GATE_STATUS_2026-10-22.json",
+    "source_baseline_sha": "dd4069109d5c94143f5c5e28e758128b90dee55a",
+    "source_only": true,
+    "github_write_status": "403_RESOURCE_NOT_ACCESSIBLE_BY_INTEGRATION",
+    "typescript_fix_files": [
+      "apps/web/app/inventory/page.tsx",
+      "apps/web/app/purchasing/page.tsx"
+    ],
+    "regression_tests": [
+      "apps/web/tests/phase7-finalization-regressions.test.mjs"
+    ],
+    "frontend_contract_tests": "38 passed",
+    "backend_tests": "206 passed / 1 skipped due missing local Redis Python package",
+    "plan_only_replay": "43 inputs; bundle SHA-256 2d446ba3c0df5903b06ed0dbb92e1c2239f353aa69cc40e80d452ecb78ec1674; SQL not executed",
+    "baseline_vercel_sha": "dd4069109d5c94143f5c5e28e758128b90dee55a",
+    "baseline_vercel_state": "ERROR due to the two targeted TypeScript diagnostics; patched source not yet re-built",
+    "render_health_check_path": "",
+    "canonical_neon_migration_count": 31,
+    "canonical_neon_latest_known_migration": "031_phase3_auth_surface_rls",
+    "migration_039_production_applied": false,
+    "candidate_committed": false,
+    "candidate_deployed": false,
+    "production_database_mutated": false,
+    "production_deployment_performed": false
   }
 }

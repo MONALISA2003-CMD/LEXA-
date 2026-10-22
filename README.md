@@ -1,7 +1,20 @@
-# LEXA — Phase 7 Purchasing & Supplier Management (v2.12.0, 21 October 2026)
+# LEXA — Phase 7 Purchasing & Supplier Management (v2.12.0, finalization increment 02 — 22 October 2026)
 
-**Current status:** local full-source Phase 7 candidate; not production-accepted. The product-strategy document remains the governing roadmap. Phase 7 implements supplier terms, supplier-specific pricing, purchase orders, partial receiving, landed costs, supplier returns, invoice matching, supplier payments and currency-separated supplier balances.
+**Current release status: NOT ACCEPTED FOR PRODUCTION.** This archive is a source-only finalization increment based on the Phase 7 Increment 01 candidate. It fixes two TypeScript errors reported by the current Vercel build, adds focused regression contracts, and records the live release blockers. GitHub rejected branch creation with HTTP 403, so these source updates have **not** been committed or deployed.
 
+- **Finalization report:** [`PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md`](PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md)
+- **Machine-readable gate status:** [`PHASE7_FINALIZATION_RELEASE_GATE_STATUS_2026-10-22.json`](PHASE7_FINALIZATION_RELEASE_GATE_STATUS_2026-10-22.json)
+- **Increment 02 release notes:** [`RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_02.md`](RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_02.md)
+
+## Current external evidence (read-only, 22 October 2026)
+
+- Source baseline: GitHub `main` SHA `dd4069109d5c94143f5c5e28e758128b90dee55a`. The uploaded Increment 01 archive matched the expected handoff SHA-256 before extraction.
+- Vercel build for that SHA fails TypeScript checks in `apps/web/app/inventory/page.tsx` and `apps/web/app/purchasing/page.tsx`; increment 02 includes targeted source fixes, but no new full build has yet verified them.
+- The connected GitHub identity cannot push/create a branch. The workflow file `.github/workflows/lexa-ci.yml` is included in this archive but is absent from current `main`; required CI has not run against increment 02.
+- Render's current LEXA deployment is live at the baseline SHA, but its configured health-check path is blank. It is not evidence of candidate parity or readiness.
+- The canonical Neon `lexa-live` branch has 31 `schema_migrations` rows through migration 031. Migration rows 033–039 and the six Phase 7 landed-cost/supplier-finance tables are absent. No database write was performed.
+
+## Phase 7 implementation
 ## Phase 7 implementation
 
 - **Supplier register:** trading/legal identity, contact and tax details, default receiving location, payment terms, default currency, status/archive guards and effective-dated supplier cost tiers.
@@ -15,7 +28,7 @@
 ## Local validation evidence
 
 - Backend: **206 passed, 1 skipped, 0 failed**. The only skip is auth-refresh integration because the offline runner has no Redis Python package; CI provisions Redis.
-- Frontend contracts: **36 passed, 0 failed** under local Node 22.16.0.
+- Frontend contracts: **38 passed, 0 failed** (including two increment-02 regression contracts) under local Node 22.16.0.
 - Syntax audit: **38 `.ts`/`.tsx` sources, zero parser diagnostics**. This is a syntax check, not a complete TypeScript typecheck.
 - Static control audit: **PASS** across 29 TS/TSX files; 153 button-like controls, 35 forms and 33 links.
 - Python compilation, strict source reconciliation, permanent migration disposition checks and checksums: **PASS**.
@@ -28,10 +41,13 @@ This archive is a review candidate, not a production release certificate. Node 2
 ## Authoritative documents
 
 - [`FRESH_NEW_PRODUCT_STRATEGY.md`](FRESH_NEW_PRODUCT_STRATEGY.md)
-- [`PHASE7_IMPLEMENTATION_REPORT_2026-10-21.md`](PHASE7_IMPLEMENTATION_REPORT_2026-10-21.md)
+- [`PHASE7_IMPLEMENTATION_REPORT_2026-10-21.md`](PHASE7_IMPLEMENTATION_REPORT_2026-10-21.md) (Increment 01 implementation record)
+- [`PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md`](PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md)
 - [`PHASE7_ACCEPTANCE_MATRIX.md`](PHASE7_ACCEPTANCE_MATRIX.md)
-- [`PHASE7_RELEASE_GATE_STATUS_2026-10-21.json`](PHASE7_RELEASE_GATE_STATUS_2026-10-21.json)
+- [`PHASE7_RELEASE_GATE_STATUS_2026-10-21.json`](PHASE7_RELEASE_GATE_STATUS_2026-10-21.json) (Increment 01 snapshot)
+- [`PHASE7_FINALIZATION_RELEASE_GATE_STATUS_2026-10-22.json`](PHASE7_FINALIZATION_RELEASE_GATE_STATUS_2026-10-22.json)
 - [`RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_01.md`](RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_01.md)
+- [`RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_02.md`](RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_02.md)
 - [`docs/decisions/ADR-DB-001-permanent-replacement-of-lost-migrations.md`](docs/decisions/ADR-DB-001-permanent-replacement-of-lost-migrations.md)
 - [`migrations/migration_dispositions.json`](migrations/migration_dispositions.json)
 - [`migrations/reconstructed/clean_replay_order.json`](migrations/reconstructed/clean_replay_order.json)
