@@ -21,7 +21,13 @@ from ..branch_access import ensure_location_access
 from ..catalog import emit_event, finish_idempotency, write_audit, begin_idempotency
 from ..dependencies import require_permission
 from ..inventory import post_ledger, tenant_variant
-from ..purchasing_rules import allocate_landed_cost, line_amounts, money, order_status_from_receipts
+from ..purchasing_rules import (
+    allocate_landed_cost,
+    line_amounts,
+    money,
+    order_status_from_receipts,
+    validate_payment_allocations,
+)
 
 router = APIRouter(prefix="/purchasing", tags=["purchasing"])
 ZERO = Decimal("0")
@@ -217,11 +223,6 @@ class SupplierPaymentCreate(Strict):
     notes: str | None = Field(default=None, max_length=4000)
     allocations: list[PaymentAllocationIn] = Field(default_factory=list, max_length=200)
 
-    @model_validator(mode="after")
-    def validate_allocations(self):
-        validate_payment_allocations(self.amount, [{"bill_id": row.bill_id, "amount": row.amount} for row in self.allocations])
-        return self
-
     @field_validator("currency_code")
     @classmethod
     def normalize_currency(cls, value: str) -> str:
@@ -229,11 +230,12 @@ class SupplierPaymentCreate(Strict):
 
     @model_validator(mode="after")
     def validate_allocations(self):
-        bill_ids = [a.bill_id for a in self.allocations]
-        if len(bill_ids) != len(set(bill_ids)):
-            raise ValueError("A payment may allocate to a bill only once")
-        if sum((a.amount for a in self.allocations), ZERO) > self.amount:
-            raise ValueError("Allocated amount cannot exceed payment amount")
+        # Keep the API model and route-level validation on one shared rule so
+        # duplicates/over-allocation are rejected before any database mutation.
+        validate_payment_allocations(
+            self.amount,
+            [{"bill_id": row.bill_id, "amount": row.amount} for row in self.allocations],
+        )
         return self
 
 

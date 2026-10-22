@@ -1,0 +1,348 @@
+{
+  "status": "PASS",
+  "evidence_origin": "MANUAL_REMOTE_NEON_REPLAY_WITH_EXACT_COMMIT_MIGRATION_SOURCE_HASHES",
+  "source_commit": "b920c8719079741ed3c2fb2288de67c7de8a0d37",
+  "target_project_id": "wispy-frog-93010235",
+  "target_branch_id": "br-jolly-mode-b966dwys",
+  "target_database": "lexa_replay_ci",
+  "completed_sql_steps": [
+    "migrations/001_phase1_foundation.sql",
+    "migrations/002_identity_rbac_organization.sql",
+    "migrations/003_rbac_sessions_organization_completion.sql",
+    "migrations/reconstructed/004_catalog_and_rbac_hardening.replay-equivalent.sql",
+    "migrations/005_inventory_foundation.sql",
+    "migrations/reconstructed/005a_phase0_outbox_contract_reconciliation.replay-only.sql",
+    "migrations/006_phase1_security_reliability.sql",
+    "migrations/007_phase2_catalog_hardening.sql",
+    "migrations/008_workspace_registration_hardening.sql",
+    "migrations/009_auth_workspace_picker.sql",
+    "migrations/reconstructed/010_phase2_catalog_intelligence.equivalent.sql",
+    "migrations/reconstructed/011_phase2_catalog_runtime_constraints.equivalent.sql",
+    "migrations/012_phase1_business_kernel.sql",
+    "migrations/013_phase2_universal_business_engine.sql",
+    "migrations/014_phase3_inventory_foundation.sql",
+    "migrations/015_financial_architecture_lock.sql",
+    "migrations/reconstructed/016_payments_tenant_identity_compatibility.equivalent.sql",
+    "migrations/016_phase4a_sales_payments_reconciliation.sql",
+    "migrations/017_phase4a_reconciliation_engine.sql",
+    "migrations/018_phase4a_application_integrity.sql",
+    "migrations/019_phase4a_customer_credit_allocation.sql",
+    "migrations/020_phase4b_accounting_efris_foundation.sql",
+    "migrations/reconstructed/021_phase5_analytics_foundation.repair-candidate.sql",
+    "migrations/022_phase6a_brain_foundation.sql",
+    "migrations/023_phase2_identity_tenancy_authorization_foundation.sql",
+    "migrations/reconstructed/023_phase4_purchasing_core.equivalent.sql",
+    "migrations/reconstructed/024_phase4_purchasing_security.equivalent.sql",
+    "migrations/reconstructed/025_phase4_purchasing_permissions.equivalent.sql",
+    "migrations/reconstructed/025a_phase2_membership_branch_contract_reconciliation.replay-only.sql",
+    "migrations/reconstructed/026_phase4_membership_branch_integrity.equivalent.sql",
+    "migrations/027_release_convergence.sql",
+    "migrations/028_phase0_auth_rls_runtime_hardening.sql",
+    "migrations/029_phase3_runtime_privilege_surface.sql",
+    "migrations/029_phase1_runtime_role_least_privilege.sql",
+    "migrations/030_phase3_workspace_memberships.sql",
+    "migrations/031_phase3_auth_surface_rls.sql",
+    "migrations/033_phase5_refund_settlement_consistency.sql",
+    "migrations/034_phase5_return_accounting_journals.sql",
+    "migrations/035_phase5_none_return_receivable_guard.sql",
+    "migrations/036_phase6_inventory_intelligence.sql",
+    "migrations/037_phase6_inventory_ageing_index.sql",
+    "migrations/038_phase6_movement_health_indexes.sql",
+    "migrations/039_phase7_supplier_ledger_landed_costs.sql"
+  ],
+  "migration_inputs": [
+    {
+      "path": "migrations/001_phase1_foundation.sql",
+      "sha256": "2eb36ca0d51535bad127dc9be707cc5c8fe4ab8a1cd6b118bfa150505963690b",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/002_identity_rbac_organization.sql",
+      "sha256": "bbb5c25c475ec1a27323c3e481e27a7bff253c6c8dc485fbb0aeb4d379dd102d",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/003_rbac_sessions_organization_completion.sql",
+      "sha256": "e4cc58bcb407ba173bb90dddaa262cd59a85b9a752343525469ac67fe608707e",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/reconstructed/004_catalog_and_rbac_hardening.replay-equivalent.sql",
+      "sha256": "1bfef40d29727cfe8877c35543cbe58a5b9884751045f88fe9d973800eca3529",
+      "mode": "replay-equivalent-generated-from-004"
+    },
+    {
+      "path": "migrations/005_inventory_foundation.sql",
+      "sha256": "bfdc4a0331957f023381aa4316179215250d99f7b0798be453b246fb3b0f1d78",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/reconstructed/005a_phase0_outbox_contract_reconciliation.replay-only.sql",
+      "sha256": "bb0b471e47ef5ed7734bfb2c4327f20a75bf8c0f0effbbd2d4eba11fd8b084ef",
+      "mode": "replay-only-contract-reconciliation"
+    },
+    {
+      "path": "migrations/006_phase1_security_reliability.sql",
+      "sha256": "3f80f8881768fdd8f00fe0f0c026348fb2daceb7c6ca2ae15f4f130c9049559b",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/007_phase2_catalog_hardening.sql",
+      "sha256": "1bc0433a8b15467630db1408d5ca514e1e208e5bff3b59f1557ed5c6e2b074c4",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/008_workspace_registration_hardening.sql",
+      "sha256": "eb2736db5b52e873cc422d4f0374128687c652107ea4220eeeedcf316c0dc80c",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/009_auth_workspace_picker.sql",
+      "sha256": "98e3c7ba133360fc5be5a6ae691ad8ebf40390ee73832ea41b08fdfb386bb26a",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/reconstructed/010_phase2_catalog_intelligence.equivalent.sql",
+      "sha256": "a1d414eb36186e28fbc24e3fd2274b9eae688b0e0f5556b83ce53430649c8d8e",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/reconstructed/011_phase2_catalog_runtime_constraints.equivalent.sql",
+      "sha256": "650aad6e622bc230b6ea85575bc2eed52e5387085f3d718e97ec162bfdc4e1b8",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/012_phase1_business_kernel.sql",
+      "sha256": "a69701bb1bc681b97ac1a12e5866325fef33b401d8520b7cbf3132748de89a24",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/013_phase2_universal_business_engine.sql",
+      "sha256": "4d43e71918101562175d45386cf6e82772054f367f53668caf0705238e51559e",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/014_phase3_inventory_foundation.sql",
+      "sha256": "feb4fa53f834bda3d2b4df848bd46be4f67b7f9ddb4689d87b8355eedf8bd454",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/015_financial_architecture_lock.sql",
+      "sha256": "3bc487ec45ec2be3cc6d071f241d75e189a80ece73ca616a429f9809a7533758",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/reconstructed/016_payments_tenant_identity_compatibility.equivalent.sql",
+      "sha256": "690d7279944f5a395c0b37958cd8a94994524177633e2c3e95e3de7e2dc95d19",
+      "mode": "reconstructed-compatibility-not-original"
+    },
+    {
+      "path": "migrations/016_phase4a_sales_payments_reconciliation.sql",
+      "sha256": "b66501dfb9c94f4f12fb5d8010789d1a3c0d3b9aa40f820368704e34cc5b1d24",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/017_phase4a_reconciliation_engine.sql",
+      "sha256": "80fccb08c0a3b1268be694de2bd8f14f44246abaafbcd988936383b6783297fe",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/018_phase4a_application_integrity.sql",
+      "sha256": "21d7f6b76096ab777574e325241046123ba5a4ba9da5e9a6bab63044f17198d9",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/019_phase4a_customer_credit_allocation.sql",
+      "sha256": "8f7b689d0821a9b571ac0c80ef5c05172d4be03233e875a426ae7759238970f8",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/020_phase4b_accounting_efris_foundation.sql",
+      "sha256": "48a3b59c571cf6e0a8075e8690c3f58c703d529d8853a964631a1f79169b08bc",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/reconstructed/021_phase5_analytics_foundation.repair-candidate.sql",
+      "sha256": "44868e8a899d9a96ca059b10f62fa8404d84934d46d0fca214fb43e134fb7614",
+      "mode": "reconstructed-repair-not-original"
+    },
+    {
+      "path": "migrations/022_phase6a_brain_foundation.sql",
+      "sha256": "d38114b3b9c28ca0569858921c691059c3d8df1bc944b8bbf2896710c0945e6f",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/023_phase2_identity_tenancy_authorization_foundation.sql",
+      "sha256": "325b3fe15b7d121b3aac2077b40dd8310dbb608ed312b40f6da3c21a43720791",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/reconstructed/023_phase4_purchasing_core.equivalent.sql",
+      "sha256": "f1631d11e65e7b3dc6d9d755b57cb7449139762cd6004b7a1146fc0cfdbe16e2",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/reconstructed/024_phase4_purchasing_security.equivalent.sql",
+      "sha256": "696365a93831c30b98b89884ad59c0950949bfd21514cdf3ae0a98a74ccc1419",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/reconstructed/025_phase4_purchasing_permissions.equivalent.sql",
+      "sha256": "71777cb9740f55bd1f52bfa3c7a11bc677b5958216aad319a19a32f7dfbe09ad",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/reconstructed/025a_phase2_membership_branch_contract_reconciliation.replay-only.sql",
+      "sha256": "ff7ccc94249c6b7aa95ecc75c54a201e9a8f3875f280d3c03ca329cabbac1b74",
+      "mode": "replay-only-contract-reconciliation"
+    },
+    {
+      "path": "migrations/reconstructed/026_phase4_membership_branch_integrity.equivalent.sql",
+      "sha256": "992be2a5c405ccfea2ead9aa2fcce0d45240aee27618de64e0952aaa76691cec",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/027_release_convergence.sql",
+      "sha256": "404334dde3e34a80d3176b1ba38347eb1def3cc8793f6b52d3a663cbc05b19cd",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/028_phase0_auth_rls_runtime_hardening.sql",
+      "sha256": "ea167797ded1c7a2bce83027d3ed28a972889909181155965cca5a876010867e",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/029_phase3_runtime_privilege_surface.sql",
+      "sha256": "bd7677c11d008ea4b6fac95dbff374cdf9db7f49629c7edbe28a4250e70e6c59",
+      "mode": "recovered-current-source-2026-10-21"
+    },
+    {
+      "path": "migrations/029_phase1_runtime_role_least_privilege.sql",
+      "sha256": "9ff42495adf8885cf498531eb9ab39c423c70fe2cec1a601a27f1f0b28b979c1",
+      "mode": "original-source"
+    },
+    {
+      "path": "migrations/030_phase3_workspace_memberships.sql",
+      "sha256": "d626d141963bacf1ba8d0d9d4e89b4a1e6033c1a0f8b77466574ff8fec8374f0",
+      "mode": "canonical-source-in-package"
+    },
+    {
+      "path": "migrations/031_phase3_auth_surface_rls.sql",
+      "sha256": "0e887fd1f3b56c147d8658fc9f32a0f3804be2c8ffc283a28693ba6953abaa53",
+      "mode": "recovered-current-source-2026-10-21"
+    },
+    {
+      "path": "migrations/033_phase5_refund_settlement_consistency.sql",
+      "sha256": "6f18ba14598174004da7626582874464e9929a4e093c7c8ffa034fb868629c6f",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/034_phase5_return_accounting_journals.sql",
+      "sha256": "fb237bfa761512a4b4ed9a7b8e48d4ee4dc6e4aafae9bc4ec7cf2ec2ba715d07",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/035_phase5_none_return_receivable_guard.sql",
+      "sha256": "106147cdbe77cc43d0b06a222715124f17547a430709c17cae067527aa6f89b8",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/036_phase6_inventory_intelligence.sql",
+      "sha256": "dd4ca5dbc869ed1fc8b9133d5ff627c3ba3f78c0e3554f8a419ba994bf8ef723",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/037_phase6_inventory_ageing_index.sql",
+      "sha256": "5aed3b599766199edf4aba1ea8c72eb6f289bc0d3d2ff53bf21d58ca74b461e4",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/038_phase6_movement_health_indexes.sql",
+      "sha256": "0fcd8b0b42a13b608f1f96fb4ad7eb8a9f475fc5edb3057491432e0a1c7b69b6",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/039_phase7_supplier_ledger_landed_costs.sql",
+      "sha256": "8997f69c173e50e8aa6cd23fb276bb98fd5ed0ad88695f2e7ee38467477a6179",
+      "mode": "additive-forward-migration-candidate"
+    }
+  ],
+  "migration_bundle_sha256": "2d446ba3c0df5903b06ed0dbb92e1c2239f353aa69cc40e80d452ecb78ec1674",
+  "historical_recovery_gate": "CLOSED_BY_PERMANENT_DISPOSITION",
+  "historical_byte_parity_asserted": false,
+  "rls": {
+    "public_tables": 126,
+    "enabled": 126,
+    "forced": 126,
+    "gaps": 0
+  },
+  "runtime_tenant_isolation_probe": {
+    "cross_tenant_read_hidden": true,
+    "cross_tenant_insert_denied": true,
+    "fixtures_rolled_back": true,
+    "test_kind": "disposable-only transaction rollback; no canonical production SQL executed"
+  },
+  "phase6_replenishment_table_exists": true,
+  "phase6_replenishment_rls_forced": true,
+  "phase6_replenishment_tenant_policy_count": 1,
+  "lexa_app_can_write_permissions_reference": false,
+  "lexa_app_can_write_schema_migrations": false,
+  "phase6_inventory_age_index_count": 1,
+  "phase6_inventory_health_index_count": 4,
+  "phase7_supplier_ledger_tables": 6,
+  "phase7_supplier_ledger_rls_forced": 6,
+  "phase7_supplier_ledger_tenant_policy_count": 6,
+  "phase7_active_supplier_cost_tier_index": true,
+  "phase7_purchase_order_updated_at": true,
+  "phase7_supplier_bill_match_contract": true,
+  "phase7_supplier_return_credit_cost_contract": true,
+  "phase7_append_only_runtime_grants": true,
+  "phase7_bill_payment_lifecycle_grants": true,
+  "required_phase5_return_routines_found": 4,
+  "index_verification": [
+    {
+      "name": "idx_inventory_transactions_age_analysis",
+      "valid": true,
+      "ready": true
+    },
+    {
+      "name": "idx_sales_inventory_movement_history",
+      "valid": true,
+      "ready": true
+    },
+    {
+      "name": "idx_transaction_lines_variant_demand",
+      "valid": true,
+      "ready": true
+    },
+    {
+      "name": "idx_sale_returns_movement_history",
+      "valid": true,
+      "ready": true
+    },
+    {
+      "name": "idx_sale_return_lines_variant_movement",
+      "valid": true,
+      "ready": true
+    },
+    {
+      "name": "uq_supplier_variant_cost_active_tier",
+      "valid": true,
+      "ready": true
+    }
+  ],
+  "phase7_table_names": [
+    "purchase_landed_costs",
+    "purchase_landed_cost_allocations",
+    "supplier_bills",
+    "supplier_payments",
+    "supplier_payment_allocations",
+    "supplier_ledger_entries"
+  ],
+  "production_database_mutated": false,
+  "github_actions_artifact": false,
+  "limitations": [
+    "This is the manually observed Neon replay audit recorded against SQL source files whose declared Git blob hashes match this repository package; it was not produced by GitHub Actions.",
+    "The current GitHub main SHA is b920c8719079741ed3c2fb2288de67c7de8a0d37; Increment 03 API fixes are not in that source commit."
+  ]
+}

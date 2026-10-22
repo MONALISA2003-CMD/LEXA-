@@ -8,7 +8,7 @@ from pathlib import Path
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=Path("artifacts/phase6-ci-gate-evidence.json"))
+    parser.add_argument("--output", type=Path, default=Path("artifacts/phase7-ci-gate-evidence.json"))
     args = parser.parse_args()
     commit = os.environ.get("GITHUB_SHA", "").strip()
     if not commit:
@@ -24,13 +24,14 @@ def main() -> int:
     evidence = {
         "schema_version": 1,
         "project": "LEXA",
-        "phase": 6,
-        "increment": "6.1-inventory-intelligence",
+        "phase": 7,
+        "increment": "7.0-purchasing-supplier-management",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "source_commit": commit,
         "ci_gate_status": "PASS_CI_CANDIDATE_GATES" if pass_ci else "FAIL_OR_INCOMPLETE",
         "production_release_accepted": False,
         "historical_source_recovery_gate": "CLOSED_BY_PHASE3_PERMANENT_DISPOSITION",
+        "phase7_scope": "supplier terms, PO lifecycle, partial receiving, landed costs, supplier returns, bill matching and payment allocations",
         "historical_byte_parity_claimed": False,
         "candidate_semantic_replay_status": statuses["clean_database_replay"].upper(),
         "jobs": statuses,

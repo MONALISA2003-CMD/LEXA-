@@ -86,7 +86,8 @@ def test_phase7_supplier_financial_ledger_and_cost_allocations_are_append_only_a
 
 def test_phase7_supplier_payment_model_uses_shared_allocation_rule():
     source = (ROOT / "apps/api/app/routes/purchasing.py").read_text()
-    assert "validate_payment_allocations(self.amount" in source
+    assert "validate_payment_allocations(" in source and "self.amount" in source
+    assert source.count("def validate_allocations(self):") == 1
     assert "A supplier payment may allocate to each bill only once" in (ROOT / "apps/api/app/purchasing_rules.py").read_text()
 
 

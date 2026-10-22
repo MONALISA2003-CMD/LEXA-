@@ -28,7 +28,7 @@ def create_role(body: RoleIn, ctx=Depends(require_permission("roles.manage"))):
     role = Role(tenant_id=tenant_id, name=body.name.strip(), description=body.description); db.add(role)
     try: db.commit()
     except Exception: db.rollback(); raise HTTPException(409, "Role name already exists")
-    db.refresh(role); return role
+    return role
 
 @router.post("/role-assignments")
 def assign_role(body: AssignRoleIn, ctx=Depends(require_permission("roles.manage"))):

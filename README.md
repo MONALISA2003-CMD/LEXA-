@@ -1,61 +1,34 @@
-# LEXA — Phase 7 Purchasing & Supplier Management (v2.12.0, finalization increment 02 — 22 October 2026)
+# LEXA — Phase 7 Purchasing & Supplier Management (v2.12.0, Increment 03 — 22 October 2026)
 
-**Current release status: NOT ACCEPTED FOR PRODUCTION.** This archive is a source-only finalization increment based on the Phase 7 Increment 01 candidate. It fixes two TypeScript errors reported by the current Vercel build, adds focused regression contracts, and records the live release blockers. GitHub rejected branch creation with HTTP 403, so these source updates have **not** been committed or deployed.
+**Release decision: NO-GO for production.** This is a full-source repair archive, not a deployment certificate. It fixes two live-log-confirmed backend failure patterns (supplier-payment Pydantic validator override and post-commit ORM refresh 500s), adds regression tests, and records exact backend/database/hosting evidence and blocked gates.
 
-- **Finalization report:** [`PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md`](PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md)
-- **Machine-readable gate status:** [`PHASE7_FINALIZATION_RELEASE_GATE_STATUS_2026-10-22.json`](PHASE7_FINALIZATION_RELEASE_GATE_STATUS_2026-10-22.json)
-- **Increment 02 release notes:** [`RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_02.md`](RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_02.md)
+- **Deep audit report:** [`PHASE7_DEEP_AUDIT_ACCEPTANCE_REPORT_2026-10-22.md`](PHASE7_DEEP_AUDIT_ACCEPTANCE_REPORT_2026-10-22.md)
+- **Release gate status:** [`PHASE7_INCREMENT_03_RELEASE_GATE_STATUS_2026-10-22.json`](PHASE7_INCREMENT_03_RELEASE_GATE_STATUS_2026-10-22.json)
+- **Manual Neon replay evidence:** [`PHASE7_REMOTE_REPLAY_EVIDENCE_2026-10-22.json`](PHASE7_REMOTE_REPLAY_EVIDENCE_2026-10-22.json)
+- **Unblock checklist:** [`PHASE7_CI_AND_RELEASE_UNBLOCK_CHECKLIST_2026-10-22.md`](PHASE7_CI_AND_RELEASE_UNBLOCK_CHECKLIST_2026-10-22.md)
+- **Increment 03 notes:** [`RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_03.md`](RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_03.md)
 
-## Current external evidence (read-only, 22 October 2026)
+## What Increment 03 fixes
 
-- Source baseline: GitHub `main` SHA `dd4069109d5c94143f5c5e28e758128b90dee55a`. The uploaded Increment 01 archive matched the expected handoff SHA-256 before extraction.
-- Vercel build for that SHA fails TypeScript checks in `apps/web/app/inventory/page.tsx` and `apps/web/app/purchasing/page.tsx`; increment 02 includes targeted source fixes, but no new full build has yet verified them.
-- The connected GitHub identity cannot push/create a branch. The workflow file `.github/workflows/lexa-ci.yml` is included in this archive but is absent from current `main`; required CI has not run against increment 02.
-- Render's current LEXA deployment is live at the baseline SHA, but its configured health-check path is blank. It is not evidence of candidate parity or readiness.
-- The canonical Neon `lexa-live` branch has 31 `schema_migrations` rows through migration 031. Migration rows 033–039 and the six Phase 7 landed-cost/supplier-finance tables are absent. No database write was performed.
+Render logs repeatedly emitted a warning that `SupplierPaymentCreate.validate_allocations` overrode an earlier Pydantic validator. The class contained two same-named methods and the surviving validator called `validate_payment_allocations` without importing it. The fix imports the shared validator, keeps one method and adds executable regression tests for valid allocations, duplicate bill allocations and over-allocation. Render also showed `Could not refresh instance` errors for category/branch creation after commit; the affected catalog/organization/RBAC routes no longer issue a redundant post-commit refresh SELECT under transaction-local RLS. A regression contract protects this behavior. These repairs are source-only: current GitHub `main` and Render do not yet contain this source change because GitHub writes returned 403.
 
-## Phase 7 implementation
-## Phase 7 implementation
+## Observed verification
 
-- **Supplier register:** trading/legal identity, contact and tax details, default receiving location, payment terms, default currency, status/archive guards and effective-dated supplier cost tiers.
-- **Purchase commitments:** draft → submit → approve → receive/close/cancel, scoped branch/location checks, audit/status history and idempotent transition writes.
-- **Partial goods receiving:** quantity and cost-variance checks, receipt drafts, landed-cost allocation by value/quantity/equal share, deterministic rounding, inventory ledger posting only after explicit receipt posting.
-- **Supplier returns:** only posted receipt quantities can be requested; quantity reservations cover requested/approved/posted returns; approval is separate; posting reverses stock at landed cost and grants supplier credit at original goods cost.
-- **Supplier bills/payments:** receipt-match status, `WAITING_RECEIPT` for PO-linked invoices without a posted receipt, reviewed/justified variance exceptions, posted payable ledger entries, bill-specific payment allocations, duplicate/over-allocation checks, draft voids, and currency-separated payable/credit balances.
-- **Database security:** forward migration 039 creates landed cost and supplier ledger tables with forced tenant RLS. Runtime privileges are append-only for landed-cost/allocation/ledger tables; supplier bills/payments are mutable only for their draft/post/void lifecycle.
-- **Release gates:** CI has a guarded clean replay, Node 24 frontend build, Redis-backed backend test, and an optional manually triggered authenticated Phase 7 E2E job. The E2E job requires an explicit HTTPS staging-host allow-list, disposable tenant/reset fixture and QA storage state; known production hosts are denied.
+- Backend suite: **211 passed, 1 skipped** (offline environment lacks Redis Python package; CI must run it with Redis and no skip).
+- Frontend contracts: **38 passed**.
+- Static frontend action/destination audit: **PASS** — 29 files, 153 controls, 35 forms, 33 links.
+- Python compileall and strict source reconciliation: **PASS**.
+- Plan-only migration check: **43 inputs** and SHA-256 `2d446ba3c0df5903b06ed0dbb92e1c2239f353aa69cc40e80d452ecb78ec1674`.
+- Actual remote disposable PostgreSQL replay: 43 ordered SQL inputs executed, migration 039 present in the test DB, 126/126 public tables with forced RLS, all six Phase 7 tables with tenant policies, cross-tenant and branch-scope probes passed. The checksummed `artifacts/phase6-replay-evidence.json` passes the evidence checker for the current baseline SHA and migration bundle. This is manual remote evidence, not CI.
+- Vercel `READY` on baseline commit `b920c8719079741ed3c2fb2288de67c7de8a0d37`. Render still live on older `dd4069109d5c94143f5c5e28e758128b90dee55a`.
 
-## Local validation evidence
+## Why release remains blocked
 
-- Backend: **206 passed, 1 skipped, 0 failed**. The only skip is auth-refresh integration because the offline runner has no Redis Python package; CI provisions Redis.
-- Frontend contracts: **38 passed, 0 failed** (including two increment-02 regression contracts) under local Node 22.16.0.
-- Syntax audit: **38 `.ts`/`.tsx` sources, zero parser diagnostics**. This is a syntax check, not a complete TypeScript typecheck.
-- Static control audit: **PASS** across 29 TS/TSX files; 153 button-like controls, 35 forms and 33 links.
-- Python compilation, strict source reconciliation, permanent migration disposition checks and checksums: **PASS**.
-- Clean replay plan: **43 SQL inputs and hashes verified in plan-only mode**. No SQL was executed by that check.
+The GitHub Actions CI workflow is absent from deployed `main` and the connected GitHub integration denied writes with 403; exact-SHA CI did not run. The API patches are not deployed, authenticated staging E2E has no isolated target/fixture/state, Render health-check path is blank despite `/ready` in `render.yaml`, the canonical `lexa-live` Neon schema remains at 031, and the available Neon snapshot API will not snapshot this non-root app branch. The project has no snapshots/schedule and branch capacity is exhausted; restore readiness remains unproven. **Do not apply migrations 033–039 in production or claim this release green.**
 
-## Release boundary
-
-This archive is a review candidate, not a production release certificate. Node 24 `npm ci`/typecheck/build, actual clean PostgreSQL replay, authenticated disposable-staging E2E, same-candidate-SHA Render/Vercel readiness and approved production migration rollout remain pending. Migration 039 and the Phase 5/6 forward candidates are **not production-applied by this work**. No production database mutation or deployment was performed.
-
-## Authoritative documents
-
-- [`FRESH_NEW_PRODUCT_STRATEGY.md`](FRESH_NEW_PRODUCT_STRATEGY.md)
-- [`PHASE7_IMPLEMENTATION_REPORT_2026-10-21.md`](PHASE7_IMPLEMENTATION_REPORT_2026-10-21.md) (Increment 01 implementation record)
-- [`PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md`](PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md)
-- [`PHASE7_ACCEPTANCE_MATRIX.md`](PHASE7_ACCEPTANCE_MATRIX.md)
-- [`PHASE7_RELEASE_GATE_STATUS_2026-10-21.json`](PHASE7_RELEASE_GATE_STATUS_2026-10-21.json) (Increment 01 snapshot)
-- [`PHASE7_FINALIZATION_RELEASE_GATE_STATUS_2026-10-22.json`](PHASE7_FINALIZATION_RELEASE_GATE_STATUS_2026-10-22.json)
-- [`RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_01.md`](RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_01.md)
-- [`RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_02.md`](RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_02.md)
-- [`docs/decisions/ADR-DB-001-permanent-replacement-of-lost-migrations.md`](docs/decisions/ADR-DB-001-permanent-replacement-of-lost-migrations.md)
-- [`migrations/migration_dispositions.json`](migrations/migration_dispositions.json)
-- [`migrations/reconstructed/clean_replay_order.json`](migrations/reconstructed/clean_replay_order.json)
+Phase 7 scope follows [`FRESH_NEW_PRODUCT_STRATEGY.md`](FRESH_NEW_PRODUCT_STRATEGY.md), especially supplier terms, PO lifecycle, partial receipts, landed costs, returns, bill matching and supplier balances. The approved historical Phase 3 replacement disposition remains closed; exact historical byte parity is not claimed.
 
 ---
-
-> **Historical documentation note:** the following handoff sections are retained for audit context. Their test counts, deployment observations and migration-blocker language describe earlier snapshots; they are not current release state if they conflict with the files listed above. In particular, the Phase 3 six-file recovery decision must not be reopened.
-
 
 ## LEXA — background and historical handoffs
 

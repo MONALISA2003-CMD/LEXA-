@@ -269,9 +269,9 @@ def _commit_created(
         resource_type=resource_type,
         resource_id=row.id,
     )
+    # response_body was materialized before commit; avoid a second RLS-scoped SELECT.
     db.commit()
-    db.refresh(row)
-    return row
+    return response_body
 
 
 def _require_replay(replay, response_model, *, resource_label: str):
@@ -353,7 +353,6 @@ def create_profile(
         resource_id=profile.id,
     )
     db.commit()
-    db.refresh(profile)
     return profile
 
 
@@ -426,7 +425,6 @@ def update_profile(
         resource_id=profile.id,
     )
     db.commit()
-    db.refresh(profile)
     return profile
 
 
@@ -536,8 +534,8 @@ def update_branch(
         resource_id=branch.id,
     )
     db.commit()
-    db.refresh(branch)
-    return branch
+    # response_body was materialized before commit; no post-commit RLS refresh is needed.
+    return response_body
 
 
 @router.get("/warehouses", response_model=list[WarehouseOut])

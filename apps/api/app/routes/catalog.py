@@ -129,7 +129,7 @@ def create_category(body: CategoryIn, ctx=Depends(require_permission("catalog.ma
         emit_event(db, tenant_id=tenant_id, event_type="CategoryCreated", aggregate_type="category", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "code": code, "name": name})
     except CatalogValidation as exc: db.rollback(); raise HTTPException(422, str(exc)) from exc
     commit_or_409(db, "Category code already exists for this tenant")
-    db.refresh(row); return row
+    return row
 
 @router.patch("/categories/{category_id}", response_model=CategoryOut)
 def patch_category(category_id: UUID, body: CategoryPatch, ctx=Depends(require_permission("catalog.manage"))):
@@ -144,7 +144,7 @@ def patch_category(category_id: UUID, body: CategoryPatch, ctx=Depends(require_p
     if body.sort_order is not None: row.sort_order = body.sort_order
     if body.status is not None: row.status = normalize_code(body.status, "Status")
     db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.category.updated", target_type="category", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="CategoryUpdated", aggregate_type="category", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "status": row.status})
-    commit_or_409(db, "Category update conflicts with existing data"); db.refresh(row); return row
+    commit_or_409(db, "Category update conflicts with existing data"); return row
 
 @router.delete("/categories/{category_id}", response_model=CategoryOut)
 def delete_category(category_id: UUID, ctx=Depends(require_permission("catalog.manage"))):
@@ -155,7 +155,7 @@ def delete_category(category_id: UUID, ctx=Depends(require_permission("catalog.m
     product = db.scalar(select(Product.id).where(Product.category_id == row.id, Product.deleted_at.is_(None)))
     if child or product: raise HTTPException(409, "Category is still referenced")
     row.deleted_at = utc_now(); row.deleted_by = actor; row.status = "INACTIVE"; db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.category.deleted", target_type="category", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="CategoryDeleted", aggregate_type="category", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id)})
-    db.commit(); db.refresh(row); return row
+    db.commit(); return row
 
 @router.get("/brands", response_model=Page)
 def brands(limit: int = Query(50, ge=1, le=100), cursor: str | None = None, ctx=Depends(require_permission("catalog.read"))):
@@ -166,7 +166,7 @@ def create_brand(body: BrandIn, ctx=Depends(require_permission("catalog.manage")
     db, actor, tenant_id, _ = ctx
     try: name = normalize_text(body.name, "Brand name"); code = normalize_code(body.code, "Brand code") if body.code else None
     except CatalogValidation as exc: raise HTTPException(422, str(exc)) from exc
-    row = Brand(tenant_id=tenant_id, name=name, code=code, description=body.description); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.brand.created", target_type="brand", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="BrandCreated", aggregate_type="brand", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "name": name, "code": code}); commit_or_409(db, "Brand code conflicts with existing data"); db.refresh(row); return row
+    row = Brand(tenant_id=tenant_id, name=name, code=code, description=body.description); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.brand.created", target_type="brand", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="BrandCreated", aggregate_type="brand", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "name": name, "code": code}); commit_or_409(db, "Brand code conflicts with existing data"); return row
 
 @router.patch("/brands/{brand_id}", response_model=BrandOut)
 def patch_brand(brand_id: UUID, body: BrandPatch, ctx=Depends(require_permission("catalog.manage"))):
@@ -178,7 +178,7 @@ def patch_brand(brand_id: UUID, body: BrandPatch, ctx=Depends(require_permission
         if body.description is not None: row.description = body.description
         if body.status is not None: row.status = normalize_code(body.status, "Status")
     except CatalogValidation as exc: raise HTTPException(422, str(exc)) from exc
-    db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.brand.updated", target_type="brand", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="BrandUpdated", aggregate_type="brand", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "status": row.status}); commit_or_409(db, "Brand update conflicts with existing data"); db.refresh(row); return row
+    db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.brand.updated", target_type="brand", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="BrandUpdated", aggregate_type="brand", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "status": row.status}); commit_or_409(db, "Brand update conflicts with existing data"); return row
 
 @router.get("/units", response_model=Page)
 def units(limit: int = Query(50, ge=1, le=100), cursor: str | None = None, ctx=Depends(require_permission("catalog.read"))):
@@ -193,7 +193,7 @@ def create_unit(body: UnitIn, ctx=Depends(require_permission("catalog.manage")))
         name = normalize_text(body.name, "Unit name"); code = normalize_code(body.code, "Unit code")
         if body.allows_fraction and body.precision_scale < 1: raise CatalogValidation("Fractional units require a precision scale")
     except CatalogValidation as exc: raise HTTPException(422, str(exc)) from exc
-    row = Unit(tenant_id=tenant_id, name=name, code=code, symbol=body.symbol.strip(), unit_type=normalize_code(body.unit_type, "Unit type"), allows_fraction=body.allows_fraction, precision_scale=body.precision_scale, is_system=False); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.unit.created", target_type="unit", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="UnitCreated", aggregate_type="unit", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "code": code}); commit_or_409(db, "Unit code conflicts with existing data"); db.refresh(row); return row
+    row = Unit(tenant_id=tenant_id, name=name, code=code, symbol=body.symbol.strip(), unit_type=normalize_code(body.unit_type, "Unit type"), allows_fraction=body.allows_fraction, precision_scale=body.precision_scale, is_system=False); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.unit.created", target_type="unit", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="UnitCreated", aggregate_type="unit", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "code": code}); commit_or_409(db, "Unit code conflicts with existing data"); return row
 
 @router.get("/products", response_model=Page)
 def products(limit: int = Query(50, ge=1, le=100), cursor: str | None = None, q: str | None = Query(None, min_length=1), status_filter: str | None = None, ctx=Depends(require_permission("catalog.read"))):
@@ -232,7 +232,7 @@ def create_product(body: ProductIn, idempotency_key: str | None = Header(None, a
     except CatalogValidation as exc: db.rollback(); raise HTTPException(422, str(exc)) from exc
     row = Product(tenant_id=tenant_id, category_id=body.category_id, brand_id=body.brand_id, name=name, description=body.description, product_type=product_type, has_variants=body.has_variants, tax_category_id=body.tax_category_id, product_metadata=body.metadata); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product.created", target_type="product", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductCreated", aggregate_type="product", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "name": name, "category_id": str(body.category_id), "brand_id": str(body.brand_id) if body.brand_id else None});
     finish_idempotency(db, idem, status_code=201, response_body=ProductOut.model_validate(row).model_dump(mode="json"), resource_type="product", resource_id=row.id)
-    db.commit(); db.refresh(row); return row
+    db.commit(); return row
 
 @router.patch("/products/{product_id}", response_model=ProductOut)
 def patch_product(product_id: UUID, body: ProductPatch, ctx=Depends(require_permission("catalog.manage"))):
@@ -249,13 +249,13 @@ def patch_product(product_id: UUID, body: ProductPatch, ctx=Depends(require_perm
             row.product_metadata = body.metadata
         # metadata is a public API field; product_metadata is the ORM-safe attribute.
     except CatalogValidation as exc: raise HTTPException(422, str(exc)) from exc
-    db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product.updated", target_type="product", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductUpdated", aggregate_type="product", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "status": row.status}); db.commit(); db.refresh(row); return row
+    db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product.updated", target_type="product", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductUpdated", aggregate_type="product", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "status": row.status}); db.commit(); return row
 
 @router.delete("/products/{product_id}", response_model=ProductOut)
 def delete_product(product_id: UUID, ctx=Depends(require_permission("catalog.manage"))):
     db, actor, tenant_id, _ = ctx; row = db.scalar(select(Product).where(Product.id == product_id, Product.tenant_id == tenant_id, Product.deleted_at.is_(None)))
     if not row: raise HTTPException(404, "Product not found")
-    row.deleted_at = utc_now(); row.deleted_by = actor; row.status = "INACTIVE"; db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product.deleted", target_type="product", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductDeleted", aggregate_type="product", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id)}); db.commit(); db.refresh(row); return row
+    row.deleted_at = utc_now(); row.deleted_by = actor; row.status = "INACTIVE"; db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product.deleted", target_type="product", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductDeleted", aggregate_type="product", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id)}); db.commit(); return row
 
 @router.get("/products/{product_id}", response_model=ProductOut)
 def get_product(product_id: UUID, ctx=Depends(require_permission("catalog.read"))):
@@ -287,7 +287,7 @@ def create_variant(body: VariantIn, idempotency_key: str | None = Header(None, a
     if body.allow_fractional_quantity and not unit.allows_fraction: db.rollback(); raise HTTPException(422, "Variant cannot allow fractional quantity with a non-fractional base unit")
     row = ProductVariant(tenant_id=tenant_id, product_id=body.product_id, name=name, sku=sku, base_unit_id=body.base_unit_id, track_inventory=body.track_inventory, allow_fractional_quantity=body.allow_fractional_quantity, costing_method=body.costing_method, variant_metadata=body.metadata); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.variant.created", target_type="product_variant", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductVariantCreated", aggregate_type="product_variant", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "product_id": str(body.product_id), "sku": sku});
     finish_idempotency(db, idem, status_code=201, response_body=VariantOut.model_validate(row).model_dump(mode="json"), resource_type="product_variant", resource_id=row.id)
-    commit_or_409(db, "SKU already exists for this tenant"); db.refresh(row); return row
+    commit_or_409(db, "SKU already exists for this tenant"); return row
 
 @router.patch("/variants/{variant_id}", response_model=VariantOut)
 def patch_variant(variant_id: UUID, body: VariantPatch, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("catalog.manage"))):
@@ -317,7 +317,7 @@ def patch_variant(variant_id: UUID, body: VariantPatch, idempotency_key: str | N
     db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.variant.updated", target_type="product_variant", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductVariantUpdated", aggregate_type="product_variant", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "sku": row.sku, "status": row.status})
     response_body = VariantOut.model_validate(row).model_dump(mode="json")
     finish_idempotency(db, idem, status_code=200, response_body=response_body, resource_type="product_variant", resource_id=row.id)
-    commit_or_409(db, "Variant update conflicts with existing data"); db.refresh(row); return row
+    commit_or_409(db, "Variant update conflicts with existing data"); return row
 
 @router.get("/variants/{variant_id}", response_model=VariantOut)
 def get_variant(variant_id: UUID, ctx=Depends(require_permission("catalog.read"))):
@@ -367,7 +367,7 @@ def create_barcode(body: BarcodeIn, idempotency_key: str | None = Header(None, a
     write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.barcode.created", target_type="barcode", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="BarcodeCreated", aggregate_type="barcode", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "variant_id": str(body.variant_id), "barcode": barcode})
     response_body = BarcodeOut.model_validate(row).model_dump(mode="json")
     finish_idempotency(db, idem, status_code=201, response_body=response_body, resource_type="barcode", resource_id=row.id)
-    commit_or_409(db, "Barcode already belongs to another active catalog identity"); db.refresh(row); return row
+    commit_or_409(db, "Barcode already belongs to another active catalog identity"); return row
 
 @router.get("/attribute-definitions", response_model=list[AttributeDefinitionOut])
 def attribute_definitions(ctx=Depends(require_permission("catalog.read"))):
@@ -387,7 +387,7 @@ def create_attribute_definition(body: AttributeDefinitionIn, ctx=Depends(require
     data_type = normalize_code(body.data_type, "Attribute data type")
     allowed = {"TEXT","NUMBER","BOOLEAN","DATE","SELECT","MULTI_SELECT"}
     if data_type not in allowed: raise HTTPException(422, f"Unsupported attribute data type: {data_type}")
-    row = ProductAttributeDefinition(tenant_id=tenant_id, category_id=body.category_id, name=normalize_text(body.name,"Attribute name"), code=normalize_code(body.code,"Attribute code"), data_type=data_type, required=body.required, options=body.options); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.attribute_definition.created", target_type="product_attribute_definition", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductAttributeDefinitionCreated", aggregate_type="product_attribute_definition", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "code": row.code}); commit_or_409(db, "Attribute definition code already exists for this tenant"); db.refresh(row); return row
+    row = ProductAttributeDefinition(tenant_id=tenant_id, category_id=body.category_id, name=normalize_text(body.name,"Attribute name"), code=normalize_code(body.code,"Attribute code"), data_type=data_type, required=body.required, options=body.options); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.attribute_definition.created", target_type="product_attribute_definition", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductAttributeDefinitionCreated", aggregate_type="product_attribute_definition", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "code": row.code}); commit_or_409(db, "Attribute definition code already exists for this tenant"); return row
 
 @router.post("/attribute-values", response_model=AttributeValueOut, status_code=201)
 def create_attribute_value(body: AttributeValueIn, ctx=Depends(require_permission("catalog.manage"))):
@@ -406,7 +406,7 @@ def create_attribute_value(body: AttributeValueIn, ctx=Depends(require_permissio
     if definition.data_type == "MULTI_SELECT" and definition.options:
         choices = set(definition.options.get("choices", [])); values = set(body.value_json if isinstance(body.value_json, list) else []); 
         if not values.issubset(choices): raise HTTPException(422, "One or more values are not allowed choices")
-    row = ProductAttributeValue(tenant_id=tenant_id, variant_id=body.variant_id, attribute_definition_id=body.attribute_definition_id, value_text=body.value_text, value_number=body.value_number, value_boolean=body.value_boolean, value_date=body.value_date, value_json=body.value_json); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.attribute_value.created", target_type="product_attribute_value", target_id=row.id); db.commit(); db.refresh(row); return row
+    row = ProductAttributeValue(tenant_id=tenant_id, variant_id=body.variant_id, attribute_definition_id=body.attribute_definition_id, value_text=body.value_text, value_number=body.value_number, value_boolean=body.value_boolean, value_date=body.value_date, value_json=body.value_json); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.attribute_value.created", target_type="product_attribute_value", target_id=row.id); db.commit(); return row
 
 @router.get("/price-lists", response_model=list[PriceListOut])
 def price_lists(ctx=Depends(require_permission("catalog.read"))):
@@ -425,7 +425,7 @@ def create_price_list(body: PriceListIn, idempotency_key: str | None = Header(No
     row = PriceList(tenant_id=tenant_id, name=normalize_text(body.name,"Price list name"), currency=normalize_code(body.currency,"Currency"), price_type=normalize_code(body.price_type,"Price type"), effective_from=body.effective_from, effective_to=body.effective_to); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.price_list.created", target_type="price_list", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="PriceListCreated", aggregate_type="price_list", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "name": row.name, "currency": row.currency})
     response_body = PriceListOut.model_validate(row).model_dump(mode="json")
     finish_idempotency(db, idem, status_code=201, response_body=response_body, resource_type="price_list", resource_id=row.id)
-    commit_or_409(db, "Price list conflicts with existing data"); db.refresh(row); return row
+    commit_or_409(db, "Price list conflicts with existing data"); return row
 
 @router.get("/prices", response_model=list[ProductPriceOut])
 def prices(variant_id: UUID | None = None, price_list_id: UUID | None = None, ctx=Depends(require_permission("catalog.read"))):
@@ -460,4 +460,4 @@ def create_price(body: ProductPriceIn, idempotency_key: str | None = Header(None
     row = ProductPrice(tenant_id=tenant_id, price_list_id=body.price_list_id, variant_id=body.variant_id, unit_price=body.unit_price, minimum_quantity=body.minimum_quantity, effective_from=body.effective_from, effective_to=body.effective_to); db.add(row); db.flush(); write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="catalog.product_price.created", target_type="product_price", target_id=row.id); emit_event(db, tenant_id=tenant_id, event_type="ProductPriceCreated", aggregate_type="product_price", aggregate_id=row.id, actor_user_id=actor, payload={"id": str(row.id), "variant_id": str(body.variant_id), "price_list_id": str(body.price_list_id)})
     response_body = ProductPriceOut.model_validate(row).model_dump(mode="json")
     finish_idempotency(db, idem, status_code=201, response_body=response_body, resource_type="product_price", resource_id=row.id)
-    commit_or_409(db, "Overlapping or duplicate product price is not permitted"); db.refresh(row); return row
+    commit_or_409(db, "Overlapping or duplicate product price is not permitted"); return row

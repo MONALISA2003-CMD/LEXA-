@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Phase 7 Purchasing and Supplier Management — Finalization Increment 02",
-  "version": "2.12.0+phase7.increment02",
+  "package": "LEXA Phase 7 Purchasing and Supplier Management — Deeper Backend/Release Audit Increment 03",
+  "version": "2.12.0+phase7.increment03",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -134,7 +134,14 @@
     "Phase 7 Increment 02: supplied businessCurrency to the inventory ledger unit-cost formatter after the current Vercel TypeScript diagnostic.",
     "Phase 7 Increment 02: added business-currency fallback for supplier return value formatting when currency_code is undefined.",
     "Added two Phase 7 finalization frontend regression contracts.",
-    "Added dated Phase 7 finalization report and machine-readable release-gate status based on read-only current infrastructure evidence."
+    "Added dated Phase 7 finalization report and machine-readable release-gate status based on read-only current infrastructure evidence.",
+    "Phase 7 increment 03: fixed duplicate Pydantic SupplierPaymentCreate validator that caused a runtime override warning and left shared payment allocation validation out of the effective validator path.",
+    "Imported and used the shared validate_payment_allocations rule so supplier payment request models reject duplicate bill allocations and payment over-allocation before database mutation.",
+    "Added executable model regression tests covering valid allocation normalization, duplicate allocation denial, over-allocation denial and duplicate validator detection.",
+    "Added deeper release audit evidence, verified manual disposable PostgreSQL replay/security probes, exact-SHA deployment-parity findings, and explicit CI/backup/staging blockers.",
+    "Documented protected GitHub workflow restoration, Render /ready health-check drift, Neon snapshot/branch-limit constraints, and no-go production rollback conditions.",
+    "Phase 7 increment 03: removed redundant post-commit ORM refresh SELECTs from affected catalog, organization and RBAC handlers after Render logged Could not refresh instance 500s on branch/category creation; added a regression contract.",
+    "Corrected CI gate evidence metadata and artifact label to Phase 7, avoiding the stale Phase 6 label in the restored workflow."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -324,5 +331,49 @@
     "candidate_deployed": false,
     "production_database_mutated": false,
     "production_deployment_performed": false
+  },
+  "phase7_increment_03": {
+    "package_version": "2.12.0+phase7.increment03",
+    "backend_fix": "apps/api/app/routes/purchasing.py",
+    "regression_tests": [
+      "apps/api/tests/test_phase7_purchasing_model_validation.py"
+    ],
+    "source_baseline_sha": "b920c8719079741ed3c2fb2288de67c7de8a0d37",
+    "source_fix_deployed": false,
+    "github_write_status": "403_RESOURCE_NOT_ACCESSIBLE_BY_INTEGRATION",
+    "local_backend_tests": "209 passed / 1 skipped (Redis dependency unavailable in offline local environment)",
+    "local_frontend_contracts": "38 passed",
+    "frontend_action_audit": "PASS (29 files, 153 button-like controls, 35 forms, 33 links)",
+    "python_compileall": "PASS",
+    "migration_plan_only": "PASS, 43 inputs, bundle SHA-256 2d446ba3c0df5903b06ed0dbb92e1c2239f353aa69cc40e80d452ecb78ec1674",
+    "manual_disposable_postgres_replay": "PASS, 43 ordered SQL inputs executed; 126/126 public tables with forced RLS; all 6 Phase 7 tables have tenant policies; tenant and branch isolation probes passed",
+    "canonical_live_database": "31 migration rows through 031; migration 039/tables absent",
+    "phase7_ci_workflow_on_main": false,
+    "vercel": "READY for exact source baseline SHA b920c8719079741ed3c2fb2288de67c7de8a0d37",
+    "render": "Still live on prior SHA dd4069109d5c94143f5c5e28e758128b90dee55a; healthCheckPath empty in service settings",
+    "authenticated_staging_e2e": "NOT RUN - isolated service, fixture and authenticated storage state are not configured",
+    "backup_restore": "BLOCKED - no snapshots/schedule; app database is a non-root Neon branch; branch cap prevents a new validation branch",
+    "production_migrations_applied": false,
+    "production_database_mutated": false,
+    "production_rollout_approved": false,
+    "backend_tests": "211 passed / 1 skipped due missing local Redis Python package",
+    "runtime_fixes": [
+      {
+        "issue": "Duplicate Pydantic payment model validator and missing shared validator import",
+        "file": "apps/api/app/routes/purchasing.py",
+        "test": "apps/api/tests/test_phase7_purchasing_model_validation.py"
+      },
+      {
+        "issue": "Post-commit refresh failures after branch/category writes under transaction-local RLS",
+        "files": [
+          "apps/api/app/routes/catalog.py",
+          "apps/api/app/routes/organization.py",
+          "apps/api/app/routes/rbac.py"
+        ],
+        "test": "apps/api/tests/test_post_commit_rls_refresh_regression.py"
+      }
+    ],
+    "semantic_replay_evidence": "artifacts/phase6-replay-evidence.json passes checker against exact baseline SHA and migration bundle; evidence origin is manual remote Neon replay, not GitHub Actions.",
+    "ci_gate_report_label": "Phase 7"
   }
 }
