@@ -1,44 +1,21 @@
-# LEXA v2.8.5 — End-to-end auth readiness / manual push
+# LEXA Phase 7 candidate — safe publication runbook
+**Updated:** 2026-10-22 UTC
 
-This archive is a complete root-level project tree. The repository has a ZIP-extractor workflow: pushing this ZIP to the repository root lets the workflow extract the files and consume the root `DELETE.txt` manifest to remove the obsolete frontend-only routes. If you extract locally instead, run `bash scripts/cleanup-obsolete-frontend-routes.sh` and remove `DELETE.txt` before staging; do not commit the deletion manifest itself. Review all changes before pushing. Keep local `.env` files out of Git.
+## Important package layout
+This handoff ZIP has two layers: root-level handoff documents, and the actual project tree under `source/`. Do not upload or extract the whole handoff archive straight into the repository root. That would leave the repair under `source/apps/...`, while deployment uses the top-level application paths.
 
-## Validate locally
+## Publish only after GitHub write access is restored
+1. Create a dedicated release branch from the latest `main`; do not push candidate code directly to `main`. The connected GitHub integration returned HTTP 403 when branch creation was attempted.
+2. Extract the ZIP to a temporary folder. On the release branch, review and copy the **contents of `source/`** into the repository root so `apps/api`, `apps/web`, and `.github/workflows/lexa-ci.yml` land at their intended top-level paths. Do not copy the outer handoff documents into the application tree as source code.
+3. Carefully review the `DELETE.txt` manifest before staging any listed removals. Keep local `.env` files, credentials, database dumps, and the handoff ZIP out of Git.
+4. Inspect `git status --short` and the complete diff. Do not use `git add -A` blindly. Run `git diff --check`, install API development dependencies, run the full Python suite, and run the frontend tests. On Node `24.x`, run `npm ci`, `npm run typecheck`, and `npm run build` from `apps/web`.
+5. Open a pull request and merge only after CI and code review pass. Render auto-deploys from `main`, so merging can trigger a live API deployment. Verify frontend and backend correspond to the reviewed release and are healthy before calling it released.
 
-```bash
-git diff --check
-python -m pip install -e 'apps/api[dev]'
-python -m pytest -q
-node --test apps/web/tests/*.test.mjs
-cd apps/web
-npm install --include=dev --no-audit --no-fund
-npm run typecheck
-npm run build
-```
+## Database and staging safety
+- Do not apply Phase 7 migrations to production as part of source publication. Production was checked at migration `031_phase3_auth_surface_rls` with zero Phase 7 migration rows.
+- First use isolated replay/staging. Authenticated supplier, bill, payment, ledger, landed-cost, permissions, and tenant-isolation tests must pass before any production migration approval.
+- Never share the production Redis/cache with staging. Paid cache, automatic backup scheduling, and any other billing-dependent infrastructure remain deferred until the final production phase.
+- Set Render's health-check path to `/ready` in service settings; the current service setting is blank. Confirm `/ready`, login, refresh, protected routes, and logout after deployment.
 
-The backend refresh test verifies cookie-only refresh through the security-definer session lookup. Migration 028 has already been applied and verified on canonical Neon `lexa-live` for this package; do not re-run it unless you first check the live ledger. Do not replay older migrations or reset the database. Frontend contract tests verify preflight session restoration, single-flight refresh, auth-gated UI, no fabricated zero values on request failure, and the standard Vercel build command. Python suite: 97 passed / 1 skipped. Node contract tests: 2 passed. TypeScript syntax parsing: 26 non-declaration TS/TSX files, zero syntax errors. Migration 028 was promoted to the canonical branch after approval and its function/privileges/RLS changes were verified live. The full Next.js production build and authenticated live smoke test must still be confirmed after source rollout; no application deployment is claimed here. See `LEXA_E2E_FORENSIC_AUDIT_2026-10-13.md`.
-
-## Vercel configuration
-
-The intended Vercel Root Directory is `apps/web`; Framework Preset is Next.js. `apps/web/vercel.json` explicitly selects `npm run build`, and the obsolete Business Engine/Kernel frontend route modules have been removed from this package. This means the old command `rm -rf app/business-engine app/kernel && npm run build` is no longer needed.
-
-## Push safely
-
-For a ZIP workflow push, place the ZIP in the repository root and let the existing ZIP-extractor workflow process it. For a local source update, extract to a temporary folder, copy reviewed changes into your checkout, run `bash scripts/cleanup-obsolete-frontend-routes.sh`, remove `DELETE.txt`, inspect `git status --short` and `git diff`, then commit and push. Do not commit credentials or the temporary `DELETE.txt` manifest.
-
-```bash
-git add -A
-git diff --cached --check
-git commit -m "fix: stabilize Phase 0 auth refresh and Vercel build"
-git push origin main
-```
-
-Render is configured to auto-deploy from `main`. Its service uses `apps/api`; the API changes include tenant-safe refresh lookup, identity verification, RLS context and correlated error logging. Migration 028 is an additive schema/security change and a conservative read-only role backfill; it was already applied to canonical `lexa-live` in this remediation. Check the ledger before any application elsewhere; it does not alter existing Owner/Admin roles or attach accounts to unrelated tenants.
-
-
-## Phase 0.4 — required deploy order
-
-1. Do not re-run migration 028 blindly: it is already applied to `lexa-live`; query the live ledger first if reconciling another database.
-2. Push/extract this reviewed ZIP into the LEXA repository and inspect the diff before accepting it. Render auto-deploys from `main`; Vercel production commit/status must be verified separately.
-3. In the actual LEXA Render service settings, set Health Check Path to `/ready` (the service currently reports this setting as blank while `render.yaml` declares `/ready`).
-4. Verify `/ready`, login, cookie-backed refresh, `/api/v1/auth/me`, hard reload, protected inventory and dashboard requests, and logout. Check logs by `X-Request-ID` if any request remains 5xx.
-5. Never grant Owner to every account. Accounts with no active tenant membership must be invited/attached by a tenant administrator; Phase 0 cannot safely infer their workspace.
+## Current release gate
+The candidate code tests passed in this environment (219 Python tests and 43 frontend contracts), but the Node 24 typecheck/production build and authenticated staging end-to-end gate are not complete. Current status and deployment SHAs are documented in `FINAL_RELEASE_GATE_STATUS.md` at the handoff ZIP root.

@@ -1,23 +1,42 @@
-# LEXA Phase 7 — release gate status
+# LEXA Phase 7 — current non-billing release recheck
 **Checked:** 22 October 2026 (UTC)
 
-## Completed and independently checked
-- Candidate backend test suite: **219 passed**; one Starlette deprecation warning.
-- Candidate frontend contract suite: **43 passed, 0 failed**.
-- Python compile check: **passed**.
-- Candidate sign-in code contract: pre-login email context is set before the user lookup; verified user context is set before the workspace lookup; no-workspace responses are distinct.
-- Phase 7 replay database: latest migration `039_phase7_supplier_ledger_landed_costs`; 126 public tables; 126 tables with forced RLS; 134 policies; 478 indexes; seven Phase 7 tables present.
-- Production database safety check: latest migration remains `031_phase3_auth_surface_rls`; zero Phase 7 migration rows. No production migrations were applied.
-- Existing live API `/health` and `/ready` were previously observed returning 200; readiness reported database and cache healthy.
+## Verified in this recheck
 
-## Not complete — blockers
-1. **Candidate is not published to the repository branch visible to deployment tools.** The current `main` login route still has the earlier implementation. GitHub branch creation returns HTTP 403 `Resource not accessible by integration`; current `.github/workflows/lexa-ci.yml` path is absent.
-2. **No isolated staging API has been deployed.** The only existing Render Key Value instance is production's cache. Creating a second free instance was refused by account limits. Creating a dedicated paid 256 MB instance was refused with HTTP 402 because billing information is required; no paid resource was created.
-3. **Authenticated Phase 7 browser tests have not run.** No isolated running API/cache plus staging-only authenticated browser state and disposable fixture currently exists. Unit/source checks are not substitutes for those tests.
-4. **Candidate frontend typecheck and production build have not been validated.** The local environment has Node 22, while the project targets Node 24. `npm ci` did not complete in this environment. The current production Vercel build success is for the older deployed source, not this candidate.
-5. **Render health monitoring is still not enabled on the live service.** `/ready` exists and returned 200, but the service's configured health-check path is blank and the connected Render tool does not expose a service-settings update action.
-6. **Recurring backups remain disabled.** Neon rejected the snapshot-schedule request because automatic scheduling is not enabled for the project; its documented schedule API requires a paid plan. One manual selective recovery copy/snapshot exists, with 57 ephemeral rows deliberately excluded; it is not a complete native clone or an automatic backup schedule.
-7. **Frontend/backend release gate remains open.** Current frontend and backend are on different commit SHAs, although the latest frontend-only commit appears workflow-related. The new repair candidate has not been deployed as an approved matched pair.
+### Candidate source checks
+- Backend and repository Python tests: **219 passed, 1 warning** (`PYTHONPATH=apps/api pytest -q`).
+- Frontend contract tests: **43 passed, 0 failed** (`npm test`).
+- Python source compilation: **passed** (`python -m compileall -q apps/api/app`).
+- Frontend typecheck: **not passed in this environment**. TypeScript reports missing `node`, `react`, and `react-dom` type definition files (`TS2688`).
+- Dependency repair/build: **blocked locally**. Offline `npm ci` cannot fetch uncached `undici-types@6.21.0` (`ENOTCACHED`); the local runtime is Node `22.16.0`, while the frontend package requires Node `24.x`. A clean Node 24 typecheck and production build remain open.
 
-## Decision
-**NO-GO for Phase 8.** Do not apply Phase 7 migrations to production until the candidate is published, a dedicated staging cache and API are available, the Node 24 build passes, authenticated supplier/payment/ledger/landed-cost/permissions/tenant-isolation tests pass, and backup/rollback readiness is confirmed.
+These are candidate-source tests, not a claim that the candidate is deployed or that authenticated end-to-end tests passed.
+
+### Database safety and replay
+- Production branch `br-soft-star-b1dj2m2w`, database `neondb`: latest migration **`031_phase3_auth_surface_rls`**; current query found **zero** schema-migration rows matching Phase 7 migration numbering (`032`–`039`). No production migrations were applied during this work.
+- Isolated replay branch `br-jolly-mode-b966dwys`, database `lexa_replay_ci`: latest migration **`039_phase7_supplier_ledger_landed_costs`**; **126** public tables, **126** with forced row-level security, **134** policies, **478** indexes, and all seven Phase 7 purchasing/supplier tables are present.
+- Existing one-time selective backup/snapshot remains the only checked recovery copy. It intentionally omitted 57 ephemeral rows and is not a native full clone or recurring backup.
+
+### Repository and deployment state
+- GitHub `main` HEAD checked: `e87754837107adb5fa001830b959d5a978024826`. The latest commit added/updated handoff documentation; it did **not** promote the candidate source into the top-level deployed paths.
+- The candidate repair file is present under the nested path `source/apps/api/app/routes/auth.py`; the top-level `apps/api/app/routes/auth.py` differs. The Render API service is configured with root directory `apps/api`, so the nested `source/` copy is not the deployed API path.
+- Latest Render deploy record: commit `311c9b73e42042956abc148cc7e40a80c93c503`, status `live`.
+- Latest Vercel production deployment record: state `READY`, commit `e87754837107adb5fa001830b959d5a978024826`. That GitHub commit is documentation-only relative to the candidate source repair.
+- A fresh GitHub branch-create attempt returned HTTP `403 Resource not accessible by integration`. The candidate still cannot be published into a proper release branch through this connection. No direct push to `main` was attempted.
+- The Render service health-check path remains blank. `/health` and `/ready` had previously been observed returning 200, but a fresh endpoint response was not independently confirmed in this recheck.
+
+## Work intentionally on hold for the final production phase
+- Paid isolated staging cache, if the free allowance cannot support it.
+- Paid/automatic Neon backup scheduling and other billing-dependent backup features.
+- Any other paid staging/production capacity.
+
+No paid resource was created or enabled. Staging must not share the production Redis/cache.
+
+## Release decision
+**NO-GO for Phase 8 / production migration.** Keep production at migration `031` until the candidate is properly published to a release branch, Node 24 typecheck/build pass, an isolated staging API and separate cache are available, authenticated supplier bill/payment/ledger/landed-cost/permission/workspace-isolation tests pass, frontend and backend are approved as one matched release, health monitoring is configured, and backup/rollback readiness is confirmed.
+
+## Safe next steps requiring no billing
+1. Restore GitHub integration write permission or manually publish the source into a dedicated release branch and open a pull request. Do not place the candidate only beneath `source/`, and do not push the candidate directly to `main`.
+2. Run the official Node 24 install, typecheck, build, and CI checks once a network-enabled runner is available.
+3. Deploy and verify an isolated, non-production API with staging-only credentials. The separate cache and any paid backup configuration remain deferred until the final production phase.
+4. Run authenticated Phase 7 end-to-end coverage and complete the release/rollback review before any production migration approval.
