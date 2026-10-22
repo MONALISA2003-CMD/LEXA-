@@ -1,22 +1,31 @@
-# LEXA Stages 1–5 — Live Audit and Build-Fix Candidate
+# LEXA Stages 1–5 + Connected Sales/Team Chat — Candidate Handoff
 
 **Audit date:** 22 October 2026 (UTC)  
-**Candidate:** `2.13.1+stage1-5-buildfix.candidate.20261022`  
-**Decision:** **Do not call this a production-accepted release yet.** The confirmed Vercel TypeScript build failures have been fixed in this candidate and regression contracts added. Automated source tests pass. Live review also exposed a significant database drift: the configured `lexa-live` schema stops at migration 031, while the current candidate requires migrations 033–040. No production SQL or deployment mutation was performed.
+**Candidate:** `2.14.0+connected-sales-chat.candidate.20261022`  
+**Decision:** Source tests pass, but **production acceptance remains blocked**. This candidate layers commerce tax/COGS/date repairs, durable analytics refresh queue and internal Team Chat onto the existing Stages 1–5 source. Migrations 041–042 are additive candidates and have not been executed against live Neon.
 
-## Executive status
+## Current candidate status
 
-| Area | Finding | Status |
+| Area | Current result | Status |
 |---|---|---|
-| Stages 1–3 source | Canonical source structure, workflow connections, security and UI polish are carried forward from prior candidates | Source audit; full live acceptance pending |
-| Stage 4 reporting | Date presets, independent states, exact-value tables, drill-through, scope-aware CSV, reports implemented in source | Source tests pass |
-| Stage 5 acceptance | 44 migration inputs/hash manifest, guarded clean-replay harness, Phase 8 postconditions and staging-only browser lanes | Harness passes plan validation; acceptance incomplete |
-| Local checks | 262 API tests, 54 frontend contract tests, Python compile, migration checks, TS/TSX syntax transpilation | Pass |
-| Vercel main | Latest production deployment fails at Next.js TypeScript check | Known compiler errors fixed in candidate; not yet built on Vercel |
-| Stable frontend link | `https://lexa-green.vercel.app` still resolves to a prior READY deployment on commit `f1e0e2f1373d7912ae1cab694615990071ef07b4` | Stale relative to latest main |
-| Live database | Neon project `LEXA`, branch `lexa-live`; migration ledger latest is `031_phase3_auth_surface_rls` | **Behind current candidate** |
-| Render | Not inspected through the account connector because its API requires workspace confirmation | Pending workspace confirmation |
-| GitHub write | GitHub connector returned HTTP 403 `Resource not accessible by integration` on a blob write | Candidate not pushed by this session |
+| Commerce/tax/accounting | Effective-dated server tax, business date, correct COGS reference, actual stock-ledger cost capture, permission-gated pricing/discounts | Source tests pass; SQL replay pending |
+| Analytics | Durable tenant/date queue, bounded poller/retries, RLS and retry/dead-letter status | Migration 041 included; actual Postgres replay pending |
+| Team Chat | Tenant/branch scope, RBAC, idempotent posting, unread/read state, audit/outbox metadata and responsive layout | Migration 042 included; actual Postgres replay pending |
+| Backend tests | 279 passed, 0 failed | Pass locally |
+| Frontend contracts | 57 passed, 0 failed | Pass locally |
+| TypeScript/TSX syntax | 36 files, 0 syntax errors | Syntax only, not full typecheck |
+| Migration plan | 46 inputs through migration 042; plan-only | Pass; no SQL executed |
+| Full build/E2E | Node 24 build and authenticated browser E2E not run | Release blocker |
+| Live DB | Earlier read-only audit found `lexa-live` at migration 031 with supplier and Phase 8 schema gaps | Drift remains until re-audited/reconciled |
+| Push/deploy | Candidate not pushed or deployed; no live DB mutation | Not released |
+
+The connected GitHub write path previously returned HTTP 403. Vercel/Render currently do not serve these unpushed local changes. Do not treat a ZIP or passing contract suite as deployment evidence. See the current README and [`LEXA_2.14.0_IMPLEMENTATION_HANDOFF_2026-10-22.md`](LEXA_2.14.0_IMPLEMENTATION_HANDOFF_2026-10-22.md) for the current release gate. The remainder of this file contains earlier audit detail retained as history.
+
+---
+
+## Prior Stage 1–5 live audit (historical snapshot)
+
+> Historical details below describe the pre-2.14.0 source/deployment audit and are retained for lineage. Use the summary above for the current source candidate.
 
 ## Verified Vercel failure and exact source fixes
 

@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..catalog import begin_idempotency, emit_event, finish_idempotency, write_audit
-from ..commerce_rules import ensure_unique_return_line_ids, original_sale_inventory_unit_cost, remaining_refund_balance, prorate_return_line_amounts, safe_payment_channel_label, safe_payment_reference
+from ..commerce_rules import calculate_line_tax, ensure_unique_return_line_ids, original_sale_inventory_unit_cost, remaining_refund_balance, prorate_return_line_amounts, safe_payment_channel_label, safe_payment_reference
 from ..branch_access import ensure_branch_access, ensure_location_access, require_full_branch_scope
 from ..dependencies import require_permission
 from ..inventory import post_ledger, tenant_location, tenant_variant
@@ -226,7 +226,7 @@ def dashboard(business_date: date | None = None, ctx=Depends(require_permission(
       FROM public.sales AS s
       WHERE s.tenant_id=:tenant_id
         AND s.currency_code=:currency_code
-        AND public.lexa_business_date(COALESCE(s.completed_at, s.created_at), :tenant_id)=:business_date
+        AND s.business_date=:business_date
         AND s.status='COMPLETED'
     """), {"tenant_id": str(tenant_id), "business_date": today, "currency_code": currency_code}).mappings().one()
     channels = db.execute(text("""
@@ -327,17 +327,44 @@ def deactivate_channel(
         raise HTTPException(400, "Could not update this payment method. Refresh and try again.") from exc
 
 
+@router.get("/capabilities")
+def commerce_capabilities(ctx=Depends(require_permission("sales.read"))):
+    """Expose UI hints only; checkout repeats every authorization check server-side."""
+    db, actor_id, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=actor_id)
+    granted = {row[0] for row in db.execute(text("""
+      SELECT DISTINCT p.code
+      FROM membership_roles mr
+      JOIN roles r ON r.id=mr.role_id AND r.tenant_id=:tenant_id
+      JOIN role_permissions rp ON rp.role_id=r.id
+      JOIN permissions p ON p.id=rp.permission_id
+      JOIN tenant_memberships tm ON tm.id=mr.membership_id AND tm.tenant_id=:tenant_id
+      WHERE tm.user_id=:user_id AND tm.status='ACTIVE'
+        AND p.code IN ('catalog.pricing.manage','catalog.manage','sales.manage')
+    """), {"tenant_id":str(tenant_id), "user_id":str(actor_id)}).all()}
+    return {
+        "can_manage_price": bool({"catalog.pricing.manage", "catalog.manage"} & granted),
+        "can_manage_sales": "sales.manage" in granted,
+    }
+
+
 @router.get("/products")
-def commerce_products(ctx=Depends(require_permission("sales.read"))):
+def commerce_products(business_date: date | None = None, ctx=Depends(require_permission("sales.read"))):
     db,_,tenant_id,_=ctx
+    pricing_date = business_date or db.execute(text("SELECT public.lexa_business_date(now(), :tenant_id)"), {"tenant_id":str(tenant_id)}).scalar_one()
     rows=db.execute(text("""
       SELECT pv.id variant_id,pv.sku,pv.name variant_name,p.name product_name,pv.track_inventory,
-             COALESCE(pp.unit_price,0) selling_price
+             COALESCE(pp.unit_price,0) selling_price,
+             COALESCE(tx.rate_percent,0) effective_tax_rate,
+             COALESCE(tx.inclusive,false) tax_inclusive,
+             tx.code tax_code,
+             CASE WHEN tx.tax_rate_id IS NULL THEN 'NO_MATCHING_TAX_RULE' ELSE 'EFFECTIVE_DATED_TENANT_RULE' END tax_rule_source
       FROM product_variants pv JOIN products p ON p.id=pv.product_id AND p.tenant_id=pv.tenant_id
-      LEFT JOIN LATERAL (SELECT unit_price FROM product_prices x WHERE x.tenant_id=pv.tenant_id AND x.variant_id=pv.id ORDER BY effective_from DESC LIMIT 1) pp ON true
+      LEFT JOIN LATERAL (SELECT unit_price FROM product_prices x WHERE x.tenant_id=pv.tenant_id AND x.variant_id=pv.id AND x.effective_from<=:business_date AND (x.effective_to IS NULL OR x.effective_to>=:business_date) ORDER BY x.effective_from DESC LIMIT 1) pp ON true
+      LEFT JOIN LATERAL (SELECT tax_rate_id,code,rate_percent,inclusive FROM public.resolve_tax_rate(pv.tenant_id,p.id,p.category_id,:business_date)) tx ON true
       WHERE pv.tenant_id=:t AND pv.deleted_at IS NULL AND pv.status='ACTIVE' AND p.deleted_at IS NULL AND p.status='ACTIVE'
       ORDER BY p.name,pv.name LIMIT 500
-    """),{"t":str(tenant_id)}).mappings().all()
+    """),{"t":str(tenant_id),"business_date":pricing_date}).mappings().all()
     return [out(x) for x in rows]
 
 
@@ -368,10 +395,10 @@ def list_sales(
         filters.append("(COALESCE(p.display_name,'') ILIKE :search OR s.id::text ILIKE :search OR s.transaction_id::text ILIKE :search)")
         params["search"] = f"%{search.strip()}%"
     if start_date:
-        filters.append("public.lexa_business_date(s.created_at, :t) >= :start_date")
+        filters.append("s.business_date >= :start_date")
         params["start_date"] = start_date
     if end_date:
-        filters.append("public.lexa_business_date(s.created_at, :t) <= :end_date")
+        filters.append("s.business_date <= :end_date")
         params["end_date"] = end_date
     if branch_id is not None:
         filters.append("s.branch_id=:branch_id")
@@ -381,7 +408,7 @@ def list_sales(
         params["payment_channel_id"] = str(payment_channel_id)
     rows = db.execute(text(f"""
       SELECT s.id,s.transaction_id,s.customer_party_id,p.display_name customer_name,s.branch_id,s.location_id,
-             s.currency_code,s.status,s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,
+             s.currency_code,s.business_date,s.status,s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,
              s.return_adjustment_amount,s.created_at,s.completed_at
       FROM sales s LEFT JOIN parties p ON p.id=s.customer_party_id AND p.tenant_id=s.tenant_id
       WHERE {' AND '.join(filters)}
@@ -394,7 +421,7 @@ def list_sales(
 def get_sale(sale_id: UUID, ctx=Depends(require_permission("sales.read"))):
     db,actor_id,tenant_id,_=ctx
     sale=db.execute(text("""
-      SELECT s.id,s.transaction_id,s.customer_party_id,p.display_name customer_name,s.branch_id,s.location_id,s.currency_code,s.status,
+      SELECT s.id,s.transaction_id,s.customer_party_id,p.display_name customer_name,s.branch_id,s.location_id,s.currency_code,s.business_date,s.status,
              s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,s.return_adjustment_amount,s.notes,s.created_at,s.completed_at
       FROM sales s LEFT JOIN parties p ON p.id=s.customer_party_id AND p.tenant_id=s.tenant_id
       WHERE s.tenant_id=:t AND s.id=:s
@@ -492,29 +519,54 @@ def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=N
         """), {"tenant_id":str(tenant_id),"user_id":str(actor)}).all()}
         can_manage_price = bool({"catalog.pricing.manage", "catalog.manage"} & granted)
         can_manage_sales = "sales.manage" in granted
-        subtotal=Decimal("0"); discount=Decimal("0"); tax=Decimal("0")
+        subtotal=Decimal("0"); discount=Decimal("0"); tax=Decimal("0"); total=Decimal("0")
         validated=[]
         for line in body.lines:
             variant=tenant_variant(db,tenant_id,line.variant_id)
             catalog_price = db.execute(text("""
               SELECT unit_price FROM product_prices
               WHERE tenant_id=:t AND variant_id=:v
+                AND effective_from<=:business_date::timestamptz
+                AND (effective_to IS NULL OR effective_to>=:business_date::timestamptz)
               ORDER BY effective_from DESC LIMIT 1
-            """), {"t":str(tenant_id),"v":str(line.variant_id)}).scalar_one_or_none()
+            """), {"t":str(tenant_id),"v":str(line.variant_id),"business_date":body.business_date}).scalar_one_or_none()
             if catalog_price is None and not can_manage_price:
                 raise HTTPException(409, "No catalogue price is configured for this product; ask a pricing manager to set one")
             if catalog_price is not None and q(line.unit_price) != q(Decimal(str(catalog_price))) and not can_manage_price:
                 raise HTTPException(403, "Price override permission required; use the catalogue price or ask a manager")
             if line.discount_amount > 0 and not can_manage_sales:
                 raise HTTPException(403, "Discount permission required; ask a manager to apply this discount")
+
+            # Tax is resolved on the server from the tenant's effective-dated
+            # PRODUCT/CATEGORY/DEFAULT rule. The client rate is only a display hint.
+            product_context = db.execute(text("""
+              SELECT p.id AS product_id, p.category_id
+              FROM products p
+              WHERE p.tenant_id=:t AND p.id=:product_id AND p.status='ACTIVE' AND p.deleted_at IS NULL
+            """), {"t":str(tenant_id), "product_id":str(variant.product_id)}).mappings().first()
+            if not product_context:
+                raise HTTPException(400, "This product is unavailable for sale")
+            tax_rule = db.execute(text("""
+              SELECT tax_rate_id,code,rate_percent,inclusive
+              FROM public.resolve_tax_rate(:tenant_id,:product_id,:category_id,:business_date)
+            """), {
+                "tenant_id":str(tenant_id),
+                "product_id":str(product_context["product_id"]),
+                "category_id":str(product_context["category_id"]),
+                "business_date":body.business_date,
+            }).mappings().first()
+            effective_tax_rate = Decimal(str(tax_rule["rate_percent"])) if tax_rule else Decimal("0")
+            tax_inclusive = bool(tax_rule["inclusive"]) if tax_rule else False
+
             gross=q(line.quantity*line.unit_price)
             if line.discount_amount>gross: raise HTTPException(422,"Line discount cannot exceed line value")
-            taxable=q(gross-line.discount_amount)
-            line_tax=q(taxable*line.tax_rate/Decimal("100"))
-            line_total=q(taxable+line_tax)
-            subtotal+=gross; discount+=q(line.discount_amount); tax+=line_tax
-            validated.append((line,variant,line_total,line_tax))
-        subtotal=q(subtotal); discount=q(discount); tax=q(tax); total=q(subtotal-discount+tax)
+            try:
+                line_tax,line_total=calculate_line_tax(gross,line.discount_amount,effective_tax_rate,inclusive=tax_inclusive)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
+            subtotal+=gross; discount+=q(line.discount_amount); tax+=line_tax; total+=line_total
+            validated.append((line,variant,line_total,line_tax,effective_tax_rate,tax_inclusive,tax_rule))
+        subtotal=q(subtotal); discount=q(discount); tax=q(tax); total=q(total)
         if total<=0: raise HTTPException(422,"Sale total must be greater than zero")
         paid=q(sum((x.amount for x in body.payments),Decimal("0")))
         if paid>total: raise HTTPException(422,"Payment allocations cannot exceed sale total")
@@ -522,20 +574,20 @@ def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=N
         ref=f"SAL-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8].upper()}"
         tx=BusinessTransaction(tenant_id=tenant_id,transaction_type="SALE",reference=ref,status="DRAFT",party_id=body.customer_party_id,branch_id=branch_id,total_amount=total,currency_code=currency,occurred_at=datetime.now(timezone.utc),metadata_json={"source":"commerce"})
         db.add(tx); db.flush()
-        db.add(TransactionLine(tenant_id=tenant_id,transaction_id=tx.id,line_no=1,line_type="PRODUCT",product_variant_id=validated[0][1].id,description=validated[0][1].name,quantity=validated[0][0].quantity,unit_price=validated[0][0].unit_price,line_total=validated[0][2],currency_code=currency,discount_amount=validated[0][0].discount_amount,tax_rate=validated[0][0].tax_rate,tax_amount=validated[0][3],metadata_json={}) )
-        for idx,(line,variant,line_total,line_tax) in enumerate(validated[1:],start=2):
-            db.add(TransactionLine(tenant_id=tenant_id,transaction_id=tx.id,line_no=idx,line_type="PRODUCT",product_variant_id=variant.id,description=variant.name,quantity=line.quantity,unit_price=line.unit_price,line_total=line_total,currency_code=currency,discount_amount=line.discount_amount,tax_rate=line.tax_rate,tax_amount=line_tax,metadata_json={}))
-        db.execute(text("""INSERT INTO sales(tenant_id,transaction_id,customer_party_id,branch_id,location_id,currency_code,status,subtotal,discount_total,tax_total,total,amount_paid,amount_due,notes,created_by)
-          VALUES(:t,:tx,:cp,:b,:l,:c,'DRAFT',:s,:d,:tax,:total,0,:due,:notes,:actor)"""),{"t":str(tenant_id),"tx":str(tx.id),"cp":str(body.customer_party_id) if body.customer_party_id else None,"b":str(branch_id),"l":str(body.location_id),"c":currency,"s":str(subtotal),"d":str(discount),"tax":str(tax),"total":str(total),"due":str(total),"notes":body.notes,"actor":str(actor)})
+        db.add(TransactionLine(tenant_id=tenant_id,transaction_id=tx.id,line_no=1,line_type="PRODUCT",product_variant_id=validated[0][1].id,description=validated[0][1].name,quantity=validated[0][0].quantity,unit_price=validated[0][0].unit_price,line_total=validated[0][2],currency_code=currency,discount_amount=validated[0][0].discount_amount,tax_rate=validated[0][4],tax_amount=validated[0][3],metadata_json={"tax_inclusive":validated[0][5],"tax_code":validated[0][6]["code"] if validated[0][6] else None,"tax_rate_source":"EFFECTIVE_DATED_TENANT_RULE" if validated[0][6] else "NO_MATCHING_TAX_RULE"}) )
+        for idx,(line,variant,line_total,line_tax,effective_tax_rate,tax_inclusive,tax_rule) in enumerate(validated[1:],start=2):
+            db.add(TransactionLine(tenant_id=tenant_id,transaction_id=tx.id,line_no=idx,line_type="PRODUCT",product_variant_id=variant.id,description=variant.name,quantity=line.quantity,unit_price=line.unit_price,line_total=line_total,currency_code=currency,discount_amount=line.discount_amount,tax_rate=effective_tax_rate,tax_amount=line_tax,metadata_json={"tax_inclusive":tax_inclusive,"tax_code":tax_rule["code"] if tax_rule else None,"tax_rate_source":"EFFECTIVE_DATED_TENANT_RULE" if tax_rule else "NO_MATCHING_TAX_RULE"}))
+        db.execute(text("""INSERT INTO sales(tenant_id,transaction_id,customer_party_id,branch_id,location_id,business_date,currency_code,status,subtotal,discount_total,tax_total,total,amount_paid,amount_due,notes,created_by)
+          VALUES(:t,:tx,:cp,:b,:l,:business_date,:c,'DRAFT',:s,:d,:tax,:total,0,:due,:notes,:actor)"""),{"t":str(tenant_id),"tx":str(tx.id),"cp":str(body.customer_party_id) if body.customer_party_id else None,"b":str(branch_id),"l":str(body.location_id),"business_date":body.business_date,"c":currency,"s":str(subtotal),"d":str(discount),"tax":str(tax),"total":str(total),"due":str(total),"notes":body.notes,"actor":str(actor)})
         sale_id=db.execute(text("SELECT id FROM sales WHERE tenant_id=:t AND transaction_id=:tx"),{"t":str(tenant_id),"tx":str(tx.id)}).scalar_one()
-        for idx,(line,variant,_,_) in enumerate(validated, start=1):
+        for idx,(line,variant,_,_,_,_,_) in enumerate(validated, start=1):
             invtx=post_ledger(db,tenant_id=tenant_id,actor_user_id=actor,location_id=body.location_id,variant_id=variant.id,quantity_delta=-q(line.quantity),unit_cost=Decimal("0"),transaction_type="SALE",reference_type="sale",reference_id=sale_id,idempotency_key=f"{idempotency_key or tx.id}:inventory:{idx}",metadata={"sale_id":str(sale_id)}) if variant.track_inventory else None
             if invtx:
                 _emit(db,tenant_id,actor,"stock.decreased","STOCK_DECREASED","inventory_transaction",invtx.id,{"sale_id":str(sale_id),"variant_id":str(variant.id),"quantity":str(q(line.quantity))},request_id)
         for payment in body.payments:
             ch=_channel(db,tenant_id,payment.payment_channel_id,currency)
             pid=db.execute(text("""INSERT INTO payments(tenant_id,transaction_id,party_id,amount,currency_code,method,status,reference,paid_at,metadata,payment_channel_id,business_date)
-              VALUES(:t,:tx,:p,:a,:c,:m,'RECORDED',:ref,now(),:meta,:ch,:d) RETURNING id"""),{"t":str(tenant_id),"tx":str(tx.id),"p":str(body.customer_party_id) if body.customer_party_id else None,"a":str(q(payment.amount)),"c":currency,"m":ch["channel_type"],"ref":payment.reference,"meta":{},"ch":str(ch["id"]),"d":payment.business_date}).scalar_one()
+              VALUES(:t,:tx,:p,:a,:c,:m,'RECORDED',:ref,now(),:meta,:ch,:d) RETURNING id"""),{"t":str(tenant_id),"tx":str(tx.id),"p":str(body.customer_party_id) if body.customer_party_id else None,"a":str(q(payment.amount)),"c":currency,"m":ch["channel_type"],"ref":payment.reference,"meta":{},"ch":str(ch["id"]),"d":body.business_date}).scalar_one()
             db.execute(text("INSERT INTO payment_allocations(tenant_id,payment_id,sale_id,amount,status,created_by) VALUES(:t,:p,:s,:a,'RECORDED',:u)"),{"t":str(tenant_id),"p":str(pid),"s":str(sale_id),"a":str(q(payment.amount)),"u":str(actor)})
             accounting_entry_id = db.execute(text("SELECT post_payment_journal(:id,:u)"), {"id":str(pid),"u":str(actor)}).scalar_one()
             _emit(db,tenant_id,actor,"accounting.entry.posted","ACCOUNTING_ENTRY_POSTED","journal_entry",accounting_entry_id,{"payment_id":str(pid)},request_id)
@@ -555,8 +607,19 @@ def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=N
         if cogs_entry:
             _emit(db,tenant_id,actor,"accounting.entry.posted","ACCOUNTING_ENTRY_POSTED","journal_entry",cogs_entry,{"sale_id":str(sale_id),"entry_role":"COGS"},request_id)
         _emit(db,tenant_id,actor,"sale.completed","SALE_COMPLETED","sale",sale_id,{"reference":ref,"total":str(total),"paid":str(paid_now["amount_paid"]),"due":str(paid_now["amount_due"]),"accounting_journal_id":str(accounting_sale_entry)},request_id)
-        result=db.execute(text("SELECT s.id,s.transaction_id,s.currency_code,s.status,s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,s.created_at,s.completed_at FROM sales s WHERE s.tenant_id=:t AND s.id=:s"),{"t":str(tenant_id),"s":str(sale_id)}).mappings().one()
-        result=out(result); _finish(db,idem,201,result,"sale",sale_id); db.commit(); return result
+        # If system-to-system EFRIS is enabled and the taxpayer is active, create
+        # an idempotent fiscalization work item in the same transaction as the sale.
+        # Queueing is not treated as proof that URA accepted an e-document.
+        fiscal_document_id = None
+        efris = db.execute(text("SELECT enabled,integration_mode,registration_status FROM efris_configurations WHERE tenant_id=:t"), {"t":str(tenant_id)}).mappings().first()
+        if efris and efris["enabled"] and efris["registration_status"] == "ACTIVE" and efris["integration_mode"] == "SYSTEM_TO_SYSTEM":
+            fiscal_document_id = db.execute(text("SELECT public.create_fiscal_document_for_sale(:id,'INVOICE')"), {"id":str(sale_id)}).scalar_one()
+            _emit(db,tenant_id,actor,"fiscalization.queued","FISCALIZATION_QUEUED","fiscal_document",fiscal_document_id,{"sale_id":str(sale_id),"status":"PENDING","reason":"Queued for the configured URA system-to-system adapter"},request_id)
+        result=db.execute(text("SELECT s.id,s.transaction_id,s.currency_code,s.business_date,s.status,s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,s.created_at,s.completed_at FROM sales s WHERE s.tenant_id=:t AND s.id=:s"),{"t":str(tenant_id),"s":str(sale_id)}).mappings().one()
+        result=out(result)
+        result["fiscal_document_id"] = str(fiscal_document_id) if fiscal_document_id else None
+        result["fiscalization_status"] = "PENDING" if fiscal_document_id else ("MANUAL_REQUIRED" if efris and efris["enabled"] and efris["registration_status"] == "ACTIVE" and efris["integration_mode"] == "MANUAL" else "NOT_CONFIGURED")
+        _finish(db,idem,201,result,"sale",sale_id); db.commit(); return result
     except HTTPException:
         db.rollback(); raise
     except IntegrityError as exc:
@@ -853,7 +916,7 @@ def create_return(sale_id: UUID, body: ReturnCreate, idempotency_key: str | None
         tx_ref=f"RET-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8].upper()}"
         tx=BusinessTransaction(tenant_id=tenant_id,transaction_type="SALE_RETURN",reference=tx_ref,status="DRAFT",party_id=sale["customer_party_id"],branch_id=sale["branch_id"],total_amount=total,currency_code=sale["currency_code"],occurred_at=datetime.now(timezone.utc),metadata_json={"source":"commerce","sale_id":str(sale_id)})
         db.add(tx); db.flush()
-        db.execute(text("""INSERT INTO sale_returns(tenant_id,sale_id,transaction_id,inventory_location_id,status,reason,total,created_by) VALUES(:t,:s,:tx,:l,'DRAFT',:r,:total,:u) RETURNING id"""),{"t":str(tenant_id),"s":str(sale_id),"tx":str(tx.id),"l":str(return_location),"r":body.reason.strip(),"total":str(total),"u":str(actor)})
+        db.execute(text("""INSERT INTO sale_returns(tenant_id,sale_id,transaction_id,inventory_location_id,business_date,status,reason,total,created_by) VALUES(:t,:s,:tx,:l,:business_date,'DRAFT',:r,:total,:u) RETURNING id"""),{"t":str(tenant_id),"s":str(sale_id),"tx":str(tx.id),"l":str(return_location),"business_date":body.business_date,"r":body.reason.strip(),"total":str(total),"u":str(actor)})
         return_id=db.execute(text("SELECT id FROM sale_returns WHERE tenant_id=:t AND transaction_id=:tx"),{"t":str(tenant_id),"tx":str(tx.id)}).scalar_one()
         for req_line, line, line_total, line_discount, line_tax, tracks_inventory, original_unit_cost in validated:
             db.execute(text("""INSERT INTO sale_return_lines(tenant_id,return_id,sale_line_id,variant_id,quantity,unit_price,discount_amount,tax_amount,line_total) VALUES(:t,:r,:sl,:v,:q,:u,:d,:tax,:total)"""),{"t":str(tenant_id),"r":str(return_id),"sl":str(req_line.sale_line_id),"v":str(line["product_variant_id"]),"q":str(req_line.quantity),"u":str(line["unit_price"]),"d":str(line_discount),"tax":str(line_tax),"total":str(line_total)})

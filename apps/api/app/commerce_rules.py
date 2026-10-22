@@ -45,6 +45,38 @@ def money(value: Decimal | int | str) -> Decimal:
     return Decimal(str(value)).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
 
 
+def calculate_line_tax(
+    gross_amount: Decimal | int | str,
+    discount_amount: Decimal | int | str,
+    rate_percent: Decimal | int | str,
+    *,
+    inclusive: bool = False,
+) -> tuple[Decimal, Decimal]:
+    """Return ``(tax_amount, payable_line_total)`` from authoritative tax rules.
+
+    For tax-exclusive prices, tax is added after discounts. For tax-inclusive
+    prices, tax is extracted from the discounted gross price and is not added a
+    second time. The caller must resolve the rate from the tenant's effective-
+    dated tax configuration; a browser-supplied rate is never authoritative.
+    """
+    gross = money(gross_amount)
+    discount = money(discount_amount)
+    rate = Decimal(str(rate_percent))
+    if gross < ZERO_MONEY or discount < ZERO_MONEY or discount > gross:
+        raise ValueError("Gross amount and discount must be valid")
+    if rate < 0 or rate > 100:
+        raise ValueError("Tax rate must be between zero and one hundred percent")
+
+    discounted = money(gross - discount)
+    if rate == 0:
+        return ZERO_MONEY, discounted
+    if inclusive:
+        tax = money(discounted * rate / (Decimal("100") + rate))
+        return tax, discounted
+    tax = money(discounted * rate / Decimal("100"))
+    return tax, money(discounted + tax)
+
+
 def ensure_unique_return_line_ids(sale_line_ids: Iterable[Hashable]) -> None:
     """Reject repeated source-line IDs in a single return request.
 

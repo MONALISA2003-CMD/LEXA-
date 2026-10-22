@@ -68,7 +68,7 @@ def test_stage5_clean_replay_includes_phase8_migration_and_postconditions():
     paths = [step["path"] for step in manifest["steps"]]
     replay = _source("../../scripts/run_clean_migration_replay.py")
 
-    assert paths[-1] == "migrations/040_phase8_finance_workflows.sql"
+    assert paths[-1] == "migrations/042_team_chat_foundation.sql"
     assert "040_phase8_finance_workflows" in replay
     assert "phase8_expense_posting_function" in replay
     assert "phase8_expense_reversal_reporting_metric" in replay

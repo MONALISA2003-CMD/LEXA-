@@ -1,5 +1,8 @@
 from uuid import UUID, uuid4
+import asyncio
 import logging
+import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,11 +10,37 @@ from fastapi.responses import JSONResponse
 
 from .config import settings
 from .health import check_database, check_redis
-from .routes import auth, organization, rbac, catalog, inventory, commerce, finance, analytics, workspace_context, membership_admin, purchasing
+from .routes import auth, organization, rbac, catalog, inventory, commerce, finance, analytics, workspace_context, membership_admin, purchasing, team_chat
 from .kernel import router as kernel_router
+from .workers.analytics_outbox import run_embedded_worker
 
-app = FastAPI(title="LEXA API", version="1.0.0")
 logger = logging.getLogger("lexa.api")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Run durable analytics refreshes once migration 041 is available.
+
+    The worker is intentionally local to LEXA; multiple API replicas coordinate
+    through PostgreSQL SKIP LOCKED, and shutdown cancels the polling task cleanly.
+    """
+    default_enabled = "true" if settings.app_env.strip().lower() == "production" else "false"
+    enabled = os.getenv("ANALYTICS_REFRESH_WORKER_ENABLED", default_enabled).strip().lower() in {"1", "true", "yes", "on"}
+    worker_task = asyncio.create_task(run_embedded_worker()) if enabled else None
+    if enabled:
+        logger.info("analytics_refresh_worker_enabled")
+    try:
+        yield
+    finally:
+        if worker_task is not None:
+            worker_task.cancel()
+            try:
+                await worker_task
+            except asyncio.CancelledError:
+                pass
+
+
+app = FastAPI(title="LEXA API", version="1.0.0", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -65,6 +94,7 @@ app.include_router(finance.router, prefix="/api/v1")
 app.include_router(finance.compliance, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(purchasing.router, prefix="/api/v1")
+app.include_router(team_chat.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["system"])

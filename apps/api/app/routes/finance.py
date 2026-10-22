@@ -79,7 +79,8 @@ class ExpenseAction(Strict):
 class EfrisConfigPatch(Strict):
     enabled: bool
     integration_mode: str = Field(pattern=r"^(MANUAL|PENDING_INTEGRATION|SYSTEM_TO_SYSTEM)$")
-    registration_status: str = Field(pattern=r"^(NOT_REGISTERED|PENDING|ACTIVE|SUSPENDED)$")
+    # Registration status is server-controlled. Users cannot self-declare EFRIS
+    # active; the verified URA adapter must do that after a successful handshake.
     tin: str | None = Field(default=None, max_length=40)
     legal_name: str | None = Field(default=None, max_length=200)
     effective_date: date | None = None
@@ -525,9 +526,10 @@ def update_efris_config(body: EfrisConfigPatch, ctx=Depends(require_permission("
           INSERT INTO efris_configurations(tenant_id,enabled,integration_mode,registration_status,tin,legal_name,effective_date)
           VALUES(:t,:e,:m,:r,:tin,:ln,:ed)
           ON CONFLICT(tenant_id) DO UPDATE SET enabled=EXCLUDED.enabled,integration_mode=EXCLUDED.integration_mode,
-            registration_status=EXCLUDED.registration_status,tin=EXCLUDED.tin,legal_name=EXCLUDED.legal_name,effective_date=EXCLUDED.effective_date,updated_at=now()
+            registration_status=CASE WHEN EXCLUDED.integration_mode='MANUAL' THEN 'NOT_REGISTERED' ELSE 'PENDING' END,
+            tin=EXCLUDED.tin,legal_name=EXCLUDED.legal_name,effective_date=EXCLUDED.effective_date,updated_at=now()
           RETURNING id,enabled,integration_mode,registration_status,tin,legal_name,effective_date,created_at,updated_at
-        """), {"t": str(tenant_id), "e": body.enabled, "m": body.integration_mode, "r": body.registration_status, "tin": body.tin, "ln": body.legal_name, "ed": body.effective_date}).mappings().one()
+        """), {"t": str(tenant_id), "e": body.enabled, "m": body.integration_mode, "r": 'NOT_REGISTERED' if body.integration_mode == 'MANUAL' else 'PENDING', "tin": body.tin, "ln": body.legal_name, "ed": body.effective_date}).mappings().one()
         write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="efris.configuration.update", target_type="efris_configuration", target_id=row["id"], outcome="SUCCESS")
         db.commit()
     except Exception as exc:

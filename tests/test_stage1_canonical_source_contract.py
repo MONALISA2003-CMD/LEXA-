@@ -7,6 +7,8 @@ def test_stage1_package_has_one_canonical_application_tree():
     assert (ROOT / "apps/web/package.json").is_file()
     assert (ROOT / "apps/api/app/main.py").is_file()
     assert (ROOT / "migrations/040_phase8_finance_workflows.sql").is_file()
+    assert (ROOT / "migrations/041_commerce_integrity_scaling.sql").is_file()
+    assert (ROOT / "migrations/042_team_chat_foundation.sql").is_file()
     assert not (ROOT / "LEXA/apps/web/package.json").exists()
     assert not (ROOT / "LEXA/apps/api/app/main.py").exists()
 

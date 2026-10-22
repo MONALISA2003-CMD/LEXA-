@@ -15,10 +15,11 @@ ENGINE_CONNECT_ARGS = {
 engine = create_engine(
     settings.sqlalchemy_database_url,
     pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=5,
-    pool_timeout=10,
-    pool_recycle=900,
+    pool_size=settings.database_pool_size,
+    max_overflow=settings.database_max_overflow,
+    pool_timeout=settings.database_pool_timeout_seconds,
+    pool_recycle=settings.database_pool_recycle_seconds,
+    pool_use_lifo=True,
     connect_args=ENGINE_CONNECT_ARGS,
 )
 

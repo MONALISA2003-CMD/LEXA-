@@ -6,12 +6,15 @@ const commerce = fs.readFileSync(new URL("app/commerce/page.tsx", root), "utf8")
 const api = fs.readFileSync(new URL("lib/api.ts", root), "utf8");
 const styles = fs.readFileSync(new URL("app/globals.css", root), "utf8");
 
-assert.match(commerce, /type CartLine = \{ id:string; variantId:string; quantity:string; unitPrice:string \}/);
+assert.match(commerce, /type CartLine = \{ id:string; variantId:string; quantity:string; unitPrice:string; discountAmount:string \}/);
 assert.match(commerce, /setCart\(\(current\) =>/);
 assert.match(commerce, /lines: cart\.map\(/);
+assert.match(commerce, /discount_amount: line.discountAmount/);
+assert.match(commerce, /can_manage_sales/);
+assert.match(commerce, /Manager permission required/);
 assert.match(commerce, /Checkout cart/);
 assert.match(commerce, /Payments cannot exceed the checkout total/);
-assert.match(commerce, /Ask the business owner or manager before changing it/);
+assert.match(commerce, /Catalogue price is locked for your role/);
 assert.match(commerce, /Select a customer to record an outstanding balance/);
 assert.match(commerce, /lastCheckoutAttempt\?\.fingerprint === fingerprint/);
 assert.match(commerce, /createCommerceSale\(body, attempt\.key\)/);

@@ -16,7 +16,8 @@ def test_collected_today_comes_from_recorded_payments_for_business_date():
     assert "p.business_date=:business_date" in body
     assert "p.currency_code=:currency_code" in body
     assert "SUM(s.amount_paid),0) collected" not in body
-    assert "COALESCE(s.completed_at, s.created_at)" in body
+    assert "s.business_date=:business_date" in body
+    assert "s.created_at::date=:business_date" not in body
     assert '"currency_code": currency_code' in body
 
 

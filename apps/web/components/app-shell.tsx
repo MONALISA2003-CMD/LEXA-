@@ -15,6 +15,7 @@ const primary = [
   ["/purchasing", "Purchases", "truck"],
   ["/accounting", "Finance", "wallet"],
   ["/reports", "Reports", "chart"],
+  ["/team-chat", "Team chat", "chat"],
 ];
 const quickNav = primary.slice(0, 4);
 const moreWorkspaces = [
@@ -37,6 +38,7 @@ function NavGlyph({ name }: { name: string }) {
     truck: <><path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="19" r="1.7"/><circle cx="18" cy="19" r="1.7"/></>,
     wallet: <><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 8h15a2 2 0 0 1 2 2v2h-5a2 2 0 0 0 0 4h5"/><path d="M16 14h.01"/></>,
     chart: <><path d="M4 20V4M4 20h17"/><path d="m7 15 4-4 3 2 5-6"/><circle cx="19" cy="7" r="1"/></>,
+    chat: <><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.7-.8L4 20l1.3-3.6A7.2 7.2 0 0 1 4 12c0-4.1 3.6-7.5 8-7.5s8 3.1 8 7Z"/><path d="M8 11h8M8 14h5"/></>,
     receipt: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6M9 16h3"/></>,
     building: <><path d="M4 21V5l8-2 8 2v16M2 21h20"/><path d="M8 8h1M15 8h1M8 12h1M15 12h1M10 21v-4h4v4"/></>,
     switch: <><path d="M4 7h15l-3-3M20 17H5l3 3"/><path d="M16 4 19 7l-3 3M8 14l-3 3 3 3"/></>,
@@ -149,6 +151,7 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
       /sale|pos|invoice|payment|receipt/.test(lower) ? `/sales?q=${encodeURIComponent(q)}` :
       /purchase|supplier|receiving/.test(lower) ? `/purchasing?q=${encodeURIComponent(q)}` :
       /finance|journal|expense|accounting|money owed/.test(lower) ? `/accounting?q=${encodeURIComponent(q)}` :
+      /chat|message|handover|team discussion/.test(lower) ? "/team-chat" :
       `/reports?q=${encodeURIComponent(q)}`;
     setSearchOpen(false);
     router.push(destination);
@@ -191,7 +194,7 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
           <div className="command-search-head"><span aria-hidden="true">⌕</span><input autoFocus aria-label="Search business areas" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") submitSearch(e); }} placeholder="Search products, stock, sales or purchases…" /><button type="button" onClick={() => setSearchOpen(false)}>Esc</button></div>
           <div className="command-suggestions">
             {[
-              ["Inventory low stock", "/inventory"], ["Products and codes", "/products"], ["Today's sales", "/sales"], ["Customers and balances", "/customers"], ["Purchase orders", "/purchasing"], ["Money and expenses", "/accounting"], ["Business reports", "/reports"], ["Settings and team", "/settings"],
+              ["Inventory low stock", "/inventory"], ["Products and codes", "/products"], ["Today's sales", "/sales"], ["Customers and balances", "/customers"], ["Purchase orders", "/purchasing"], ["Money and expenses", "/accounting"], ["Business reports", "/reports"], ["Team messages", "/team-chat"], ["Settings and team", "/settings"],
             ].map(([item, href]) => <button key={item} type="button" onClick={() => { setSearchOpen(false); setSearch(""); router.push(href); }}>{item}<span aria-hidden="true">→</span></button>)}
           </div>
           <p className="command-hint">Search takes you to the right part of your business using your saved records.</p>

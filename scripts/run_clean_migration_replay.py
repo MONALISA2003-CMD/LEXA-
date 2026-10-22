@@ -163,7 +163,7 @@ def main() -> int:
                        '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                        '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
                        '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs',
-                       '040_phase8_finance_workflows')
+                       '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation')
                 """)
                 migration_rows = sorted(row[0] for row in cur.fetchall())
                 expected_migrations = sorted([
@@ -172,7 +172,7 @@ def main() -> int:
                     '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                     '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
                     '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs',
-                    '040_phase8_finance_workflows',
+                    '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation',
                 ])
                 cur.execute("""
                     SELECT to_regclass('public.inventory_replenishment_policies') IS NOT NULL,
@@ -241,6 +241,22 @@ def main() -> int:
                 (phase8_reversal_column, phase8_reversal_index, phase8_expense_posting_function,
                  phase8_expense_reversal_metric, phase8_reversal_fk, phase8_status_constraint) = cur.fetchone()
                 cur.execute("""
+                    SELECT
+                      count(*) FILTER (WHERE c.relname IN ('team_conversations','team_messages','team_conversation_reads')),
+                      count(*) FILTER (WHERE c.relname IN ('team_conversations','team_messages','team_conversation_reads') AND c.relrowsecurity AND c.relforcerowsecurity),
+                      count(*) FILTER (WHERE c.relname IN ('team_conversations','team_messages','team_conversation_reads') AND EXISTS (
+                        SELECT 1 FROM pg_policies p WHERE p.schemaname='public' AND p.tablename=c.relname
+                      )),
+                      EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='sales' AND column_name='business_date'),
+                      EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_sales_tenant_business_date_status'),
+                      (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.analytics_refresh_queue'::regclass),
+                      to_regprocedure('public.process_analytics_refresh_queue(integer)') IS NOT NULL
+                    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+                    WHERE n.nspname='public' AND c.relkind='r'
+                """)
+                (team_chat_tables, team_chat_rls_forced, team_chat_policy_tables, sales_business_date_column,
+                 sales_business_date_index, analytics_queue_rls_forced, analytics_queue_worker) = cur.fetchone()
+                cur.execute("""
                     SELECT count(*) FROM information_schema.tables
                      WHERE table_schema='public' AND table_type='BASE TABLE'
                 """)
@@ -304,6 +320,12 @@ def main() -> int:
         if not phase8_expense_reversal_metric: failures.append("Phase 8 expense-correction reporting column is missing")
         if not phase8_reversal_fk: failures.append("Phase 8 expense reversal journal reference is not tenant-safe")
         if not phase8_status_constraint: failures.append("Phase 8 expense lifecycle does not allow the supported correction status")
+        if team_chat_tables != 3 or team_chat_rls_forced != 3 or team_chat_policy_tables != 3:
+            failures.append(f"Team chat tables must all exist with forced RLS and scoped policies: tables={team_chat_tables}/3, forced={team_chat_rls_forced}/3, policies={team_chat_policy_tables}/3")
+        if not sales_business_date_column or not sales_business_date_index:
+            failures.append("Commerce business-date ledger column or query index is missing")
+        if not analytics_queue_rls_forced or not analytics_queue_worker:
+            failures.append("Durable analytics queue forced-RLS or worker function is missing")
 
         evidence = {
             "schema_version": 1,
@@ -341,6 +363,13 @@ def main() -> int:
             "phase8_expense_reversal_reporting_metric": bool(phase8_expense_reversal_metric),
             "phase8_expense_reversal_tenant_safe_fk": bool(phase8_reversal_fk),
             "phase8_expense_correction_status": bool(phase8_status_constraint),
+            "team_chat_tables": team_chat_tables,
+            "team_chat_rls_forced": team_chat_rls_forced,
+            "team_chat_policy_tables": team_chat_policy_tables,
+            "sales_business_date_column": bool(sales_business_date_column),
+            "sales_business_date_index": bool(sales_business_date_index),
+            "analytics_refresh_queue_rls_forced": bool(analytics_queue_rls_forced),
+            "analytics_refresh_queue_worker": bool(analytics_queue_worker),
             "lexa_app_can_write_permissions_reference": bool(can_write_permissions),
             "lexa_app_can_write_schema_migrations": bool(can_write_migrations),
             "required_phase5_return_routines_found": routine_count,

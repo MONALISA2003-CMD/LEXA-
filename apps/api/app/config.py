@@ -1,6 +1,7 @@
 import re
 from urllib.parse import parse_qs, unquote, urlsplit
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +16,12 @@ class Settings(BaseSettings):
     jwt_audience: str = "lexa-web"
     access_token_minutes: int = 30
     refresh_token_days: int = 30
+    # Per-process limits. The application uses Neon pooling, so these values
+    # must be sized across all Render instances/workers, not per user account.
+    database_pool_size: int = Field(default=5, ge=1, le=30)
+    database_max_overflow: int = Field(default=5, ge=0, le=30)
+    database_pool_timeout_seconds: int = Field(default=10, ge=1, le=60)
+    database_pool_recycle_seconds: int = Field(default=900, ge=60, le=3600)
     cors_origins: str = "http://localhost:3000"
     lexa_neon_project_id: str = "wispy-mud-75323042"
     lexa_neon_branch_id: str = "br-soft-star-b1dj2m2w"

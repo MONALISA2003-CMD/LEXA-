@@ -107,3 +107,32 @@ def test_return_line_ids_must_be_unique_within_one_return():
     ensure_unique_return_line_ids([first, second])
     with pytest.raises(ValueError, match="combine quantities"):
         ensure_unique_return_line_ids([first, second, first])
+
+
+@pytest.mark.parametrize(
+    ("gross", "discount", "rate", "inclusive", "expected_tax", "expected_total"),
+    [
+        ("118", "0", "18", True, "18.0000", "118.0000"),
+        ("100", "0", "18", False, "18.0000", "118.0000"),
+        ("100", "10", "18", False, "16.2000", "106.2000"),
+        ("100", "10", "18", True, "13.7288", "90.0000"),
+        ("100", "0", "0", False, "0.0000", "100.0000"),
+    ],
+)
+def test_effective_tax_math_handles_inclusive_exclusive_discount_and_zero(
+    gross, discount, rate, inclusive, expected_tax, expected_total
+):
+    from app.commerce_rules import calculate_line_tax
+
+    tax, total = calculate_line_tax(gross, discount, rate, inclusive=inclusive)
+    assert str(tax) == expected_tax
+    assert str(total) == expected_total
+
+
+def test_effective_tax_math_rejects_bad_discount_and_tax_rate():
+    from app.commerce_rules import calculate_line_tax
+
+    with pytest.raises(ValueError, match="discount"):
+        calculate_line_tax("10", "11", "18")
+    with pytest.raises(ValueError, match="Tax rate"):
+        calculate_line_tax("10", "0", "101")

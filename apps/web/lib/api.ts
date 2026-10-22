@@ -331,7 +331,7 @@ export function refreshAnalytics(fromDate:string,toDate:string){return getJson<{
 // Phase 4A commerce contracts
 export type CommerceCustomer = { id:string; party_id:string; display_name:string; party_type:string; email?:string|null; phone?:string|null; credit_limit:string; status:string; notes?:string|null; created_at:string };
 export type PaymentChannel = { id:string; tenant_id:string; name:string; channel_type:string; provider?:string|null; currency_code:string; active:boolean; created_at:string; updated_at:string };
-export type CommerceProduct = { variant_id:string; sku:string; variant_name:string; product_name:string; track_inventory:boolean; selling_price:string };
+export type CommerceProduct = { variant_id:string; sku:string; variant_name:string; product_name:string; track_inventory:boolean; selling_price:string; effective_tax_rate:string; tax_inclusive:boolean; tax_code?:string|null; tax_rule_source:string };
 export type CommerceSale = { id:string; transaction_id:string; customer_party_id?:string|null; customer_name?:string|null; currency_code:string; status:string; subtotal:string; discount_total:string; tax_total:string; total:string; amount_paid:string; amount_due:string; return_adjustment_amount?:string; created_at:string; completed_at?:string|null };
 export type Receivable = { id:string; sale_id:string; customer_party_id:string; customer_name:string; original_amount:string; paid_amount:string; adjustment_amount:string; balance:string; status:string; due_at?:string|null; created_at:string };
 export type ReconciliationLine = { line_id:string; payment_channel_id:string; channel_name:string; channel_type:string; expected_amount:string; actual_amount?:string|null; variance?:string|null; line_status:string; line_notes?:string|null; reviewed_by?:string|null };
@@ -350,7 +350,9 @@ export function createCommerceCustomer(body:{display_name:string;party_type?:'PE
 export function getPaymentChannels(){return getJson<PaymentChannel[]>('/api/v1/commerce/payment-channels');}
 export function createPaymentChannel(body:{name:string;channel_type:string;provider?:string;currency_code:string}){return postIdempotent<PaymentChannel>('/api/v1/commerce/payment-channels',body);}
 export function deactivatePaymentChannel(id:string,reason='No longer used'){return postIdempotent<PaymentChannel>(`/api/v1/commerce/payment-channels/${encodeURIComponent(id)}/deactivate`,{reason});}
-export function getCommerceProducts(){return getJson<CommerceProduct[]>('/api/v1/commerce/products');}
+export type CommerceCapabilities = { can_manage_price:boolean; can_manage_sales:boolean };
+export function getCommerceCapabilities() { return getJson<CommerceCapabilities>("/api/v1/commerce/capabilities"); }
+export function getCommerceProducts(businessDate=''){return getJson<CommerceProduct[]>(`/api/v1/commerce/products${businessDate?`?business_date=${encodeURIComponent(businessDate)}`:''}`);}
 export type CommerceSalesQuery = { limit?:number; offset?:number; search?:string; status?:string; start_date?:string; end_date?:string; branch_id?:string; payment_channel_id?:string };
 export function getCommerceSales(query:CommerceSalesQuery={}){
   const params = new URLSearchParams({limit:String(query.limit ?? 100),offset:String(query.offset ?? 0)});
@@ -402,7 +404,7 @@ export function postExpense(id:string){return postIdempotent<{expense_id:string;
 export function voidExpense(id:string,reason:string){return postIdempotent<{expense_id:string;status:string}>(`/api/v1/accounting/expenses/${encodeURIComponent(id)}/void`,{reason});}
 export function reverseExpense(id:string,reason:string){return postIdempotent<{expense_id:string;status:string;reversal_journal_entry_id:string}>(`/api/v1/accounting/expenses/${encodeURIComponent(id)}/reverse`,{reason});}
 export function getEfrisConfig(){return getJson<EfrisConfig>('/api/v1/compliance/efris/config');}
-export function updateEfrisConfig(body:{enabled:boolean;integration_mode:string;registration_status:string;tin?:string|null;legal_name?:string|null;effective_date?:string|null}){return getJson<EfrisConfig>('/api/v1/compliance/efris/config',{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
+export function updateEfrisConfig(body:{enabled:boolean;integration_mode:string;tin?:string|null;legal_name?:string|null;effective_date?:string|null}){return getJson<EfrisConfig>('/api/v1/compliance/efris/config',{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
 export function getFiscalDocuments(status?:string){return getJson<FiscalDocument[]>(`/api/v1/compliance/fiscal-documents${status?`?status=${encodeURIComponent(status)}`:''}`);}
 export function fiscalizeSale(saleId:string,documentType:'INVOICE'|'RECEIPT'='INVOICE'){return getJson<{fiscal_document_id:string;status:string}>(`/api/v1/compliance/sales/${saleId}/fiscalize?document_type=${documentType}`,{method:'POST',headers:{'Idempotency-Key':key()}});}
 export type TaxRate = { id:string; code:string; name:string; rate_percent:string; inclusive:boolean; effective_from:string; effective_to?:string|null; status:string; created_at:string; updated_at:string };
@@ -618,3 +620,32 @@ export function postSupplierPayment(id:string) { return purchasingPost<{id:strin
 export function voidSupplierPayment(id:string,reason?:string) { return purchasingPost<{id:string;status:string}>(`/api/v1/purchasing/supplier-payments/${encodeURIComponent(id)}/void`,{reason}); }
 export function getSupplierBalances(params:{supplier_party_id?:string;currency_code?:string;include_zero?:boolean}={}) { const p=new URLSearchParams(); Object.entries(params).forEach(([k,v])=>v!==undefined&&v!==null&&v!==''&&p.set(k,String(v))); return getJson<SupplierBalance[]>(`/api/v1/purchasing/supplier-balances${p.size?`?${p}`:''}`); }
 export function getSupplierLedger(id:string,currencyCode?:string) { return getJson<SupplierLedgerEntry[]>(`/api/v1/purchasing/supplier-ledger/${encodeURIComponent(id)}${currencyCode?`?currency_code=${encodeURIComponent(currencyCode)}`:''}`); }
+
+// Internal LEXA team chat. This is deliberately a real tenant/branch-scoped
+// collaboration feature, not an AI chat or an unverified external messenger.
+export type TeamConversation = {
+  id: string; branch_id: string | null; branch_name?: string | null; title: string;
+  context_type: string | null; context_id: string | null; created_by_user_id: string;
+  created_by_name: string; created_at: string; updated_at: string; last_message_at: string | null;
+  latest_message: string | null; latest_sender_user_id: string | null; latest_sender_name: string | null;
+  unread_count: number | string;
+};
+export type TeamMessage = {
+  id: string; conversation_id: string; sender_user_id: string; sender_name: string;
+  body: string; created_at: string; is_mine: boolean;
+};
+export function getTeamConversations(limit = 100) {
+  return getJson<TeamConversation[]>(`/api/v1/team-chat/conversations?limit=${Math.min(200, Math.max(1, Math.floor(limit)))}`);
+}
+export function createTeamConversation(body: { title: string; branch_id?: string | null; context_type?: string | null; context_id?: string | null }) {
+  return postIdempotent<TeamConversation>('/api/v1/team-chat/conversations', body);
+}
+export function getTeamMessages(conversationId: string, limit = 100) {
+  return getJson<TeamMessage[]>(`/api/v1/team-chat/conversations/${encodeURIComponent(conversationId)}/messages?limit=${Math.min(200, Math.max(1, Math.floor(limit)))}`);
+}
+export function sendTeamMessage(conversationId: string, body: string) {
+  return postIdempotent<TeamMessage>(`/api/v1/team-chat/conversations/${encodeURIComponent(conversationId)}/messages`, { body });
+}
+export function markTeamConversationRead(conversationId: string) {
+  return getJson<{ conversation_id: string; read_at: string }>(`/api/v1/team-chat/conversations/${encodeURIComponent(conversationId)}/read`, { method: 'POST' });
+}

@@ -20,9 +20,11 @@ def test_inventory_ageing_is_tenant_and_location_scoped_and_labels_unknown_prove
 
 def test_clean_replay_contains_ageing_migration_and_evidence_gate_checks_it():
     order = json.loads((ROOT / "migrations/reconstructed/clean_replay_order.json").read_text())
-    assert order["steps"][-2]["path"] == "migrations/039_phase7_supplier_ledger_landed_costs.sql"
-    assert order["steps"][-1]["path"] == "migrations/040_phase8_finance_workflows.sql"
-    assert len(order["steps"]) == 44
+    assert order["steps"][-4]["path"] == "migrations/039_phase7_supplier_ledger_landed_costs.sql"
+    assert order["steps"][-3]["path"] == "migrations/040_phase8_finance_workflows.sql"
+    assert order["steps"][-2]["path"] == "migrations/041_commerce_integrity_scaling.sql"
+    assert order["steps"][-1]["path"] == "migrations/042_team_chat_foundation.sql"
+    assert len(order["steps"]) == 46
     replay = (ROOT / "scripts/run_clean_migration_replay.py").read_text()
     verifier = (ROOT / "scripts/check_phase6_replay_evidence.py").read_text()
     assert "037_phase6_inventory_ageing_index" in replay
@@ -32,8 +34,6 @@ def test_clean_replay_contains_ageing_migration_and_evidence_gate_checks_it():
     assert "phase8_expense_reversal_reference" in verifier
     assert "phase8_expense_posting_routine" in verifier
     assert "phase8_expense_reversal_tenant_safe_fk" in verifier
-    assert order["steps"][-2]["path"] == "migrations/039_phase7_supplier_ledger_landed_costs.sql"
-    assert order["steps"][-1]["path"] == "migrations/040_phase8_finance_workflows.sql"
 
 
 def test_phase3_six_lost_sources_remain_permanently_dispositioned_not_reopened():

@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Stages 1–5 Build-Fix Candidate (Live Drift Audit)",
-  "version": "2.13.1+stage1-5-buildfix.candidate.20261022",
+  "package": "LEXA Connected Sales, Analytics Queue and Team Chat Candidate",
+  "version": "2.14.0+connected-sales-chat.candidate.20261022",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -155,7 +155,14 @@
     "Patched verified Vercel TypeScript failures in Finance and Customers Promise.allSettled narrowing and nullable profile currency access.",
     "Corrected supplier-bill UI field to match_variance, matching the backend response type.",
     "Added frontend regression assertions for the exact Vercel TypeScript failures observed on main commit cf25deac57832ac897f76a86b03928664a85ddb6.",
-    "Added dated Stage 1–5 live audit: latest Vercel deployment fails typechecking; stable alias remains on older READY commit; current Neon lexa-live migration ledger only reaches 031 and lacks Phase 7 supplier tables plus Phase 8 reversal schema."
+    "Added dated Stage 1–5 live audit: latest Vercel deployment fails typechecking; stable alias remains on older READY commit; current Neon lexa-live migration ledger only reaches 031 and lacks Phase 7 supplier tables plus Phase 8 reversal schema.",
+    "Candidate 2.14.0: server-authoritative effective-dated tax resolution at checkout and tax-mode-aware cart preview with discounts applied before tax.",
+    "Candidate 2.14.0: persist sales and return business dates and align accounting/report periods to the recorded business date.",
+    "Candidate 2.14.0: use checkout inventory reference types for COGS and capture the source stock-ledger cost instead of zero-cost sale issues.",
+    "Candidate 2.14.0: gate pricing/discount modifications by server permissions and prevent ordinary EFRIS setup users from self-declaring successful registration.",
+    "Candidate 2.14.0: add migration 041 for durable coalesced analytics refresh, bounded retries/worker and commerce integrity.",
+    "Candidate 2.14.0: add migration 042 and tenant/branch-scoped, idempotent internal Team Chat with unread/read state, audit/outbox metadata and responsive frontend.",
+    "Candidate 2.14.0: pool limits are configurable and bounded per API process; 5,000-user readiness remains subject to measured load test and hosting/database capacity."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -164,11 +171,11 @@
   "database_reset": false,
   "seed_reset": false,
   "product_deletion": false,
-  "description": "Full-source LEXA Phase 7 finalization candidate. Includes two fixes for TypeScript errors observed in the current Vercel baseline and regression contracts. GitHub write access was denied; current main does not contain the packaged CI workflow; disposable replay, authenticated staging E2E, candidate deployment parity and production rollout remain pending. Historical six-source replacement disposition remains closed.",
-  "package_version": "2.13.1+stage1-5-buildfix.candidate.20261022",
+  "description": "LEXA source candidate adding effective-dated checkout tax, sale business dates, correct COGS source references and inventory cost capture, safer EFRIS credit-note preconditions, durable analytics refresh processing and tenant/branch scoped Team Chat. Source tests pass. Migration 041–042 PostgreSQL replay, full Node 24 build, authenticated staging workflows, source/deployment alignment and production release remain pending. No production database mutation or deployment occurred.",
+  "package_version": "2.14.0+connected-sales-chat.candidate.20261022",
   "phase": 5,
-  "phase_name": "Stages 1–5 — Vercel Build Fix, Reporting and Acceptance",
-  "phase_status": "BUILD_ERRORS_PATCHED_SOURCE_CANDIDATE_LIVE_ACCEPTANCE_BLOCKED",
+  "phase_name": "Stages 1–5 + Sales Integrity, Durable Analytics and Team Chat",
+  "phase_status": "SOURCE_TESTS_PASS_POSTGRES_REPLAY_NODE24_BUILD_AND_PRODUCTION_PARITY_PENDING",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -205,59 +212,70 @@
   },
   "verification": {
     "backend_tests": {
-      "passed": 262,
+      "passed": 279,
       "failed": 0,
       "skipped": 0,
       "warning": "One existing Starlette deprecation warning."
     },
     "frontend_contract_tests": {
-      "passed": 53,
+      "passed": 57,
       "failed": 0,
       "skipped": 0,
-      "runtime": "Node 22.16.0; syntax checks use globally installed TypeScript."
+      "runtime": "Node 22.16.0; contract tests pass, but full Node 24 app build was not run."
     },
     "python_compileall": true,
     "typescript_jsx_syntax_transpile": {
-      "files": 35,
+      "files": 36,
       "errors": 0,
-      "full_typecheck": false
+      "full_typecheck": false,
+      "typescript_version": "Global TypeScript 5.8.3"
     },
     "migration_replay_plan": {
       "status": "PASS_PLAN_ONLY",
-      "input_count": 44,
+      "input_count": 46,
       "sql_executed": false,
       "database_connection_opened": false,
-      "bundle_sha256": "15555832b8153b52f412937de6f153e96afb1c6f6187a15b487b5e874ed5ae46"
+      "bundle_sha256": "8d1e7f77051550258fc6784526d48fb6899b0cb3deaade1bd896380c4e2a9957"
     },
-    "node24_clean_install_typecheck_production_build": "NOT_RUN: local Node is v22.16.0; app requires Node 24 and dependencies are not installed.",
-    "clean_disposable_postgres_replay": "NOT_RUN: no local PostgreSQL/psql available; replay apply is guarded for a fresh loopback disposable database only.",
-    "authenticated_browser_acceptance": "NOT_RUN: requires Node 24 dependencies, isolated staging host, QA authentication state and explicit opt-in.",
-    "candidate_deployment": "NOT_DEPLOYED: GitHub write path returned 403; live Vercel/Render do not yet serve this candidate.",
+    "node24_clean_install_typecheck_production_build": "NOT_RUN: available runtime is Node 22; Node 24 dependencies were unavailable in offline cache.",
+    "clean_disposable_postgres_replay": "NOT_RUN: no local PostgreSQL/psql; plan-only has not executed SQL.",
+    "authenticated_browser_acceptance": "NOT_RUN: requires isolated staging host, QA auth and Node 24 dependencies.",
+    "candidate_deployment": "NOT_DEPLOYED: candidate remains local/unpushed; prior GitHub write path returned 403.",
     "production_database_mutation": false,
-    "production_deployment_performed": false
+    "production_deployment_performed": false,
+    "archive_verification": {
+      "zip_crc": "PASS",
+      "entries": 424,
+      "payload_files_hash_verified": 422,
+      "fresh_extraction_backend_tests": "279 passed, 0 failed",
+      "fresh_extraction_frontend_contract_tests": "57 passed, 0 failed",
+      "fresh_extraction_migration_plan": "46 inputs hashed; plan-only; no DB connection or SQL execution",
+      "frontend_action_audit": "PASS: 29 TS/TSX files parsed; 203 button-like controls, 46 forms and 71 links checked",
+      "secrets_and_caches": "No real .env files, bytecode caches, node_modules or .next output packaged"
+    }
   },
-  "release": "stages1-5-buildfix-candidate-2026-10-22",
-  "release_name": "Stages 1–5 canonical source, Vercel TypeScript build fixes, reporting and live parity audit",
+  "release": "connected-sales-chat-2026-10-22",
+  "release_name": "LEXA connected commerce integrity, durable analytics refresh and team chat",
   "source_baseline": "Derived from GitHub main dd8fe8f60310831ef80809fe2e517ae80bafd0b2; canonical source changes remain local/unpublished because GitHub write operations returned 403.",
   "canonical_source_parity": false,
-  "release_status": "Source candidate only. Known Vercel TypeScript errors are patched and regression tests pass. Current Vercel alias remains on an older READY deployment; the connected Neon lexa-live branch is missing migrations 033–040 plus supplier bill/payment/ledger and Phase 8 reversal schema. Render account logs await workspace confirmation. No live deployment or database changes were made.",
+  "release_status": "Source candidate only. Backend and frontend contract suites pass (279/57); 46 migration inputs pass plan-only. Full PostgreSQL replay, Node 24 production build, authenticated staging E2E, load and recovery tests remain unrun. No GitHub push, deployment or production DB mutation.",
   "validation_summary": {
-    "strategy_basis": "Stage 4/5 roadmap and approved product blueprint: Home is a concise overview, Finance holds detailed money workflows, Reports provides visual analysis, and AI stays blocked until Phase 8 acceptance.",
-    "stage4": "Implemented common report periods, real loaded data, accessible chart/table pairs, exact values, selected-range display, correct snapshot scope, CSV export and safe drill-through.",
-    "stage5": "Implemented migration 040 manifest/postconditions, source-SHA-bound evidence verification and explicit opt-in browser acceptance lanes. Stage 5 not accepted until real disposable database replay and authenticated staging tests pass.",
-    "payment_boundary": "Recording only; no provider integration, payment transfer, automatic provider verification or credentials.",
-    "backend_tests": "262 passed, 0 failed.",
-    "frontend_contract_tests": "54 passed, 0 failed, from fresh ZIP extraction.",
-    "typescript_syntax": "35 TS/TSX files transpiled using global TypeScript 5.8.3, 0 syntax errors; actual Node 24/TypeScript 5.9.3 typecheck/build not run because package dependency install was unavailable.",
-    "migration_replay": "44 input paths/hashes pass plan-only; bundle SHA-256 15555832b8153b52f412937de6f153e96afb1c6f6187a15b487b5e874ed5ae46; SQL not executed.",
-    "release_acceptance": "Pending actual clean replay through migration 040, evidence checker, Node 24 typecheck/build, authenticated browser journeys and live source/schema parity.",
+    "strategy_basis": "Prior approved LEXA direction plus source hardening of checkout, accounting, operational collaboration and reporting; AI remains deferred until real workflows pass acceptance.",
+    "commerce_integrity": "Server-resolved effective tax at selected business date, discount-before-tax pricing, sale/return business date, actual inventory cost capture and lower-case checkout COGS reference alignment are included in source candidate.",
+    "team_chat": "Tenant/branch-scoped RBAC chat, idempotent send, read/unread state, append-only messages, audit/outbox metadata and responsive UI included; file uploads and external messaging are not claimed.",
+    "analytics_refresh": "Durable tenant/date queue with bounded coalescing/retries/worker and forced RLS included in migration 041 and API poller; SQL replay not run.",
+    "efris_boundary": "No manufactured FDN/QR; fiscalization requires the genuine registered system-to-system adapter and is not live/accepted in this source package.",
+    "payment_boundary": "Payment-method records do not initiate, transfer, settle or automatically verify money; bank/mobile money verification connectors are not live.",
+    "backend_tests": "279 passed, 0 failed.",
+    "frontend_contract_tests": "57 passed, 0 failed.",
+    "typescript_syntax": "36 TS/TSX files transpiled with global TypeScript 5.8.3; 0 syntax errors; full Node 24 project typecheck/build not run.",
+    "migration_replay": "46 migration input paths/hashes pass plan-only; bundle SHA-256 8d1e7f77051550258fc6784526d48fb6899b0cb3deaade1bd896380c4e2a9957; SQL not executed.",
+    "scale_gate": "5,000 named-account target documented; proposed initial acceptance workload is 250 concurrent users, with no load test yet; the current Render Free service/database state is not evidence of capacity.",
+    "release_acceptance": "Pending guarded PostgreSQL clean replay through 042, Node 24 build, authenticated staging workflows, load test, backup/restore verification and source/schema/deployment parity.",
     "production_changes": "None.",
-    "live_database": "Read-only audit of Neon LEXA / lexa-live found latest schema_migrations row 031_phase3_auth_surface_rls; no 032–040 rows. supplier_bills, supplier_payments, supplier_ledger_entries and five migration-040 postconditions are absent. No SQL was applied.",
-    "vercel": "Latest main deployment dpl_9XjcgzpSnBFo3gPNkSxFbo8Rmmdd fails npm run build during TypeScript: PromiseSettledResult narrowing in accounting/customers, nullable customer profile currency, and nonexistent SupplierBill.match_difference. Candidate fixes and regression test added; not yet verified by a new remote build.",
-    "frontend_alias": "lexa-green.vercel.app resolves to previous READY deployment at commit f1e0e2f1373d7912ae1cab694615990071ef07b4; current main commit cf25deac57832ac897f76a86b03928664a85ddb6 failed its Vercel build.",
-    "render": "Not inspected via account connector: Render requires workspace selection; only candidate My Workspace (tea-d9cssgflk1mc73br1cp0) was surfaced and needs user confirmation. No Render mutation.",
-    "archive_verification": "411 repository-root files; ZIP CRC passes; fresh extraction reran 262 backend tests, 54 frontend tests, Python compilation, migration/source checks, frontend action audit, and 44-input plan hash validation; no secret env files, caches, node_modules, or build outputs packaged.",
-    "offline_npm_install": "Attempted npm ci --offline; blocked by missing cached undici-types@6.21.0 (ENOTCACHED) and project engine Node 24.x vs local Node 22.16.0; no dependency install completed."
+    "live_database": "Read-only audit of Neon LEXA/lexa-live observed migration 031 and missing later supplier/Phase 8 schema; no SQL applied.",
+    "deployment": "Candidate not pushed or deployed; prior GitHub write path returned 403; new candidate is not served by live Vercel/Render.",
+    "archive_verification": "PASS: fresh extraction CRC check and 422 payload-file checksums succeeded; fresh extraction reran 279 backend tests and 57 frontend contract tests; migration plan-only and frontend action audit pass. ZIP contains 424 entries including 2 checksum indexes, excludes runtime secrets/caches, and remains an undeployed candidate."
   },
   "final_gate_report": "PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md",
   "local_repair_readme": "PHASE5_INCREMENT_03_README_2026-10-21.md",
@@ -414,7 +432,7 @@
     "paid_resources_created": false
   },
   "stage4_reporting": {
-    "status": "IMPLEMENTED_IN_SOURCE_CANDIDATE",
+    "status": "IMPLEMENTED_IN_SOURCE_CANDIDATE_NOT_LIVE_ACCEPTED",
     "features": [
       "common date presets and manual ranges",
       "sales trend and exact-value date table",
@@ -436,34 +454,33 @@
     ]
   },
   "stage5_acceptance": {
-    "status": "BUILD_FIX_CANDIDATE_SOURCE_CHECKS_PASS_LIVE_ACCEPTANCE_BLOCKED",
-    "migration_manifest_inputs": 44,
-    "migration_bundle_sha256": "15555832b8153b52f412937de6f153e96afb1c6f6187a15b487b5e874ed5ae46",
-    "phase8_migration": "migrations/040_phase8_finance_workflows.sql",
+    "status": "SOURCE_TESTS_PASS_POSTGRES_REPLAY_NODE24_BUILD_AND_PRODUCTION_PARITY_PENDING",
+    "migration_manifest_inputs": 46,
+    "migration_bundle_sha256": "8d1e7f77051550258fc6784526d48fb6899b0cb3deaade1bd896380c4e2a9957",
+    "latest_forward_migrations": [
+      "migrations/041_commerce_integrity_scaling.sql",
+      "migrations/042_team_chat_foundation.sql"
+    ],
     "replay_mode": "plan-only validated; no database connection opened and no SQL executed",
-    "phase8_replay_postconditions": [
-      "expense reversal reference and index",
-      "expense journal-posting routine",
-      "expense-reversal analytics metric",
-      "tenant-safe journal foreign key",
-      "supported expense correction status"
+    "new_replay_postconditions": [
+      "sales business_date and tenant/date index",
+      "durable analytics refresh queue with forced RLS and worker routine",
+      "three Team Chat tables with forced RLS and scoped policies"
     ],
     "browser_lanes": [
-      "Stage 4 read-only reports/modules",
-      "Stage 5 sales write journeys - opt-in disposable staging only",
-      "Stage 7 purchasing write journeys - opt-in disposable staging only"
+      "read-only reports/modules",
+      "staging-only sales checkout/returns and accounting flows",
+      "staging-only purchasing/billing flows",
+      "staging-only Team Chat tenant/branch authorization and idempotency"
     ],
     "acceptance_complete": false,
     "blockers": [
-      "GitHub connector write/publish blocked by HTTP 403; branch/PR not created in remote repository.",
-      "Project npm ci/typecheck/build not run locally: Node 24 is unavailable and offline npm cache lacks undici-types@6.21.0; patched known Vercel TypeScript errors still need remote build verification.",
-      "Node 24 project npm ci/typecheck/build not run locally; Vercel errors patched but new remote build has not verified the fix.",
-      "Neon lexa-live migration ledger stops at 031; 033–040 absent; supplier billing/ledger tables and Phase 8 reversal schema/metric/foreign key/status constraint absent. Requires reviewed migration rollout after isolated clean replay and backup.",
-      "Six historically missing SQL sources are permanently designated reconstructed-equivalent sources; semantic clean replay/security validation remains pending.",
-      "Authenticated report, sales and purchasing browser journeys have not been run against staging.",
-      "Render service/deploy/log/source parity not inspected pending explicit confirmation of My Workspace.",
-      "Vercel stable frontend alias remains on older READY commit; new source is not live because main deployment fails TypeScript build.",
-      "Vercel env values for LEXA_API_URL/NEXT_PUBLIC_API_URL remain encrypted to this connector, so the actual backend origins have not been confirmed."
+      "Candidate code is not pushed to GitHub or deployed to Vercel/Render; prior GitHub write path returned HTTP 403.",
+      "Full Node 24 npm install, TypeScript typecheck and Next.js production build remain unverified.",
+      "Migrations 041 and 042 and the preceding chain need guarded clean PostgreSQL replay and security/postcondition checks; the live Neon branch was observed at migration 031 and lacks supplier-billing and Phase 8 schema expected by source.",
+      "Authenticated browser tests have not been run against isolated staging fixtures.",
+      "Backup/restore validation, concurrency/load testing, queue operations, and production capacity sizing for 5,000 named users remain open.",
+      "Live EFRIS system-to-system adapter and provider payment/bank/messaging connectors require approved specs, onboarding and credentials; they are not represented as active."
     ]
   },
   "live_deployment_audit": {
@@ -498,6 +515,7 @@
       "candidate_workspace": "My Workspace",
       "workspace_id": "tea-d9cssgflk1mc73br1cp0",
       "mutated": false
-    }
+    },
+    "candidate_note": "The locally packaged 2.14.0 source candidate is newer than the observed live source and is not deployed. This source packaging did not mutate services or database."
   }
 }

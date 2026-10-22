@@ -1,29 +1,42 @@
-# LEXA — Stage 4 Reporting + Stage 5 Acceptance Candidate (22 October 2026)
+# LEXA — Connected Sales & Operations Candidate (22 October 2026)
 
-**Status: reporting work is implemented in this source candidate; Stage 5 is not accepted yet.** This candidate builds on Stage 2–3 by adding report period controls, accessible chart/table pairs, drill-through, safe CSV export, explicit all-date/current-snapshot scope, and a gated acceptance harness through Phase 8 migration 040.
+**Candidate:** `2.14.0+connected-sales-chat.candidate.20261022`  
+**Decision:** Source implementation and local contract checks pass; this is **not yet an accepted production release**. The current package adds sales/tax/COGS integrity repairs, durable analytics refresh processing, internal Team Chat, responsive workspace changes and forward-only migrations 041–042. It retains the prior sales, purchasing, inventory, finance, compliance and reporting modules.
 
-**Payment boundary:** LEXA records a business user's chosen payment method and amount. It does not initiate, transfer, settle or automatically verify money. No payment gateway or payment-provider credentials are included or requested.
+## What changed in this candidate
 
-- [Stage 4 + Stage 5 acceptance handoff](STAGE4_STAGE5_REPORTING_AND_ACCEPTANCE.md)
-- [Stage 2–3 implementation report](LEXA_STAGE2_3_IMPLEMENTATION_REPORT_2026-10-22.md)
-- [Stage 1 foundation report](LEXA_STAGE1_FOUNDATION_IMPLEMENTATION_REPORT_2026-10-22.md)
-- [Phase 8 implementation report](PHASE8_IMPLEMENTATION_REPORT_2026-10-22.md)
+- Checkout tax is resolved server-side from effective-dated tenant tax rules and the selected business date. The browser preview supports inclusive and exclusive tax and applies discounts before tax.
+- Business dates are preserved through sales/returns and accounting posting/reporting; COGS uses the inventory reference type actually written by checkout, and stock-ledger cost is captured rather than recording zero-cost issues.
+- Cashier prices are read-only; pricing changes and discounts are server permission-gated. Browser controls are not treated as a security boundary.
+- EFRIS queueing only happens when a genuine adapter has set configuration to active system-to-system mode. Fiscal numbers/FDNs/QR codes are never invented locally; a credit note requires an accepted source fiscal invoice.
+- Analytics refresh uses a durable, tenant/date-coalesced queue, bounded retries, `SKIP LOCKED`, RLS and a bounded API-lifespan poller rather than refreshing every heavy projection synchronously in the sale transaction.
+- Team Chat adds tenant- and branch-scoped conversations, idempotent send, unread/read status, audit/outbox metadata and responsive phone/tablet/desktop layout. It is operational team chat, not AI chat.
+- Database pool controls are bounded and configurable per process. The readiness plan calls out the need to measure pool totals, concurrency and real request latency before asserting 5,000-user capacity.
 
-## Current candidate verification
+## Verification completed for this source candidate
 
-- Backend Python tests: **262 passed** (one existing Starlette deprecation warning).
-- Frontend Node contracts: **53 passed**.
+- Backend Python tests: **279 passed**, 0 failed (one existing Starlette deprecation warning).
+- Frontend Node contract tests: **57 passed**, 0 failed.
 - Python compilation: passed.
-- TypeScript/TSX syntax transpilation: **35 files, zero syntax errors**; a full TypeScript typecheck and Next.js build were not run because this environment has Node 22 while the app requires Node 24, and the web dependencies are not installed.
-- Migration plan: **44 hashed input files through `migrations/040_phase8_finance_workflows.sql`**; plan-only made no database connection and executed no SQL.
-- PostgreSQL clean replay and authenticated browser E2E: **not run**; see the handoff for required isolated database, Node 24 and QA staging setup.
-- No production database mutation or live deployment occurred in this packaging job. The connected GitHub write path returned 403, so Vercel/Render remain to be aligned to this canonical source.
+- TypeScript/TSX syntax transpilation: **36 files, zero syntax errors** using globally installed TypeScript. This is not a full project typecheck.
+- Migration plan: **46 migration inputs** hashed and ordered, through `migrations/042_team_chat_foundation.sql`; plan-only mode opened no database connection and executed no SQL.
+- Clean PostgreSQL replay and authenticated browser E2E: **not run**. Full Node 24 Next.js typecheck/build also remains unverified: the available environment is Node 22 with dependencies unavailable offline.
+- No live database mutation, GitHub push, Vercel deployment or Render deployment was performed.
 
-Phase 9 remains on hold until the Phase 8 workflows are accepted. The single release/rollback/launch gate remains Phase 12.
+## Important release blockers
+
+The read-only live Neon `lexa-live` branch was previously observed at migration 031 and missing supplier billing/ledger tables and Phase 8 fields expected by later source. This package includes migrations 033–042 as forward candidates but does not apply them. Do not apply a clean replay to live business data. Run the guarded disposable PostgreSQL replay and security checks, a Node 24 clean install/typecheck/Next build, authenticated staging workflows, backup/restore verification, load testing and controlled release review first.
+
+Real URA EFRIS system-to-system transmission and other provider integrations are **not claimed live**: they require URA-approved API specifications/onboarding and credentials, and provider signing/webhook details. Mobile-money/bank payment entries remain recorded business facts, not verified or settled transfers. AI integrations remain deferred until real operational flows are accepted.
+
+- [Implementation handoff](LEXA_2.14.0_IMPLEMENTATION_HANDOFF_2026-10-22.md)
+- [Sales integrity and 5,000-user readiness plan](docs/LEXA_SALES_INTEGRITY_AND_5000_USER_READINESS.md)
+- [Stage 4/5 acceptance handoff](STAGE4_STAGE5_REPORTING_AND_ACCEPTANCE.md)
 
 ---
 
-> **Historical reference material below:** older phase notes, historical test counts and deployment states are retained for context. They are not proof of Stage 4/5 acceptance for this candidate.
+> Historical phase notes below record earlier audit snapshots and must not be read as current verification of this candidate.
+
 
 # LEXA — Phase 7 Purchasing & Supplier Management (v2.12.0, Increment 03 — 22 October 2026)
 

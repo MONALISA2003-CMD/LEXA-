@@ -13,8 +13,8 @@ def test_sales_history_supports_server_side_filters():
     assert 'end_date: date | None = None' in block
     assert 'branch_id: UUID | None = None' in block
     assert 'LIMIT :lim OFFSET :off' in block
-    assert 'public.lexa_business_date(s.created_at, :t) >= :start_date' in block
-    assert 'public.lexa_business_date(s.created_at, :t) <= :end_date' in block
+    assert 's.business_date >= :start_date' in block
+    assert 's.business_date <= :end_date' in block
 
 
 def test_sales_history_enforces_assigned_branch_scope():

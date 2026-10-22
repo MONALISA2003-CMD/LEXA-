@@ -12,6 +12,7 @@ import {
   createReconciliation,
   createSaleReturn,
   getCommerceCustomers,
+  getCommerceCapabilities,
   getCommerceDashboard,
   getBusinessProfile,
   getCommerceProducts,
@@ -27,6 +28,7 @@ import {
   resolveReconciliationLine,
   setReconciliationActual,
   type CommerceCustomer,
+  type CommerceCapabilities,
   type CommerceDashboard,
   type CommerceProduct,
   type CommerceSale,
@@ -65,7 +67,7 @@ function recordStatusLabel(value: string) {
 }
 
 type PaymentRow = { channelId: string; amount: string; reference?: string };
-type CartLine = { id:string; variantId:string; quantity:string; unitPrice:string };
+type CartLine = { id:string; variantId:string; quantity:string; unitPrice:string; discountAmount:string };
 type CheckoutAttempt = { fingerprint:string; key:string };
 
 export default function CommercePage() {
@@ -75,6 +77,7 @@ export default function CommercePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<CommerceDashboard | null>(null);
   const [businessCurrency, setBusinessCurrency] = useState<string | null>(null);
+  const [capabilities, setCapabilities] = useState<CommerceCapabilities>({ can_manage_price:false, can_manage_sales:false });
   const [customers, setCustomers] = useState<CommerceCustomer[]>([]);
   const [channels, setChannels] = useState<PaymentChannel[]>([]);
   const [products, setProducts] = useState<CommerceProduct[]>([]);
@@ -133,7 +136,18 @@ export default function CommercePage() {
     if (!q) return products;
     return products.filter((x) => `${x.product_name} ${x.variant_name} ${x.sku}`.toLowerCase().includes(q));
   }, [products, productSearch]);
-  const cartTotal = useMemo(() => cart.reduce((sum, line) => sum + Math.max(0, Number(line.quantity) || 0) * Math.max(0, Number(line.unitPrice) || 0), 0), [cart]);
+  const cartTotal = useMemo(() => cart.reduce((sum, line) => {
+    const quantity = Math.max(0, Number(line.quantity) || 0);
+    const unitPrice = Math.max(0, Number(line.unitPrice) || 0);
+    const product = products.find((item) => item.variant_id === line.variantId);
+    const rate = Math.max(0, Number(product?.effective_tax_rate) || 0);
+    const gross = quantity * unitPrice;
+    const discount = Math.min(gross, Math.max(0, Number(line.discountAmount) || 0));
+    const discountedGross = Math.max(0, gross - discount);
+    const lineTotal = product?.tax_inclusive ? discountedGross : discountedGross * (1 + rate / 100);
+    return sum + Math.round(lineTotal * 10000) / 10000;
+  }, 0), [cart, products]);
+  const cartDiscountError = cart.find((line) => Number(line.discountAmount || 0) > Number(line.quantity || 0) * Number(line.unitPrice || 0));
   const selectedReconData = useMemo(() => reconciliations.find((x) => x.id === selectedRecon), [reconciliations, selectedRecon]);
   const currencyCode = businessCurrency ?? "";
   const moneyInWorkspace = (value: string | number) => money(value, currencyCode);
@@ -143,20 +157,22 @@ export default function CommercePage() {
   async function refresh() {
     setBusy(true);
     try {
-      const [d, c, ch, p, l, s, r, re, rr, profile] = await Promise.all([
+      const [d, c, ch, p, l, s, r, re, rr, profile, userCapabilities] = await Promise.all([
         getCommerceDashboard(),
         getCommerceCustomers(),
         getPaymentChannels(),
-        getCommerceProducts(),
+        getCommerceProducts(saleDate),
         getLocations(),
         getCommerceSales(),
         getReceivables(),
         getReconciliations(),
         getSaleReturns(),
         getBusinessProfile().catch(() => null),
+        getCommerceCapabilities().catch(() => ({ can_manage_price:false, can_manage_sales:false })),
       ]);
       const profileCurrency = profile?.currency_code && /^[A-Z]{3}$/i.test(profile.currency_code) ? profile.currency_code.toUpperCase() : (d.currency_code && /^[A-Z]{3}$/i.test(d.currency_code) ? d.currency_code.toUpperCase() : null);
       setBusinessCurrency(profileCurrency);
+      setCapabilities(userCapabilities);
       setDashboard(d);
       setCustomers(c);
       setChannels(ch);
@@ -254,6 +270,31 @@ export default function CommercePage() {
     }
   }
 
+  async function changeSaleDate(nextDate:string) {
+    if (!nextDate || nextDate === saleDate) return;
+    setMessage(null);
+    try {
+      const nextProducts = await getCommerceProducts(nextDate);
+      const previousProducts = products;
+      setProducts(nextProducts);
+      setCart((current) => current.map((line) => {
+        const previous = previousProducts.find((item) => item.variant_id === line.variantId);
+        const next = nextProducts.find((item) => item.variant_id === line.variantId);
+        if (previous && next && Number(line.unitPrice) === Number(previous.selling_price)) return { ...line, unitPrice: next.selling_price };
+        return line;
+      }));
+      if (variantId) {
+        const nextSelected = nextProducts.find((item) => item.variant_id === variantId);
+        if (nextSelected) setPrice(nextSelected.selling_price || "0");
+      }
+      setSaleDate(nextDate);
+      setLastCheckoutAttempt(null);
+      setMessage("Prices and tax rules refreshed for the selected business date. Final tax is recalculated by LEXA on save.");
+    } catch (error) {
+      setMessage(userFacingError(error, "Current tax and price rules could not be refreshed. The selected date was not changed."));
+    }
+  }
+
   function addCartLine() {
     if (!selectedProduct) { setMessage("Choose a product first."); return; }
     const quantity = Number(qty);
@@ -261,9 +302,9 @@ export default function CommercePage() {
     if (!Number.isFinite(quantity) || quantity <= 0) { setMessage("Quantity must be greater than zero."); return; }
     if (!Number.isFinite(unitPrice) || unitPrice < 0) { setMessage("Selling price cannot be negative."); return; }
     setCart((current) => {
-      const existing = current.find((line) => line.variantId === selectedProduct.variant_id && Number(line.unitPrice) === unitPrice);
+      const existing = current.find((line) => line.variantId === selectedProduct.variant_id && Number(line.unitPrice) === unitPrice && Number(line.discountAmount || 0) === 0);
       if (existing) return current.map((line) => line.id === existing.id ? { ...line, quantity: String((Number(line.quantity) || 0) + quantity) } : line);
-      return [...current, { id: crypto.randomUUID(), variantId: selectedProduct.variant_id, quantity: String(quantity), unitPrice: String(unitPrice) }];
+      return [...current, { id: crypto.randomUUID(), variantId: selectedProduct.variant_id, quantity: String(quantity), unitPrice: String(unitPrice), discountAmount:"0" }];
     });
     setMessage(`${selectedProduct.product_name} added to cart.`);
   }
@@ -324,7 +365,7 @@ export default function CommercePage() {
         location_id: locationId,
         currency_code: currencyCode,
         business_date: saleDate,
-        lines: cart.map((line) => ({ variant_id: line.variantId, quantity: line.quantity, unit_price: line.unitPrice })),
+        lines: cart.map((line) => ({ variant_id: line.variantId, quantity: line.quantity, unit_price: line.unitPrice, discount_amount: line.discountAmount || "0" })),
         payments,
       };
       const fingerprint = JSON.stringify(body);
@@ -475,7 +516,7 @@ export default function CommercePage() {
     }
   }
 
-  function updateCartLine(id:string, field:"quantity"|"unitPrice", value:string) {
+  function updateCartLine(id:string, field:"quantity"|"unitPrice"|"discountAmount", value:string) {
     setCart((current) => current.map((line) => line.id === id ? { ...line, [field]: value } : line));
     setLastCheckoutAttempt(null);
   }
@@ -525,26 +566,28 @@ export default function CommercePage() {
             <div className="split-panel">
               <form className="command-form" onSubmit={submitSale}>
                 <div><p className="eyebrow">NEW SALE</p><h3>Record a sale</h3><p>LEXA saves the sale, updates stock, records how the customer paid and shows any amount still owed.</p></div>
-                <label>Business date<input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} required /></label>
+                <label>Business date<input type="date" value={saleDate} onChange={(e) => void changeSaleDate(e.target.value)} required /></label>
                 <label>Customer<select value={customerId} onChange={(e) => setCustomerId(e.target.value)}><option value="">Walk-in customer</option>{customers.map((c) => <option key={c.party_id} value={c.party_id}>{c.display_name}</option>)}</select></label>
                 <label>Location<select value={locationId} onChange={(e) => setLocationId(e.target.value)} required><option value="">Select location</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
                 <label>Search products<input value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Search product or code…" autoComplete="off" /></label>
                 <label>Product<select value={variantId} onChange={(e) => { setVariantId(e.target.value); const p = products.find((x) => x.variant_id === e.target.value); if (p) setPrice(p.selling_price || "0"); }} required><option value="">Select product</option>{filteredProducts.map((p) => <option key={p.variant_id} value={p.variant_id}>{p.product_name} · Code {p.sku}</option>)}</select><small>{filteredProducts.length} matching products</small></label>
-                <div className="form-grid"><label>Quantity<input type="number" min="0.001" step="0.001" value={qty} onChange={(e) => setQty(e.target.value)} required /></label><label>Selling price<input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required /><small>Use the listed selling price. Ask the business owner or manager before changing it.</small></label></div>
+                <div className="form-grid"><label>Quantity<input type="number" min="0.001" step="0.001" value={qty} onChange={(e) => setQty(e.target.value)} required /></label><label>Selling price<input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required disabled={!capabilities.can_manage_price} /><small>{capabilities.can_manage_price ? "Price overrides are audited by LEXA." : "Catalogue price is locked for your role. Ask a pricing manager to change it."}</small>{selectedProduct && <small>{Number(selectedProduct.effective_tax_rate)>0 ? `${Number(selectedProduct.effective_tax_rate)}% ${selectedProduct.tax_inclusive ? "included in the listed price" : "added to the listed price"}` : "No tax rule is configured for this product on the selected date."}</small>}</label></div>
                 <button className="secondary" type="button" onClick={addCartLine}>Add item to cart</button>
                 <section className="workflow-list" aria-label="Checkout cart">
                   <div className="eyebrow">CART · {cart.length} LINE{cart.length === 1 ? "" : "S"}</div>
                   {cart.length === 0 ? <div className="empty-inline">Search for a product and add it to start a sale.</div> : cart.map((line) => {
                     const product = products.find((item) => item.variant_id === line.variantId);
                     return <div className="workflow-row cart-line" key={line.id}>
-                      <div><strong>{product?.product_name || "Product"}</strong><small>{product?.sku || "Product code not available"}</small></div>
+                      <div><strong>{product?.product_name || "Product"}</strong><small>{product?.sku || "Product code not available"}</small><small>{product ? (Number(product.effective_tax_rate) > 0 ? `${Number(product.effective_tax_rate)}% tax ${product.tax_inclusive ? "included in price" : "added at checkout"}` : "No active tax rule for this date") : "Tax rule loading"}</small></div>
                       <label>Qty<input aria-label={`Quantity ${product?.product_name || "product"}`} type="number" min="0.001" step="0.001" value={line.quantity} onChange={(e) => updateCartLine(line.id,"quantity",e.target.value)} required /></label>
-                      <label>Unit price<input aria-label={`Unit price ${product?.product_name || "product"}`} type="number" min="0" step="0.01" value={line.unitPrice} onChange={(e) => updateCartLine(line.id,"unitPrice",e.target.value)} required /></label>
-                      <strong>{moneyInWorkspace((Number(line.quantity)||0)*(Number(line.unitPrice)||0))}</strong>
+                      <label>Unit price<input aria-label={`Unit price ${product?.product_name || "product"}`} type="number" min="0" step="0.01" value={line.unitPrice} onChange={(e) => updateCartLine(line.id,"unitPrice",e.target.value)} required disabled={!capabilities.can_manage_price} /></label>
+                      <label>Line discount<input aria-label={`Line discount ${product?.product_name || "product"}`} type="number" min="0" max={Math.max(0,Number(line.quantity)||0)*Math.max(0,Number(line.unitPrice)||0)} step="0.01" value={line.discountAmount} onChange={(e) => updateCartLine(line.id,"discountAmount",e.target.value)} disabled={!capabilities.can_manage_sales} /><small>{capabilities.can_manage_sales ? "Total discount for this line" : "Manager permission required"}</small></label>
+                      <strong>{moneyInWorkspace((() => { const raw=(Number(line.quantity)||0)*(Number(line.unitPrice)||0); const discount=Math.min(raw,Math.max(0,Number(line.discountAmount)||0)); const discounted=Math.max(0,raw-discount); const rate=Math.max(0,Number(product?.effective_tax_rate)||0); return Math.round((product?.tax_inclusive ? discounted : discounted*(1+rate/100))*10000)/10000; })())}</strong>
                       <button type="button" className="secondary" onClick={() => removeCartLine(line.id)} aria-label={`Remove ${product?.product_name || "item"}`}>Remove</button>
                     </div>;
                   })}
-                  <div className="inline-message">Subtotal · {moneyInWorkspace(totalPreview)}. Any applicable tax or charges are included in the total.</div>
+                  {cartDiscountError && <div className="notice notice-error" role="alert">A line discount cannot exceed that line's subtotal. Correct the discount before checkout.</div>}
+                  <div className="inline-message">Estimated checkout total · {moneyInWorkspace(totalPreview)}. Discounts and tax are recalculated by LEXA on the server; price overrides and discounts are restricted by role.</div>
                 </section>
                 <div className="workflow-list">
                   <div className="eyebrow">PAYMENT AMOUNTS</div><p className="muted">Split one sale across different methods if needed. Receipt or transaction references are optional. Never enter PINs, passwords or one-time codes. LEXA records the information entered and does not verify the payment with a provider.</p>
@@ -561,7 +604,7 @@ export default function CommercePage() {
                   <button type="button" className="secondary" onClick={() => setPaymentRows((rows) => [...rows, { channelId: activeCurrencyChannels[0]?.id || "", amount: "0" }])}>Add another payment</button>
                 </div>
                 <div className="inline-message">{selectedProduct ? `${selectedProduct.product_name} · ${selectedProduct.sku}` : "Choose a product"} · Cart total {moneyInWorkspace(totalPreview)}</div>
-                <button className="primary" type="submit" disabled={submittingSale || cart.length === 0}>{submittingSale ? "Completing sale…" : `Complete sale · ${moneyInWorkspace(totalPreview)}`}</button>
+                <button className="primary" type="submit" disabled={submittingSale || cart.length === 0 || Boolean(cartDiscountError)}>{submittingSale ? "Completing sale…" : `Complete sale · ${moneyInWorkspace(totalPreview)}`}</button>
               </form>
               <div className="workflow-list"><p className="eyebrow">PAYMENT METHODS</p>{channels.length ? channels.map((c) => <div className="workflow-row" key={c.id}><div><strong>{c.name}</strong><small>{channelTypeLabel(c.channel_type)} · {c.provider || "Business configured"} · {c.currency_code}</small></div><span className="status good">Available</span></div>) : <div className="empty-inline">No payment methods have been set up yet.</div>}</div>
             </div>

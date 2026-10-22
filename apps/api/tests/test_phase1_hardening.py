@@ -15,9 +15,12 @@ def test_production_config_has_fail_closed_validation():
 
 def test_sqlalchemy_pool_is_bounded_and_pg_bouncer_safe():
     source = (ROOT / "app" / "db.py").read_text()
-    assert "pool_size=5" in source
-    assert "max_overflow=5" in source
-    assert "pool_timeout=10" in source
+    assert "pool_size=settings.database_pool_size" in source
+    assert "max_overflow=settings.database_max_overflow" in source
+    assert "pool_timeout=settings.database_pool_timeout_seconds" in source
+    config = (ROOT / "app" / "config.py").read_text()
+    assert "database_pool_size: int = Field(default=5, ge=1, le=30)" in config
+    assert "database_max_overflow: int = Field(default=5, ge=0, le=30)" in config
     assert '"prepare_threshold": None' in source
     assert '"options"' not in source
     assert "SET LOCAL statement_timeout" in source
