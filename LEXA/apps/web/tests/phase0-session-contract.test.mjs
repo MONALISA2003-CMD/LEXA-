@@ -1,0 +1,37 @@
+import fs from "node:fs";
+import assert from "node:assert/strict";
+
+const web = new URL("../", import.meta.url);
+const read = (relativePath) => fs.readFileSync(new URL(relativePath, web), "utf8");
+const api = read("lib/api.ts");
+const home = read("app/page.tsx");
+const shell = read("components/app-shell.tsx");
+const refreshRoute = read("../api/app/routes/auth.py");
+const vercel = JSON.parse(read("vercel.json"));
+
+assert.match(api, /function refreshSession\(\): Promise<AuthResponse>/);
+assert.match(api, /refreshInFlight: Promise<AuthResponse> \| null/);
+assert.match(api, /body: "\{\}"/);
+assert.match(api, /if \(!accessToken && requiresSession\(path\)\)/);
+assert.match(api, /await refreshSession\(\);\s*return getJson<T>\(path, init, true\)/);
+assert.match(api, /function requiresSession\(path: string\)/);
+assert.match(shell, /authState !== "ready"/);
+assert.match(home, /const \[dashboardState, setDashboardState\] = useState<LoadState>\("loading"\)/);
+assert.match(home, /const \[analyticsState, setAnalyticsState\] = useState<LoadState>\("loading"\)/);
+assert.match(home, /await Promise\.all\(tasks\)/);
+assert.match(home, /Some items need attention/);
+assert.match(home, /dashboardState === "error" \|\| !dashboard \? "Unavailable"/);
+assert.doesNotMatch(home, /const \[loadError, setLoadError\]/);
+assert.match(shell, /Opening your business/);
+assert.match(shell, /Try again/);
+assert.match(shell, /Signing out locally must remain possible/);
+assert.match(refreshRoute, /def refresh\(request: Request, response: Response, db: Session = Depends\(get_db\), body: RefreshRequest \| None = None\)/);
+assert.match(refreshRoute, /or \(body\.refresh_token if body else None\)/);
+assert.match(refreshRoute, /lexa_find_session_by_refresh_hash/);
+assert.match(refreshRoute, /@router.get\("\/me"\)/);
+assert.match(api, /await getCurrentIdentity\(\)/);
+assert.match(read("../api/app/dependencies.py"), /set_config/);
+assert.equal(vercel.buildCommand, "npm run build");
+assert.equal(fs.existsSync(new URL("app/business-engine/page.tsx", web)), false);
+assert.equal(fs.existsSync(new URL("app/kernel/page.tsx", web)), false);
+console.log("phase 0 session/build contract: PASS");

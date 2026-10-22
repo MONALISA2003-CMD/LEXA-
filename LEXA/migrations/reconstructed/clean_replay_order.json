@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "purpose": "Disposable clean-replay sequence for semantic validation of the maintained replacement chain. Six original SQL byte sources are permanently dispositioned by Phase 3; this manifest never claims original byte recovery and must never run against production.",
+  "baseline_commit": "a6acc0eb53660ea938a314640bf28283ae2a98a8",
+  "status": "HISTORICAL_RECOVERY_GATE_CLOSED_BY_PHASE3_APPROVAL; SEMANTIC_REPLAY_PENDING",
+  "do_not_execute_in_production": true,
+  "steps": [
+    {
+      "path": "migrations/001_phase1_foundation.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "96a408b1b24cba53f44cfff746fe190954cb045f"
+    },
+    {
+      "path": "migrations/002_identity_rbac_organization.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "e6bd4dfa7694cf5823264a8fb18f395829de66d2"
+    },
+    {
+      "path": "migrations/003_rbac_sessions_organization_completion.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "7e30c545ec8d2c7030b936a70915509f016233f5"
+    },
+    {
+      "path": "migrations/reconstructed/004_catalog_and_rbac_hardening.replay-equivalent.sql",
+      "mode": "replay-equivalent-generated-from-004"
+    },
+    {
+      "path": "migrations/005_inventory_foundation.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "9281facd2c4eef1c26741d7209589d32871da361"
+    },
+    {
+      "path": "migrations/reconstructed/005a_phase0_outbox_contract_reconciliation.replay-only.sql",
+      "mode": "replay-only-contract-reconciliation"
+    },
+    {
+      "path": "migrations/006_phase1_security_reliability.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "d5ee19c758dc4740e8e9d8a8aeb5d4e1119c9765"
+    },
+    {
+      "path": "migrations/007_phase2_catalog_hardening.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "663540c2977cd82dd6ffca10e12de8a90e29faea"
+    },
+    {
+      "path": "migrations/008_workspace_registration_hardening.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "6903accb651537ed522fa8bd9d7c9cb408feb116"
+    },
+    {
+      "path": "migrations/009_auth_workspace_picker.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "1afcd32de42dacc1ffa3561a566e958074bbda91"
+    },
+    {
+      "path": "migrations/reconstructed/010_phase2_catalog_intelligence.equivalent.sql",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/reconstructed/011_phase2_catalog_runtime_constraints.equivalent.sql",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/012_phase1_business_kernel.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "e470dbdbad0955eedb32249ae03a1c231b38999a"
+    },
+    {
+      "path": "migrations/013_phase2_universal_business_engine.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "b6df80948bd042ad43cea3de2449239d3a7d9edb"
+    },
+    {
+      "path": "migrations/014_phase3_inventory_foundation.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "f414d31542adf223c990606e55e04279181f5334"
+    },
+    {
+      "path": "migrations/015_financial_architecture_lock.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "758f6cb947b565ec11af5e636138d3493ee894bf"
+    },
+    {
+      "path": "migrations/reconstructed/016_payments_tenant_identity_compatibility.equivalent.sql",
+      "mode": "reconstructed-compatibility-not-original"
+    },
+    {
+      "path": "migrations/016_phase4a_sales_payments_reconciliation.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "0d76b4664b0325f89fbbb469ba5de8a41b649499"
+    },
+    {
+      "path": "migrations/017_phase4a_reconciliation_engine.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "e01be49ed9aaaa56d5d0f6488a46b0580257d753"
+    },
+    {
+      "path": "migrations/018_phase4a_application_integrity.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "2406d8b48c4269f8b430d74b6036edcd6b510295"
+    },
+    {
+      "path": "migrations/019_phase4a_customer_credit_allocation.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "caefc2e3b46c5a4bae2ff2592b787d3b4092dd61"
+    },
+    {
+      "path": "migrations/020_phase4b_accounting_efris_foundation.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "86d3761a0cfc15190cc5a66690416b0f81ae8972"
+    },
+    {
+      "path": "migrations/reconstructed/021_phase5_analytics_foundation.repair-candidate.sql",
+      "mode": "reconstructed-repair-not-original"
+    },
+    {
+      "path": "migrations/022_phase6a_brain_foundation.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "47ae46a0663c4d98f891fc87e0f603adf3d3ae82"
+    },
+    {
+      "path": "migrations/023_phase2_identity_tenancy_authorization_foundation.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "23d4b3e90ccc8beef849cf781e0fc1faa4cb6efa"
+    },
+    {
+      "path": "migrations/reconstructed/023_phase4_purchasing_core.equivalent.sql",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/reconstructed/024_phase4_purchasing_security.equivalent.sql",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/reconstructed/025_phase4_purchasing_permissions.equivalent.sql",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/reconstructed/025a_phase2_membership_branch_contract_reconciliation.replay-only.sql",
+      "mode": "replay-only-contract-reconciliation"
+    },
+    {
+      "path": "migrations/reconstructed/026_phase4_membership_branch_integrity.equivalent.sql",
+      "mode": "reconstructed-equivalent-not-original"
+    },
+    {
+      "path": "migrations/027_release_convergence.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "e6d9242d7dedb2cbf7b1a71a46fe635b3ab051d8"
+    },
+    {
+      "path": "migrations/028_phase0_auth_rls_runtime_hardening.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "54ff0a390d707752fc8507ff9274691812ab8a67"
+    },
+    {
+      "path": "migrations/029_phase3_runtime_privilege_surface.sql",
+      "mode": "recovered-current-source-2026-10-21",
+      "git_blob_sha1": "43ed181f1c60722d4f14121f6743ebe994f018bf"
+    },
+    {
+      "path": "migrations/029_phase1_runtime_role_least_privilege.sql",
+      "mode": "original-source",
+      "git_blob_sha1": "2cf52bc39ff42b62af5a47b2c0de483dfaa86c4c"
+    },
+    {
+      "path": "migrations/030_phase3_workspace_memberships.sql",
+      "mode": "canonical-source-in-package"
+    },
+    {
+      "path": "migrations/031_phase3_auth_surface_rls.sql",
+      "mode": "recovered-current-source-2026-10-21",
+      "git_blob_sha1": "835df668f49b684a66df781d561eb914f30cffc6"
+    },
+    {
+      "path": "migrations/033_phase5_refund_settlement_consistency.sql",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/034_phase5_return_accounting_journals.sql",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/035_phase5_none_return_receivable_guard.sql",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/036_phase6_inventory_intelligence.sql",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/037_phase6_inventory_ageing_index.sql",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/038_phase6_movement_health_indexes.sql",
+      "mode": "additive-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/039_phase7_supplier_ledger_landed_costs.sql",
+      "mode": "additive-forward-migration-candidate"
+    }
+  ],
+  "replay_only_notice": "Runs only on a fresh local/CI disposable PostgreSQL database after explicit environment opt-in. Never execute against production. A successful replay validates the selected replacement chain, not original historical-byte parity.",
+  "permanent_disposition_manifest": "migrations/migration_dispositions.json",
+  "permanently_replaced_histories": [
+    "010_phase2_catalog_intelligence",
+    "011_phase2_catalog_runtime_constraints",
+    "023_phase4_purchasing_core",
+    "024_phase4_purchasing_security",
+    "025_phase4_purchasing_permissions",
+    "026_phase4_membership_branch_integrity"
+  ]
+}
