@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "project": "LEXA",
+  "policy": "A permanent replacement decision closes repeated historical retrieval work. It does not claim original bytes or historical transformations were recovered. Replacement SQL is maintained as a distinct artifact and remains subject to clean replay, schema parity and security tests.",
+  "approved_decision": "Phase 3 explicitly declared the six exact source files lost and approved permanent substitutes; this register is the operational implementation of that decision.",
+  "historical_recovery_gate": "CLOSED_BY_PERMANENT_DISPOSITION",
+  "replacement_semantic_validation_gate": "PENDING_CLEAN_REPLAY_AND_SCHEMA_SECURITY_ASSERTIONS",
+  "permanently_replaced_sources": [
+    {
+      "version": "010_phase2_catalog_intelligence",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "historical_source_path": "migrations/010_phase2_catalog_intelligence.sql",
+      "historical_bytes_recovered": false,
+      "replacement_path": "migrations/reconstructed/010_phase2_catalog_intelligence.equivalent.sql",
+      "replacement_sha256": "a1d414eb36186e28fbc24e3fd2274b9eae688b0e0f5556b83ce53430649c8d8e",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "release_gate_effect": "Does not block source reconciliation; semantic replay/security assertions remain separate gates."
+    },
+    {
+      "version": "011_phase2_catalog_runtime_constraints",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "historical_source_path": "migrations/011_phase2_catalog_runtime_constraints.sql",
+      "historical_bytes_recovered": false,
+      "replacement_path": "migrations/reconstructed/011_phase2_catalog_runtime_constraints.equivalent.sql",
+      "replacement_sha256": "650aad6e622bc230b6ea85575bc2eed52e5387085f3d718e97ec162bfdc4e1b8",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "release_gate_effect": "Does not block source reconciliation; semantic replay/security assertions remain separate gates."
+    },
+    {
+      "version": "023_phase4_purchasing_core",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "historical_source_path": "migrations/023_phase4_purchasing_core.sql",
+      "historical_bytes_recovered": false,
+      "replacement_path": "migrations/reconstructed/023_phase4_purchasing_core.equivalent.sql",
+      "replacement_sha256": "f1631d11e65e7b3dc6d9d755b57cb7449139762cd6004b7a1146fc0cfdbe16e2",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "release_gate_effect": "Does not block source reconciliation; semantic replay/security assertions remain separate gates."
+    },
+    {
+      "version": "024_phase4_purchasing_security",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "historical_source_path": "migrations/024_phase4_purchasing_security.sql",
+      "historical_bytes_recovered": false,
+      "replacement_path": "migrations/reconstructed/024_phase4_purchasing_security.equivalent.sql",
+      "replacement_sha256": "696365a93831c30b98b89884ad59c0950949bfd21514cdf3ae0a98a74ccc1419",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "release_gate_effect": "Does not block source reconciliation; semantic replay/security assertions remain separate gates."
+    },
+    {
+      "version": "025_phase4_purchasing_permissions",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "historical_source_path": "migrations/025_phase4_purchasing_permissions.sql",
+      "historical_bytes_recovered": false,
+      "replacement_path": "migrations/reconstructed/025_phase4_purchasing_permissions.equivalent.sql",
+      "replacement_sha256": "71777cb9740f55bd1f52bfa3c7a11bc677b5958216aad319a19a32f7dfbe09ad",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "release_gate_effect": "Does not block source reconciliation; semantic replay/security assertions remain separate gates."
+    },
+    {
+      "version": "026_phase4_membership_branch_integrity",
+      "disposition": "PERMANENTLY_REPLACED",
+      "approved_in_phase": "Phase 3",
+      "historical_source_path": "migrations/026_phase4_membership_branch_integrity.sql",
+      "historical_bytes_recovered": false,
+      "replacement_path": "migrations/reconstructed/026_phase4_membership_branch_integrity.equivalent.sql",
+      "replacement_sha256": "992be2a5c405ccfea2ead9aa2fcce0d45240aee27618de64e0952aaa76691cec",
+      "semantic_validation_status": "PENDING_CLEAN_REPLAY",
+      "release_gate_effect": "Does not block source reconciliation; semantic replay/security assertions remain separate gates."
+    }
+  ],
+  "current_canonical_ledger_snapshot": "migrations/live_ledger_snapshot_2026-10-21.json",
+  "current_ledger_source_gaps": [
+    "010_phase2_catalog_intelligence",
+    "011_phase2_catalog_runtime_constraints",
+    "023_phase4_purchasing_core",
+    "024_phase4_purchasing_security",
+    "025_phase4_purchasing_permissions",
+    "026_phase4_membership_branch_integrity"
+  ],
+  "known_nonproduction_qa_only_migration_entry": {
+    "version": "032_phase5_return_settlement_reconciliation",
+    "status": "QA_BRANCH_ONLY_NOT_IN_CANONICAL_PRODUCTION_LEDGER",
+    "release_gate_effect": "Do not include in canonical production replay unless its scope is formally adopted as a versioned forward migration."
+  },
+  "malformed_migration_021": {
+    "status": "REPAIR_CANDIDATE_NOT_HISTORICAL_BYTES",
+    "path": "migrations/021_phase5_analytics_foundation.sql",
+    "release_gate_effect": "Semantic clean replay and review required; exact-byte historical parity is not asserted."
+  }
+}

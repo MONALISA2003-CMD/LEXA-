@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "project": "LEXA",
+  "run_date": "2026-10-20",
+  "tested_frontend_sha": "4dac83541badc21800f84e652f0f192c211a612a",
+  "frontend_clean_install": {
+    "runtime": "Node v24.21.0",
+    "npm": "11.19.0",
+    "command": "npm ci --no-audit --no-fund",
+    "exit_code": 0,
+    "checkout_sha": "4dac83541badc21800f84e652f0f192c211a612a",
+    "clean_install_repeated_in_fresh_disposable_sandbox": true
+  },
+  "frontend_typecheck": {
+    "command": "npm run typecheck",
+    "exit_code": 0
+  },
+  "frontend_contract_tests": {
+    "command": "node --test tests/*.test.mjs",
+    "passed": 23,
+    "failed": 0,
+    "exit_code": 0,
+    "run_context": "Repeated in the clean Vercel sandbox at the inspected SHA after clean npm ci and sandbox-only Playwright dependency installation; command exited zero."
+  },
+  "frontend_build": {
+    "command": "npm run build",
+    "exit_code": 0,
+    "run_context": "Repeated after the browser suite config was added in the disposable sandbox; command exited zero."
+  },
+  "chromium_acceptance": {
+    "runner": "isolated Vercel sandbox",
+    "framework": "Playwright",
+    "browser": "Chromium",
+    "passed": 4,
+    "failed": 0,
+    "exit_code": 0,
+    "cases": [
+      "application routes respond and render an application surface",
+      "product routes do not create horizontal overflow at 390, 768 and 1280px",
+      "login page exposes labelled email/password controls and keyboard focus",
+      "keyboard users can reach an interactive control on the login page"
+    ],
+    "limitation": "No authenticated credentials or staging backend were used. Does not prove session rotation, revoked-session behavior, API authorization or tenant isolation.",
+    "playwright_version": "1.64.1",
+    "chromium_build": "Chrome for Testing 156.0.8078.4 (Playwright chromium v1248)",
+    "exact_suite_source": "apps/web/e2e/acceptance.spec.ts included in this handoff; executed from a temporary sandbox checkout of the same LEXA source SHA after a sandbox-only Playwright install",
+    "install_deps": "sudo npx playwright install-deps chromium in the disposable sandbox; no production system was changed"
+  },
+  "preview_route_scan": {
+    "host": "https://lexa-rjitqt5kf-kabuusumohammed182-7875s-projects.vercel.app",
+    "routes_returning_http_200": [
+      "/",
+      "/login",
+      "/register",
+      "/invite",
+      "/products",
+      "/inventory",
+      "/sales",
+      "/commerce",
+      "/customers",
+      "/purchasing",
+      "/accounting",
+      "/reports",
+      "/compliance",
+      "/intelligence",
+      "/administration",
+      "/settings"
+    ],
+    "route_count": 16,
+    "scope": "Real browser smoke against a deployed LEXA preview URL; not authenticated acceptance."
+  },
+  "backend_tests": {
+    "runtime": "Python 3.14.4 in sandbox; CI candidate targets Python 3.13",
+    "install": "python -m pip install -e '.[dev]' in apps/api",
+    "suite": "python -m pytest -q tests apps/api/tests",
+    "exit_code": 0,
+    "compile": "python -m compileall -q apps/api/app apps/api/tests scripts",
+    "exit_code_compile": 0,
+    "limitation": "Sandbox session stopped after command completion before full detailed test-count log could be exported; do not cite a precise Python test count.",
+    "local_packaging_workspace": {
+      "command": "python -m pytest -q tests apps/api/tests",
+      "passed": 116,
+      "skipped": 1,
+      "skip_reason": "Redis dependency not installed in local packaging environment",
+      "exit_code": 0,
+      "note": "Separate remote dependency-complete sandbox suite also exited zero after installing apps/api[dev]; its detailed count could not be exported before sandbox expiry."
+    },
+    "compile_local_package": {
+      "command": "python -m compileall -q apps/api/app apps/api/tests scripts",
+      "exit_code": 0,
+      "status": "PASS"
+    }
+  },
+  "source_gates": {
+    "python scripts/check_migration_sources.py": "PASS with explicit tracked gaps",
+    "python scripts/check_migration_sources.py --strict": "EXPECTED FAIL, six original sources missing",
+    "python scripts/check_migration_recovery_manifest.py": "PASS after final file hash refresh",
+    "strict_exact_source_gate": "BLOCKED"
+  },
+  "render_public_health": {
+    "service": "LEXA",
+    "url": "https://lexa-n10e.onrender.com",
+    "health_http": 200,
+    "ready_http": 200,
+    "ready_payload": "database and cache healthy",
+    "limitation": "Current live service health only; no separate LEXA staging service found; Render healthCheckPath control-plane field was blank at last metadata inspection even though /ready returns 200."
+  },
+  "deployment_context": {
+    "vercel_ready_sha": "4dac83541badc21800f84e652f0f192c211a612a",
+    "render_live_sha": "a1ed64eec79daf3d74456c7b8b854d84f634d6fd",
+    "same_sha": false
+  },
+  "access_and_safety": {
+    "github_branch_create": "403 Resource not accessible by integration",
+    "github_main_protection": "main was unprotected; integration could not change protection",
+    "production_sql_writes": false,
+    "production_role_cutover": false,
+    "production_deployments_triggered": false,
+    "render_or_vercel_config_changed": false,
+    "separate_staging_service_found": false
+  },
+  "overall": "NOT_RELEASE_READY; CI workflow and recovery patch are prepared locally but not installed in GitHub because authorized GitHub write integration refused branch creation.",
+  "browser_suite_package_integration": "Browser test source and config are delivered, but @playwright/test and its updated lockfile are intentionally not in this package because local npm-registry access failed. Regenerate and review package-lock in an authorized Node 24 environment before integrating the suite into required CI."
+}

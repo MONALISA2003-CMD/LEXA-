@@ -1,0 +1,44 @@
+"""Pure helpers for Phase 3 workspace setup and membership access."""
+from __future__ import annotations
+
+import hashlib
+from datetime import datetime, timezone
+from typing import Any
+
+
+def invitation_token_digest(token: str) -> str:
+    """Hash a high-entropy invitation bearer token before persistence or lookup."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def setup_progress(*, profile_exists: bool, branch_count: int, warehouse_count: int, location_count: int) -> dict[str, Any]:
+    """Derive resumable setup from persisted configuration; no shadow completion flag."""
+    steps = [
+        {"key": "business_profile", "label": "Business profile", "href": "/administration", "required": True, "complete": profile_exists},
+        {"key": "branch", "label": "At least one active branch", "href": "/administration", "required": True, "complete": branch_count > 0},
+        {"key": "warehouse", "label": "At least one active warehouse", "href": "/administration", "required": True, "complete": warehouse_count > 0},
+        {"key": "location", "label": "At least one active stock location", "href": "/administration", "required": True, "complete": location_count > 0},
+    ]
+    first_incomplete = next((step for step in steps if step["required"] and not step["complete"]), None)
+    completed = sum(1 for step in steps if step["complete"])
+    return {
+        "status": "COMPLETE" if first_incomplete is None else "IN_PROGRESS",
+        "complete": first_incomplete is None,
+        "completed_required_steps": completed,
+        "required_steps": len(steps),
+        "resume_path": first_incomplete["href"] if first_incomplete else "/",
+        "steps": steps,
+    }
+
+
+def invitation_is_expired(expires_at: datetime, now: datetime | None = None) -> bool:
+    current = now or datetime.now(timezone.utc)
+    if expires_at.tzinfo is None:
+        # Naive timestamps are treated as UTC; DB columns are expected to be timestamptz.
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at <= current
+
+
+def normalize_branch_ids(branch_ids: list[str]) -> list[str]:
+    """Return stable unique IDs without changing caller-provided identity values."""
+    return list(dict.fromkeys(str(branch_id) for branch_id in branch_ids))

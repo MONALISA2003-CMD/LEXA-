@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "project": "LEXA",
+  "repository": "MONALISA2003-CMD/LEXA-",
+  "head_sha": "4dac83541badc21800f84e652f0f192c211a612a",
+  "run_date": "2026-10-20",
+  "zip_related_commits_examined": 116,
+  "distinct_archives_examined": 58,
+  "target_versions": [
+    "010_phase2_catalog_intelligence",
+    "011_phase2_catalog_runtime_constraints",
+    "023_phase4_purchasing_core",
+    "024_phase4_purchasing_security",
+    "025_phase4_purchasing_permissions",
+    "026_phase4_membership_branch_integrity"
+  ],
+  "hits": [],
+  "errors": [],
+  "conclusion": "No exact copy of any of the six expected SQL source files was found in the scanned historical ZIP objects. This is evidence of a negative search over the inspected sample, not proof that no copy exists outside it."
+}

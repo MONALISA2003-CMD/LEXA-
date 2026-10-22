@@ -1,0 +1,27 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.next/
+node_modules/
+dist/
+build/
+coverage.xml
+htmlcov/
+.DS_Store
+
+# TypeScript compiler cache
+*.tsbuildinfo
+# Generated browser-test outputs and editable package metadata
+apps/web/playwright-report/
+apps/web/test-results/
+playwright-report/
+test-results/
+apps/api/*.egg-info/
+
+# Ephemeral authenticated Playwright state for manually opted-in staging E2E
+apps/web/.phase7-storage-state.json
