@@ -1,0 +1,17 @@
+LEXA authentication/RLS hotfix — focused local test results
+Date: 2026-10-22
+
+Command (working directory: apps/api):
+APP_ENV=development DATABASE_URL='postgresql+psycopg://test:test@127.0.0.1/test' REDIS_URL='redis://127.0.0.1:6379/0' JWT_SECRET='test-only-jwt-secret-for-login-context-contract' PYTHONPATH=. python -m pytest -q tests/test_auth_login_workspace_context.py tests/test_auth_refresh.py tests/test_phase1_runtime_security.py
+
+Result: 13 passed, 1 warning in 0.61s.
+
+Python compile:
+python -m compileall -q apps/api
+Result: PASS.
+
+Runtime/live checks:
+- Read-only RLS-context probe on `lexa-live` with runtime role `lexa_app`: PASS; a matching user is hidden without pre-tenant context and visible with correctly scoped login context; active workspace function returns one workspace after app.user_id is set.
+- No live login attempt was made using the user's password.
+- No database mutation, password reset, policy edit, deployment, or production migration was performed.
+- The source hotfix has not been deployed because GitHub write access returned HTTP 403.

@@ -108,6 +108,20 @@ def _clear_login_rate_limit(request: Request, email: str) -> None:
         logger.warning("login_rate_limit_clear_failed", extra={"request_id": getattr(request.state, "request_id", "untracked")})
 
 
+def _set_registration_rls_context(db: Session, *, email: str, registration_key: str) -> None:
+    """Scope pre-tenant registration access to this email and one idempotency key.
+
+    The Phase 3 forced-RLS policy requires all three transaction-local settings
+    before registration_requests or the new user row can be read/written.
+    """
+    db.execute(
+        text("SELECT set_config('app.pre_tenant_access', 'registration', true), "
+             "set_config('app.pre_tenant_email', :email, true), "
+             "set_config('app.registration_key', :registration_key, true)"),
+        {"email": email, "registration_key": registration_key},
+    )
+
+
 def _clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie("lexa_refresh_token", path="/")
 
@@ -158,6 +172,10 @@ def register(
         raise HTTPException(503, f"LEXA database is not ready: {database_error}")
 
     try:
+        # Establish the exact pre-tenant scope before the first RLS-protected write.
+        # The idempotency key keeps this permission limited to this registration row.
+        _set_registration_rls_context(db, email=email, registration_key=key)
+
         # Registration is pre-tenant, so its idempotency record intentionally lives
         # outside tenant RLS. The unique key makes retries and concurrent submits safe.
         stmt = insert(RegistrationRequest).values(
@@ -188,8 +206,13 @@ def register(
         db.add_all([tenant, user])
         db.flush()
 
-        # Set tenant context before any RLS-protected tenant-owned insert.
-        db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant.id)})
+        # Bind subsequent work to the newly created user and workspace. Keep the
+        # narrow registration-key context until the registration result is committed.
+        db.execute(
+            text("SELECT set_config('app.tenant_id', :tenant_id, true), "
+                 "set_config('app.user_id', :user_id, true)"),
+            {"tenant_id": str(tenant.id), "user_id": str(user.id)},
+        )
 
         profile = BusinessProfile(
             tenant_id=tenant.id,
@@ -286,9 +309,25 @@ def register(
 def login(body: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     email = body.email.lower().strip()
     _enforce_login_rate_limit(request, email)
+    # Forced row-level security hides users before authentication unless the
+    # pre-tenant login context is explicit. Scope that read to this normalized
+    # email rather than attempting an unrestricted account lookup.
+    db.execute(
+        text("SELECT set_config('app.pre_tenant_access', 'login', true), set_config('app.pre_tenant_email', :email, true)"),
+        {"email": email},
+    )
     user = db.scalar(select(User).where(User.email == email))
     if not user or not user.is_active or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "Invalid credentials")
+
+    # The workspace lookup is SECURITY DEFINER but still validates the
+    # transaction-local user context. Establish that context before asking for
+    # memberships; otherwise a valid active user is incorrectly returned zero
+    # workspaces and the frontend reports a false credential failure.
+    db.execute(
+        text("SELECT set_config('app.user_id', :user_id, true), set_config('app.pre_tenant_access', '', true), set_config('app.pre_tenant_email', '', true)"),
+        {"user_id": str(user.id)},
+    )
 
     tenant_id = body.tenant_id
     if tenant_id is None:
@@ -297,7 +336,13 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
             {"user_id": str(user.id)},
         ).mappings().all()
         if len(rows) == 0:
-            raise HTTPException(401, "Invalid credentials")
+            raise HTTPException(
+                403,
+                detail={
+                    "code": "NO_ACTIVE_WORKSPACE",
+                    "message": "This account has no active workspace. Ask your workspace administrator for access.",
+                },
+            )
         if len(rows) > 1:
             raise HTTPException(409, detail={
                 "code": "WORKSPACE_SELECTION_REQUIRED",
@@ -310,7 +355,10 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
         tenant_id = UUID(str(rows[0]["tenant_id"]))
 
     request_id = getattr(request.state, "request_id", None) or "untracked"
-    db.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant_id)})
+    db.execute(
+        text("SELECT set_config('app.tenant_id', :tenant_id, true), set_config('app.user_id', :user_id, true)"),
+        {"tenant_id": str(tenant_id), "user_id": str(user.id)},
+    )
     membership = db.scalar(
         select(TenantMembership).where(
             TenantMembership.user_id == user.id,
