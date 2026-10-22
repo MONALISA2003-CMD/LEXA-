@@ -29,6 +29,7 @@ def overview(start_date: date, end_date: date, currency_code: str = Query(..., m
         "refunds_total": sum((Decimal(r["refunds_total"]) for r in rows), Decimal(0)),
         "credit_created": sum((Decimal(r["credit_created"]) for r in rows), Decimal(0)),
         "expenses_total": sum((Decimal(r["expenses_total"]) for r in rows), Decimal(0)),
+        "expense_reversals_total": sum((Decimal(r["expense_reversals_total"]) for r in rows), Decimal(0)),
         "net_cash_movement": sum((Decimal(r["net_cash_movement"]) for r in rows), Decimal(0)),
         "sale_count": sum((int(r["sale_count"]) for r in rows), 0),
     }
@@ -38,7 +39,7 @@ def overview(start_date: date, end_date: date, currency_code: str = Query(..., m
 def daily(start_date: date, end_date: date, currency_code: str = Query(..., min_length=3, max_length=3), ctx=Depends(require_permission("analytics.read"))):
     db, _, tenant_id, _ = ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
-    rows=db.execute(text("SELECT business_date,currency_code,sales_total,returns_total,net_sales,payments_collected,refunds_total,credit_created,expenses_total,net_cash_movement,sale_count,return_count,payment_count,expense_count FROM analytics_daily_business_metrics WHERE tenant_id=:t AND business_date BETWEEN :f AND :to AND currency_code=:c ORDER BY business_date"),{"t":str(tenant_id),"f":start_date,"to":end_date,"c":currency_code.upper()}).mappings().all()
+    rows=db.execute(text("SELECT business_date,currency_code,sales_total,returns_total,net_sales,payments_collected,refunds_total,credit_created,expenses_total,expense_reversals_total,net_cash_movement,sale_count,return_count,payment_count,expense_count FROM analytics_daily_business_metrics WHERE tenant_id=:t AND business_date BETWEEN :f AND :to AND currency_code=:c ORDER BY business_date"),{"t":str(tenant_id),"f":start_date,"to":end_date,"c":currency_code.upper()}).mappings().all()
     return [out(r) for r in rows]
 
 @router.get("/products")

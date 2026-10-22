@@ -3,9 +3,41 @@
 from collections.abc import Iterable
 from typing import Hashable
 from decimal import Decimal, ROUND_HALF_UP
+import re
 
 MONEY_QUANTUM = Decimal("0.0001")
 ZERO_MONEY = Decimal("0.0000")
+
+
+# Payment data in LEXA is a business-entered record, not provider authentication.
+# Keep secret detection in this shared rule module so route contracts never grow
+# credential fields or provider integration logic.
+_SECRET_TEXT = re.compile(
+    r"\b(?:pin|password|passcode|otp|one[- ]time(?: password| code)|verification code|security code|api key|access token|client secret|webhook secret)\b",
+    re.IGNORECASE,
+)
+
+
+def safe_payment_reference(value: str | None) -> str | None:
+    """Normalize an ordinary receipt/reference and reject explicit auth secrets."""
+    if value is None:
+        return None
+    reference = value.strip()
+    if not reference:
+        return None
+    if _SECRET_TEXT.search(reference):
+        raise ValueError("Enter a receipt or transaction reference only. Never enter a PIN, password or verification code.")
+    return reference
+
+
+def safe_payment_channel_label(name: str, provider: str | None = None) -> tuple[str, str | None]:
+    """Normalize business labels without collecting account identifiers or credentials."""
+    clean_name = name.strip()
+    clean_provider = provider.strip() if provider and provider.strip() else None
+    label = f"{clean_name} {clean_provider or ''}"
+    if _SECRET_TEXT.search(label) or re.search(r"\d{8,}", label):
+        raise ValueError("Use a friendly name only. Do not enter account or phone numbers or sign-in details.")
+    return clean_name, clean_provider
 
 
 def money(value: Decimal | int | str) -> Decimal:

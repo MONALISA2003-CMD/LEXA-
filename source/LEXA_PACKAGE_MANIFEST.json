@@ -141,7 +141,11 @@
     "Added deeper release audit evidence, verified manual disposable PostgreSQL replay/security probes, exact-SHA deployment-parity findings, and explicit CI/backup/staging blockers.",
     "Documented protected GitHub workflow restoration, Render /ready health-check drift, Neon snapshot/branch-limit constraints, and no-go production rollback conditions.",
     "Phase 7 increment 03: removed redundant post-commit ORM refresh SELECTs from affected catalog, organization and RBAC handlers after Render logged Could not refresh instance 500s on branch/category creation; added a regression contract.",
-    "Corrected CI gate evidence metadata and artifact label to Phase 7, avoiding the stale Phase 6 label in the restored workflow."
+    "Corrected CI gate evidence metadata and artifact label to Phase 7, avoiding the stale Phase 6 label in the restored workflow.",
+    "Phase 8 finance workspace with plain-language collections, supplier payables, expenses, manual end-of-day checking and reporting",
+    "Owner-configured payment channels remain recording-only; no payment-provider connections or credentials",
+    "Expense draft/post/cancel/correct lifecycle with traceable history and separate correction reporting",
+    "Phase 8 migration 040 and backend/frontend contract tests; production status remains unchanged"
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -375,5 +379,27 @@
     ],
     "semantic_replay_evidence": "artifacts/phase6-replay-evidence.json passes checker against exact baseline SHA and migration bundle; evidence origin is manual remote Neon replay, not GitHub Actions.",
     "ci_gate_report_label": "Phase 7"
+  },
+  "phase8_candidate": {
+    "date": "2026-10-22",
+    "version": "2.13.0+phase8.candidate.20261022",
+    "status": "IMPLEMENTED — SOURCE CANDIDATE / TARGETED LOCAL ACCEPTANCE; NOT PRODUCTION-APPROVED",
+    "report": "PHASE8_IMPLEMENTATION_REPORT_2026-10-22.md",
+    "migration": "migrations/040_phase8_finance_workflows.sql",
+    "payment_boundary": "Recording only; no payment processing, provider verification, or provider credentials",
+    "verified": {
+      "backend_tests_passed": 233,
+      "frontend_contract_tests_passed": 50,
+      "python_compileall": true,
+      "typescript_jsx_syntax_transpile": true
+    },
+    "open_checks": [
+      "PostgreSQL replay of migration 040 on disposable database",
+      "Node 24 full frontend typecheck and production build",
+      "Authenticated browser/mobile-sized acceptance"
+    ],
+    "production_changed": false,
+    "deployed": false,
+    "paid_resources_created": false
   }
 }
