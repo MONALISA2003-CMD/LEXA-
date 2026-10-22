@@ -1,2 +1,0 @@
-"use client";
-export default function Error({ reset }: { reset: () => void }) { return <div className="route-error"><strong>Products could not load.</strong><span>We hit a problem while loading your products. Please try again.</span><button className="button button-dark" onClick={() => reset()}>Try again</button></div>; }

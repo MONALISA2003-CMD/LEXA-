@@ -42,7 +42,7 @@ test('Product catalogue search cancels stale requests and rejects late results',
   assert.doesNotMatch(products, /Promise\.all\(\[getProducts\(search\), getCategories\(\), getBrands\(\), getUnits\(\), getPriceLists\(\)\]\)/);
 });
 
-test('Product search supports SKU and barcode lookup without mutating catalogue records', () => {
+test('Product search supports product codes and barcodes without mutating catalogue records', () => {
   assert.match(products, /getCatalogLookup\(normalized, signal\)/);
   assert.match(products, /missingProductIds.*slice\(0, 10\)/s);
   assert.match(products, /Promise\.allSettled\(missingProductIds\.map\(\(id\) => getProduct\(id, signal\)\)\)/);
@@ -51,7 +51,7 @@ test('Product search supports SKU and barcode lookup without mutating catalogue 
   assert.match(catalogRoute, /@router\.get\("\/lookup", response_model=list\[dict\]\)/);
   assert.match(catalogRoute, /ProductVariant\.sku\.ilike/);
   assert.match(catalogRoute, /Barcode\.barcode == needle/);
-  assert.match(products, /Search product, SKU or barcode/);
+  assert.match(products, /Search product name, product code or barcode/);
 });
 
 test('Inventory filters refresh only balance and ledger data with cancellation and stale-result protection', () => {
@@ -69,7 +69,7 @@ test('Inventory filters refresh only balance and ledger data with cancellation a
 });
 
 test('Render blueprint distinguishes liveness from dependency readiness', () => {
-  assert.match(render, /healthCheckPath: \/ready/);
+  assert.match(render, /healthCheckPath: \/health/);
   const health = readFileSync(resolve(root, '../../apps/api/app/main.py'), 'utf8');
   assert.match(health, /@app\.get\("\/health"/);
   assert.match(health, /@app\.get\("\/ready"/);

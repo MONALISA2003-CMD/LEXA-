@@ -49,7 +49,7 @@ def test_render_runtime_contract_is_intact():
     assert "rootDir: apps/api" in render
     assert "pip install -r requirements.txt" in render
     assert "uvicorn app.main:app --host 0.0.0.0 --port $PORT" in render
-    assert "healthCheckPath: /ready" in render
+    assert "healthCheckPath: /health" in render
     assert "key: DATABASE_APP_ROLE" in render
     assert "key: DATABASE_LOGIN_ROLE" in render
 

@@ -41,8 +41,8 @@ def test_frontend_catalog_exit_condition_is_visible():
     page = (ROOT / "apps/web/app/products/page.tsx").read_text()
     api = (ROOT / "apps/web/lib/api.ts").read_text()
     assert "Products" in page
-    assert "Variants" in page
-    assert "SKU" in page
+    assert "Pack sizes & options" in page
+    assert "product code" in page.lower()
     assert "Pricing" in page
     assert "Barcodes" in page
     assert "getProducts" in page
@@ -85,4 +85,24 @@ def test_readiness_requires_cache_and_database_before_claiming_ready():
     assert '"cache": "ok" if cache_ok else "error"' in main
     assert "socket_connect_timeout=2" in health
     assert "socket_timeout=2" in health
-    assert '"failure_code"] = "LEXA_DEPENDENCY_NOT_READY"' in main
+    assert "LEXA_DEPENDENCY_NOT_READY" in main
+    assert "FEATURES_NEED_UPDATE" in main
+    assert "BUSINESS_RECORDS_NEED_REVIEW" in main
+
+
+def test_readiness_checks_all_current_business_schema_migrations_and_columns():
+    health = HEALTH.read_text()
+    assert '"033_phase5_refund_settlement_consistency"' in health
+    assert '"034_phase5_return_accounting_journals"' in health
+    assert '"035_phase5_none_return_receivable_guard"' in health
+    assert '"036_phase6_inventory_intelligence"' in health
+    assert '"037_phase6_inventory_ageing_index"' in health
+    assert '"038_phase6_movement_health_indexes"' in health
+    assert '"039_phase7_supplier_ledger_landed_costs"' in health
+    assert '"040_phase8_finance_workflows"' in health
+    # 032 is intentionally excluded; it is QA-branch-only per the source disposition.
+    assert '"032_phase5_return_settlement_reconciliation"' not in health
+    assert '"supplier_party_id"' in health
+    assert '"reversal_journal_entry_id"' in health
+    assert '"expense_reversals_total"' in health
+    assert '"LEXA_SCHEMA_NOT_READY"' in health

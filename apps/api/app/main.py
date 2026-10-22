@@ -95,8 +95,17 @@ def readiness() -> dict[str, object]:
     }
     if not ready:
         if settings.app_env.strip().lower() == "production":
-            # Keep externally visible diagnostics stable and non-sensitive.
-            payload["failure_code"] = "LEXA_DEPENDENCY_NOT_READY"
+            # Keep externally visible diagnostics stable and non-sensitive while
+            # distinguishing an unavailable dependency from a schema mismatch.
+            payload["failure_code"] = (
+                "FEATURES_NEED_UPDATE"
+                if database_error == "LEXA_SCHEMA_NOT_READY"
+                else "SIGN_IN_NEEDS_UPDATE"
+                if database_error == "LEXA_AUTH_SCHEMA_NOT_READY"
+                else "BUSINESS_RECORDS_NEED_REVIEW"
+                if database_error == "LEXA_DATABASE_NOT_CANONICAL"
+                else "LEXA_DEPENDENCY_NOT_READY"
+            )
         else:
             if not database_ok:
                 payload["database_error_type"] = database_error

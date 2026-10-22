@@ -62,7 +62,7 @@ def test_open_development_mode_is_absent_from_production_surface():
     assert "lexa_open_dev_mode" not in config
     assert '"/dev-session"' not in auth
     assert "LEXA_OPEN_DEV_MODE" not in render
-    assert "healthCheckPath: /ready" in render
+    assert "healthCheckPath: /health" in render
 
 
 def test_workspace_does_not_open_directly_in_development():

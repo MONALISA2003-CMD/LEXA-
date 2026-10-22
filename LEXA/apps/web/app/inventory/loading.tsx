@@ -1,1 +1,0 @@
-export default function Loading() { return <div className="app-loading"><div className="loading-bar"/><div className="loading-title"/><div className="loading-grid"><div/><div/><div/></div><div className="loading-table"/></div>; }

@@ -1,3 +1,16 @@
+# LEXA — Phase 8 Finance Implementation Candidate (22 October 2026)
+
+**Implementation status: source candidate with targeted local acceptance; not production-approved.** This package extends the Phase 7 candidate with plain-language finance workflows: customer collections/balances, supplier payables via the existing supplier ledger, expenses, owner-configured payment methods, manual end-of-day checking and finance reporting.
+
+**Payment boundary:** LEXA records a business user's chosen payment method and amount. It does not initiate, transfer, settle or automatically verify money. No payment gateway or payment-provider credentials are included or requested.
+
+- [Phase 8 implementation report](PHASE8_IMPLEMENTATION_REPORT_2026-10-22.md)
+- [Phase 8 onwards architecture handoff](LEXA_PHASE8_REVISED_ARCHITECTURE_AND_IMPLEMENTATION_PLAN_2026-10-22.md)
+
+Phase 12 remains the single full production-readiness and launch gate. The report above lists exact test results and the remaining disposable-database, Node 24 build and browser acceptance checks. Historical Phase 7 reports below are retained as baseline evidence and are not Phase 8 completion evidence.
+
+---
+
 # LEXA — Phase 7 Purchasing & Supplier Management (v2.12.0, Increment 03 — 22 October 2026)
 
 **Release decision: NO-GO for production.** This is a full-source repair archive, not a deployment certificate. It fixes two live-log-confirmed backend failure patterns (supplier-payment Pydantic validator override and post-commit ORM refresh 500s), adds regression tests, and records exact backend/database/hosting evidence and blocked gates.

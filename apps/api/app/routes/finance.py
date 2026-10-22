@@ -1,20 +1,26 @@
 from __future__ import annotations
 
 from datetime import date
+import re
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import text
 
-from ..catalog import write_audit
+from ..catalog import begin_idempotency, emit_event, finish_idempotency, write_audit
 from ..dependencies import require_permission
 from ..branch_access import require_full_branch_scope
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 compliance = APIRouter(prefix="/compliance", tags=["compliance"])
+
+_EXPENSE_REFERENCE_SECRET = re.compile(
+    r"\b(?:pin|password|passcode|otp|one[- ]time(?: password| code)|verification code|security code|api key|access token|client secret|webhook secret)\b",
+    re.IGNORECASE,
+)
 
 
 class Strict(BaseModel):
@@ -33,14 +39,41 @@ class AccountCreate(Strict):
 
 class ExpenseCreate(Strict):
     expense_date: date = Field(default_factory=date.today)
-    reference: str = Field(min_length=1, max_length=120)
+    reference: str = Field(min_length=1, max_length=120, description="Receipt or expense reference only; never a password, PIN or verification code")
     description: str = Field(min_length=1, max_length=1000)
     expense_account_id: UUID
-    payment_channel_id: UUID | None = None
+    payment_channel_id: UUID
     currency_code: str = Field(min_length=3, max_length=3)
     subtotal: Decimal = Field(ge=0)
     tax_amount: Decimal = Field(default=Decimal("0"), ge=0)
     supplier_party_id: UUID | None = None
+
+    @field_validator("reference")
+    @classmethod
+    def reference_is_not_a_credential(cls, value: str) -> str:
+        cleaned = value.strip()
+        if _EXPENSE_REFERENCE_SECRET.search(cleaned):
+            raise ValueError("Enter a receipt reference only. Never enter a PIN, password or verification code.")
+        return cleaned
+
+    @model_validator(mode="after")
+    def validate_expense(self):
+        self.reference = self.reference.strip()
+        self.description = self.description.strip()
+        self.currency_code = self.currency_code.upper().strip()
+        if not self.reference:
+            raise ValueError("Enter a receipt or expense reference")
+        if not self.description:
+            raise ValueError("Describe what the money was spent on")
+        if self.subtotal + self.tax_amount <= 0:
+            raise ValueError("Enter an expense amount greater than zero")
+        if not self.currency_code.isalpha():
+            raise ValueError("Enter a valid three-letter currency code")
+        return self
+
+
+class ExpenseAction(Strict):
+    reason: str = Field(min_length=3, max_length=500)
 
 
 class EfrisConfigPatch(Strict):
@@ -303,7 +336,8 @@ def expenses(ctx=Depends(require_permission("expenses.read"))):
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("""
       SELECT er.id,er.expense_date,er.reference,er.description,er.expense_account_id,a.code expense_account_code,a.name expense_account_name,
-             er.payment_channel_id,pc.name payment_channel_name,er.currency_code,er.subtotal,er.tax_amount,er.total,er.status,er.journal_entry_id,er.created_at,er.updated_at
+             er.payment_channel_id,pc.name payment_channel_name,er.currency_code,er.subtotal,er.tax_amount,er.total,er.status,
+             er.journal_entry_id,er.reversal_journal_entry_id,er.created_by,er.posted_by,er.created_at,er.updated_at
       FROM expense_records er JOIN accounting_accounts a ON a.id=er.expense_account_id AND a.tenant_id=er.tenant_id
       LEFT JOIN payment_channels pc ON pc.id=er.payment_channel_id AND pc.tenant_id=er.tenant_id
       WHERE er.tenant_id=:t ORDER BY er.expense_date DESC,er.created_at DESC LIMIT 500
@@ -311,33 +345,167 @@ def expenses(ctx=Depends(require_permission("expenses.read"))):
     return [out(r) for r in rows]
 
 
+@router.get("/expenses/{expense_id}/history")
+def expense_history(expense_id: UUID, ctx=Depends(require_permission("expenses.read"))):
+    """Return a plain, tenant-scoped timeline for the requested expense."""
+    db, _, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
+    exists = db.execute(text("SELECT id FROM expense_records WHERE tenant_id=:t AND id=:id"), {"t": str(tenant_id), "id": str(expense_id)}).scalar_one_or_none()
+    if not exists:
+        raise HTTPException(404, "Expense not found")
+    rows = db.execute(text("""
+      SELECT e.event_type, e.occurred_at, u.email AS actor_email, e.payload->>'reason' AS reason
+      FROM outbox_events e
+      LEFT JOIN users u ON u.id=e.actor_id
+      WHERE e.tenant_id=:t AND e.aggregate_type='expense' AND e.aggregate_id=:id
+      ORDER BY e.occurred_at ASC, e.created_at ASC
+    """), {"t": str(tenant_id), "id": str(expense_id)}).mappings().all()
+    return [{"event_type": row["event_type"], "occurred_at": row["occurred_at"], "actor_email": row["actor_email"], "reason": row["reason"]} for row in rows]
+
+
 @router.post("/expenses", status_code=201)
-def create_expense(body: ExpenseCreate, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), ctx=Depends(require_permission("expenses.manage"))):
+def create_expense(body: ExpenseCreate, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("expenses.manage"))):
     db, actor, tenant_id, _ = ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
+    payload = body.model_dump(mode="json")
+    try:
+        idem, cached = begin_idempotency(db, tenant_id=tenant_id, operation_type="accounting.expense.create", key=idempotency_key, payload=payload)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(400, "This request could not be safely repeated. Refresh and try again.") from exc
+    if cached:
+        return cached[1]
+
     total = body.subtotal + body.tax_amount
     try:
+        account = db.execute(text("""
+          SELECT id FROM accounting_accounts
+          WHERE tenant_id=:t AND id=:id AND account_type='EXPENSE' AND status='ACTIVE' AND allow_posting=true
+        """), {"t": str(tenant_id), "id": str(body.expense_account_id)}).scalar_one_or_none()
+        if not account:
+            raise HTTPException(422, "Choose an active expense category")
+        channel = db.execute(text("""
+          SELECT id FROM payment_channels
+          WHERE tenant_id=:t AND id=:id AND active=true AND currency_code=:cc
+        """), {"t": str(tenant_id), "id": str(body.payment_channel_id), "cc": body.currency_code}).scalar_one_or_none()
+        if not channel:
+            raise HTTPException(422, "Choose an active payment method in the same currency as this expense")
         expense_id = db.execute(text("""
           INSERT INTO expense_records(tenant_id,expense_date,reference,description,expense_account_id,payment_channel_id,currency_code,subtotal,tax_amount,total,supplier_party_id,created_by)
           VALUES(:t,:d,:r,:desc,:a,:pc,:cc,:s,:tax,:tot,:sp,:u) RETURNING id
-        """), {"t": str(tenant_id), "d": body.expense_date, "r": body.reference.strip(), "desc": body.description.strip(), "a": str(body.expense_account_id), "pc": str(body.payment_channel_id) if body.payment_channel_id else None, "cc": body.currency_code.upper(), "s": str(body.subtotal), "tax": str(body.tax_amount), "tot": str(total), "sp": str(body.supplier_party_id) if body.supplier_party_id else None, "u": str(actor)}).scalar_one()
+        """), {"t": str(tenant_id), "d": body.expense_date, "r": body.reference, "desc": body.description, "a": str(body.expense_account_id), "pc": str(body.payment_channel_id), "cc": body.currency_code, "s": str(body.subtotal), "tax": str(body.tax_amount), "tot": str(total), "sp": str(body.supplier_party_id) if body.supplier_party_id else None, "u": str(actor)}).scalar_one()
+        result = {"id": str(expense_id), "status": "DRAFT", "total": str(total), "currency_code": body.currency_code}
+        write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="expense.draft_created", target_type="expense", target_id=expense_id, correlation_id=request_id)
+        emit_event(db, tenant_id=tenant_id, actor_user_id=actor, event_type="EXPENSE_DRAFT_CREATED", aggregate_type="expense", aggregate_id=expense_id, payload={"reference": body.reference, "total": str(total), "currency_code": body.currency_code}, correlation_id=request_id)
+        finish_idempotency(db, idem, status_code=201, response_body=result, resource_type="expense", resource_id=expense_id)
         db.commit()
+        return result
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as exc:
         db.rollback()
-        raise HTTPException(400, str(exc)) from exc
-    return {"id": str(expense_id), "status": "DRAFT", "total": str(total)}
+        raise HTTPException(400, "The expense draft was not saved. Check the details and try again.") from exc
 
 
 @router.post("/expenses/{expense_id}/post")
-def post_expense(expense_id: UUID, ctx=Depends(require_permission("expenses.manage"))):
-    db, actor, _, _ = ctx
+def post_expense(expense_id: UUID, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("expenses.manage"))):
+    db, actor, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
+    payload = {"expense_id": str(expense_id)}
     try:
-        entry = db.execute(text("SELECT post_expense_journal(:id,:u)"), {"id": str(expense_id), "u": str(actor)}).scalar_one()
-        db.commit()
+        idem, cached = begin_idempotency(db, tenant_id=tenant_id, operation_type="accounting.expense.post", key=idempotency_key, payload=payload)
     except Exception as exc:
         db.rollback()
-        raise HTTPException(400, str(exc)) from exc
-    return {"expense_id": str(expense_id), "journal_entry_id": str(entry), "status": "POSTED"}
+        raise HTTPException(400, "This request could not be safely repeated. Refresh and try again.") from exc
+    if cached:
+        return cached[1]
+    try:
+        expense = db.execute(text("SELECT id,status,journal_entry_id,total,currency_code FROM expense_records WHERE tenant_id=:t AND id=:id FOR UPDATE"), {"t": str(tenant_id), "id": str(expense_id)}).mappings().first()
+        if not expense:
+            raise HTTPException(404, "Expense not found")
+        if expense["status"] == "POSTED" and expense["journal_entry_id"]:
+            result = {"expense_id": str(expense_id), "journal_entry_id": str(expense["journal_entry_id"]), "status": "POSTED", "total": str(expense["total"]), "currency_code": expense["currency_code"]}
+            finish_idempotency(db, idem, status_code=200, response_body=result, resource_type="expense", resource_id=expense_id)
+            db.commit()
+            return result
+        if expense["status"] != "DRAFT":
+            raise HTTPException(409, "Only a saved draft can be added to the official records")
+        entry = db.execute(text("SELECT post_expense_journal(:id,:u)"), {"id": str(expense_id), "u": str(actor)}).scalar_one()
+        write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="expense.posted", target_type="expense", target_id=expense_id, correlation_id=request_id)
+        emit_event(db, tenant_id=tenant_id, actor_user_id=actor, event_type="EXPENSE_POSTED", aggregate_type="expense", aggregate_id=expense_id, payload={"journal_entry_id": str(entry)}, correlation_id=request_id)
+        result = {"expense_id": str(expense_id), "journal_entry_id": str(entry), "status": "POSTED", "total": str(expense["total"]), "currency_code": expense["currency_code"]}
+        finish_idempotency(db, idem, status_code=200, response_body=result, resource_type="expense", resource_id=expense_id)
+        db.commit()
+        return result
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(400, "This expense could not be added to the official records. Check its date and account setup.") from exc
+
+
+@router.post("/expenses/{expense_id}/void")
+def void_expense(expense_id: UUID, body: ExpenseAction, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("expenses.manage"))):
+    db, actor, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
+    payload = {"expense_id": str(expense_id), "reason": body.reason.strip()}
+    try:
+        idem, cached = begin_idempotency(db, tenant_id=tenant_id, operation_type="accounting.expense.void", key=idempotency_key, payload=payload)
+    except Exception as exc:
+        db.rollback(); raise HTTPException(400, "This request could not be safely repeated.") from exc
+    if cached: return cached[1]
+    try:
+        expense = db.execute(text("SELECT id,status FROM expense_records WHERE tenant_id=:t AND id=:id FOR UPDATE"), {"t": str(tenant_id), "id": str(expense_id)}).mappings().first()
+        if not expense: raise HTTPException(404, "Expense not found")
+        if expense["status"] == "VOIDED":
+            result = {"expense_id": str(expense_id), "status": "VOIDED"}
+        elif expense["status"] != "DRAFT":
+            raise HTTPException(409, "Only a draft can be cancelled. To correct a posted expense, use the reversal action.")
+        else:
+            db.execute(text("UPDATE expense_records SET status='VOIDED',updated_at=now() WHERE tenant_id=:t AND id=:id AND status='DRAFT'"), {"t": str(tenant_id), "id": str(expense_id)})
+            write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="expense.draft_cancelled", target_type="expense", target_id=expense_id, correlation_id=request_id)
+            emit_event(db, tenant_id=tenant_id, actor_user_id=actor, event_type="EXPENSE_DRAFT_CANCELLED", aggregate_type="expense", aggregate_id=expense_id, payload={"reason": body.reason.strip()}, correlation_id=request_id)
+            result = {"expense_id": str(expense_id), "status": "VOIDED"}
+        finish_idempotency(db, idem, status_code=200, response_body=result, resource_type="expense", resource_id=expense_id)
+        db.commit(); return result
+    except HTTPException:
+        db.rollback(); raise
+    except Exception as exc:
+        db.rollback(); raise HTTPException(400, "This draft could not be cancelled.") from exc
+
+
+@router.post("/expenses/{expense_id}/reverse")
+def reverse_expense(expense_id: UUID, body: ExpenseAction, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("expenses.manage"))):
+    db, actor, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
+    payload = {"expense_id": str(expense_id), "reason": body.reason.strip()}
+    try:
+        idem, cached = begin_idempotency(db, tenant_id=tenant_id, operation_type="accounting.expense.reverse", key=idempotency_key, payload=payload)
+    except Exception as exc:
+        db.rollback(); raise HTTPException(400, "This request could not be safely repeated.") from exc
+    if cached: return cached[1]
+    try:
+        expense = db.execute(text("SELECT id,status,journal_entry_id,reversal_journal_entry_id FROM expense_records WHERE tenant_id=:t AND id=:id FOR UPDATE"), {"t": str(tenant_id), "id": str(expense_id)}).mappings().first()
+        if not expense: raise HTTPException(404, "Expense not found")
+        if expense["status"] == "REVERSED" and expense["reversal_journal_entry_id"]:
+            result = {"expense_id": str(expense_id), "status": "REVERSED", "reversal_journal_entry_id": str(expense["reversal_journal_entry_id"])}
+        elif expense["status"] != "POSTED" or not expense["journal_entry_id"]:
+            raise HTTPException(409, "Only a posted expense can be corrected this way")
+        else:
+            business_date = db.execute(text("SELECT public.lexa_business_date(now(), :tenant_id)"), {"tenant_id": str(tenant_id)}).scalar_one()
+            reversal_id = db.execute(text("SELECT reverse_journal_entry(:id,:u,:d)"), {"id": str(expense["journal_entry_id"]), "u": str(actor), "d": business_date}).scalar_one()
+            db.execute(text("UPDATE expense_records SET status='REVERSED',reversal_journal_entry_id=:r,updated_at=now() WHERE tenant_id=:t AND id=:id AND status='POSTED'"), {"r": str(reversal_id), "t": str(tenant_id), "id": str(expense_id)})
+            write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action="expense.reversed", target_type="expense", target_id=expense_id, correlation_id=request_id)
+            emit_event(db, tenant_id=tenant_id, actor_user_id=actor, event_type="EXPENSE_REVERSED", aggregate_type="expense", aggregate_id=expense_id, payload={"reversal_journal_entry_id": str(reversal_id), "reason": body.reason.strip()}, correlation_id=request_id)
+            result = {"expense_id": str(expense_id), "status": "REVERSED", "reversal_journal_entry_id": str(reversal_id)}
+        finish_idempotency(db, idem, status_code=200, response_body=result, resource_type="expense", resource_id=expense_id)
+        db.commit(); return result
+    except HTTPException:
+        db.rollback(); raise
+    except Exception as exc:
+        db.rollback(); raise HTTPException(400, "This expense could not be corrected. Review the record and try again.") from exc
 
 
 @compliance.get("/efris/config")

@@ -10,7 +10,7 @@ export type StockCount = { id: string; location_id: string; status: string; scop
 export type Transfer = { id: string; source_location_id: string; destination_location_id: string; status: string; notes?: string | null; created_at: string; lines: { id: string; variant_id: string; requested_quantity: string; dispatched_quantity: string; received_quantity: string; unit_cost: string }[] };
 
 export type ApiHealth = { status: string };
-export type ApiReadiness = { status: string; dependencies?: { database?: string; cache?: string; [key: string]: string | undefined } };
+export type ApiReadiness = { status: string; failure_code?: string; dependencies?: { database?: string; cache?: string; [key: string]: string | undefined } };
 
 export type WorkspaceChoice = { tenant_id: string; tenant_name: string };
 export class WorkspaceSelectionError extends Error {
@@ -30,19 +30,37 @@ export class ApiError extends Error {
   }
 }
 
+/** Turn unexpected module failures into safe, everyday wording for business users. */
+export function userFacingError(error: unknown, fallback: string): string {
+  const raw = error instanceof Error ? error.message : "";
+  if (!raw) return fallback;
+  if (/UndefinedTable|UndefinedColumn|ProgrammingError|OperationalError|psycopg|sqlalchemy|Traceback|relation .* does not exist|column .* does not exist|public\.[a-z_]+|SELECT .* FROM|INSERT INTO|UPDATE .* SET|permission required:/i.test(raw)) {
+    return fallback;
+  }
+  return raw.length > 220 ? fallback : raw;
+}
+
 function friendlyMessage(status: number, payload: unknown, path = ""): string {
+  const topCode = typeof payload === "object" && payload !== null && "failure_code" in payload ? String((payload as { failure_code?: unknown }).failure_code || "") : "";
+  if (path === "/ready" && topCode === "FEATURES_NEED_UPDATE") return "LEXA is online, but some business features need a service update before all pages can load. Your saved records have not been changed.";
+  if (path === "/ready" && topCode === "BUSINESS_RECORDS_NEED_REVIEW") return "LEXA is connected to the wrong business data source. Please contact support before making changes.";
   const detail = typeof payload === "object" && payload !== null && "detail" in payload ? (payload as { detail?: unknown }).detail : null;
   const code = typeof detail === "object" && detail !== null && "code" in detail ? String((detail as { code?: unknown }).code) : "";
   const raw = typeof detail === "string" ? detail : "";
   if (code === "WORKSPACE_SELECTION_REQUIRED") return "Choose a workspace to continue.";
-  if (status === 401 && path === "/api/v1/auth/login") return "The email or password doesn't match an account. Check both and try again.";
+  if (code === "WORKSPACE_SETUP_REQUIRED" || code === "SETUP_INCOMPLETE") return "Finish setting up your business locations to open this view.";
+  if (code === "BRANCH_ACCESS_REQUIRED") return "Your access needs to include the locations shown here. Ask the business owner to review your access.";
+  if (code === "BUSINESS_PROFILE_REQUIRED") return "Save your business name and currency before completing setup.";
+  if (status === 403 && /(spans the workspace|every active branch|branch scope|business locations)/i.test(raw)) return "Finish setting up your business locations to open this view.";
+  if (code === "NO_ACTIVE_WORKSPACE") return "Your sign-in worked, but this account is not linked to an active business yet. Ask the business owner to check your access.";
+  if (status === 401 && path === "/api/v1/auth/login") return "We couldn't sign you in. Check your email and password, then try again.";
   if (status === 401 && path === "/api/v1/auth/register") return "We could not verify that registration. Check the details and try again.";
   if (status === 401) return "Your session may have expired. Sign in again to continue.";
-  if (status === 403) return "You don't have permission to do this. Ask your workspace administrator to review your access.";
-  if (status === 404) return "We couldn't find that record. It may have been removed or you may not have access.";
+  if (status === 403) return "You can't open this part of the business with your current access. Ask the business owner or manager to review it.";
+  if (status === 404) return "We couldn't find that item. It may have been removed or may not be available to your business.";
   if (status === 409 && raw === "User already exists") return "An account with this email already exists. Sign in to continue.";
   if (status === 409 && raw.toLowerCase().includes("business")) return "That business information conflicts with an existing workspace.";
-  if (status === 409 && code !== "WORKSPACE_SELECTION_REQUIRED") return "This change conflicts with the latest record. Refresh the page and review it before trying again.";
+  if (status === 409 && code !== "WORKSPACE_SELECTION_REQUIRED") return "This record has changed since you opened it. Refresh the page and review the latest details before trying again.";
   if (status === 400 && raw === "Business name is required") return "Enter your business name to continue.";
   if (status === 422) return "Please check the required fields and correct any invalid information.";
   if (status === 429) return "Too many attempts. Please wait a moment before trying again.";
@@ -118,6 +136,30 @@ async function getJson<T>(path: string, init?: RequestInit, retried = false): Pr
   return payload as T;
 }
 function key() { return crypto.randomUUID(); }
+
+// Reuse a request key after an uncertain network failure. The server can then
+// return the first result instead of creating a second payment/expense. A key is
+// cleared only after success; changing the submitted data uses a different key.
+const pendingIdempotencyKeys = new Map<string, string>();
+async function postIdempotent<T>(path: string, body: unknown = {}): Promise<T> {
+  const fingerprint = `POST ${path}:${JSON.stringify(body)}`;
+  const requestKey = pendingIdempotencyKeys.get(fingerprint) || key();
+  pendingIdempotencyKeys.set(fingerprint, requestKey);
+  try {
+    const result = await getJson<T>(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': requestKey },
+      body: JSON.stringify(body),
+    });
+    pendingIdempotencyKeys.delete(fingerprint);
+    return result;
+  } catch (error) {
+    // Definite client/business rejections did not complete the requested write.
+    // Keep the key for network and server failures where the commit result may be unknown.
+    if (error instanceof ApiError && error.status < 500) pendingIdempotencyKeys.delete(fingerprint);
+    throw error;
+  }
+}
 export function getHealth(signal?: AbortSignal) { return getJson<ApiHealth>("/health", { signal }); }
 export function getReadiness(signal?: AbortSignal) { return getJson<ApiReadiness>("/ready", signal ? { signal } : undefined); }
 
@@ -266,12 +308,12 @@ export function createKernelTask(body:{title:string;description?:string;priority
 
 
 // Phase 5 analytics / BI contracts
-export type AnalyticsDailyMetric = { business_date:string; currency_code:string; sales_total:string; returns_total:string; net_sales:string; payments_collected:string; refunds_total:string; credit_created:string; expenses_total:string; net_cash_movement:string; sale_count:number; return_count:number; payment_count:number; expense_count:number };
+export type AnalyticsDailyMetric = { business_date:string; currency_code:string; sales_total:string; returns_total:string; net_sales:string; payments_collected:string; refunds_total:string; credit_created:string; expenses_total:string; expense_reversals_total:string; net_cash_movement:string; sale_count:number; return_count:number; payment_count:number; expense_count:number };
 export type AnalyticsProductMetric = { business_date:string; variant_id:string; product_id:string; sku?:string|null; product_name?:string|null; variant_name?:string|null; units_sold:string; sales_amount:string; discount_amount:string; tax_amount:string; returns_units:string; returns_amount:string; net_sales:string; cogs:string; gross_margin:string; currency_code:string };
 export type AnalyticsCustomerMetric = { customer_party_id:string; customer_name?:string|null; first_sale_date?:string|null; last_sale_date?:string|null; sale_count:number; total_sales:string; total_returns:string; net_sales:string; total_paid:string; outstanding_balance:string; average_sale_value:string };
 export type AnalyticsInventoryHealth = { snapshot_date:string; location_id:string; location_name?:string|null; variant_id:string; sku?:string|null; product_name?:string|null; variant_name?:string|null; on_hand:string; reserved:string; available:string; stock_value:string; units_sold_30d:string; daily_velocity:string; days_cover?:string|null };
 export type AnalyticsBranchMetric = { branch_id:string; branch_name?:string|null; business_date:string; currency_code:string; sales_total:string; returns_total:string; net_sales:string; payments_collected:string; credit_created:string; sale_count:number };
-export type AnalyticsOverview = { from_date:string; to_date:string; currency_code:string; totals:{sales_total:string;returns_total:string;net_sales:string;payments_collected:string;refunds_total:string;credit_created:string;expenses_total:string;net_cash_movement:string;sale_count:number}; daily:AnalyticsDailyMetric[] };
+export type AnalyticsOverview = { from_date:string; to_date:string; currency_code:string; totals:{sales_total:string;returns_total:string;net_sales:string;payments_collected:string;refunds_total:string;credit_created:string;expenses_total:string;expense_reversals_total:string;net_cash_movement:string;sale_count:number}; daily:AnalyticsDailyMetric[] };
 export function getAnalyticsOverview(fromDate:string,toDate:string,currency:string){return getJson<AnalyticsOverview>(`/api/v1/analytics/overview?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}`);}
 export function getAnalyticsDaily(fromDate:string,toDate:string,currency:string){return getJson<AnalyticsDailyMetric[]>(`/api/v1/analytics/daily?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}`);}
 export function getAnalyticsProducts(fromDate:string,toDate:string,currency:string){return getJson<AnalyticsProductMetric[]>(`/api/v1/analytics/products?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}&limit=100`);}
@@ -302,7 +344,8 @@ export function getCommerceDashboard(dateValue=''){return getJson<CommerceDashbo
 export function getCommerceCustomers(search=''){return getJson<CommerceCustomer[]>(`/api/v1/commerce/customers${search?`?search=${encodeURIComponent(search)}`:''}`);}
 export function createCommerceCustomer(body:{display_name:string;party_type?:'PERSON'|'ORGANIZATION';legal_name?:string;email?:string;phone?:string;credit_limit?:string;notes?:string}){return getJson<CommerceCustomer>('/api/v1/commerce/customers',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
 export function getPaymentChannels(){return getJson<PaymentChannel[]>('/api/v1/commerce/payment-channels');}
-export function createPaymentChannel(body:{name:string;channel_type:string;provider?:string;currency_code:string}){return getJson<PaymentChannel>('/api/v1/commerce/payment-channels',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
+export function createPaymentChannel(body:{name:string;channel_type:string;provider?:string;currency_code:string}){return postIdempotent<PaymentChannel>('/api/v1/commerce/payment-channels',body);}
+export function deactivatePaymentChannel(id:string,reason='No longer used'){return postIdempotent<PaymentChannel>(`/api/v1/commerce/payment-channels/${encodeURIComponent(id)}/deactivate`,{reason});}
 export function getCommerceProducts(){return getJson<CommerceProduct[]>('/api/v1/commerce/products');}
 export type CommerceSalesQuery = { limit?:number; offset?:number; search?:string; status?:string; start_date?:string; end_date?:string; branch_id?:string };
 export function getCommerceSales(query:CommerceSalesQuery={}){
@@ -316,12 +359,12 @@ export function getCommerceSales(query:CommerceSalesQuery={}){
 export function getCommerceSale(id:string){return getJson<CommerceSaleDetail>(`/api/v1/commerce/sales/${id}`);}
 export function createCommerceSale(body:{customer_party_id?:string|null;branch_id?:string|null;location_id:string;currency_code:string;business_date:string;lines:Array<{variant_id:string;quantity:string;unit_price:string;discount_amount?:string;tax_rate?:string}>;payments:Array<{payment_channel_id:string;amount:string;reference?:string|null}>;notes?:string|null}, idempotencyKey?:string){return getJson<CommerceSale>('/api/v1/commerce/sales',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':idempotencyKey || key()},body:JSON.stringify(body)});}
 export function getReceivables(){return getJson<Receivable[]>('/api/v1/commerce/receivables');}
-export function payReceivable(id:string,body:{payment_channel_id:string;amount:string;business_date:string;reference?:string|null}){return getJson<Receivable>(`/api/v1/commerce/receivables/${id}/payments`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
+export function payReceivable(id:string,body:{payment_channel_id:string;amount:string;business_date:string;reference?:string|null}){return postIdempotent<Receivable>(`/api/v1/commerce/receivables/${id}/payments`,body);}
 export function getReconciliations(dateValue=''){return getJson<Reconciliation[]>(`/api/v1/commerce/reconciliations${dateValue?`?business_date=${encodeURIComponent(dateValue)}`:''}`);}
-export function createReconciliation(body:{business_date:string;notes?:string}){return getJson<Reconciliation>('/api/v1/commerce/reconciliations',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
-export function setReconciliationActual(id:string,body:{actual_amount:string;notes?:string}){return getJson<ReconciliationLine>(`/api/v1/commerce/reconciliation-lines/${id}/actual`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}
-export function resolveReconciliationLine(id:string,body:{status:'RESOLVED'|'ACKNOWLEDGED';notes?:string}){return getJson<ReconciliationLine>(`/api/v1/commerce/reconciliation-lines/${id}/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}
-export function closeReconciliation(id:string){return getJson<{id:string;business_date:string;status:string;closed_at:string}>(`/api/v1/commerce/reconciliations/${id}/close`,{method:'POST',headers:{'Idempotency-Key':key()}});}
+export function createReconciliation(body:{business_date:string;notes?:string}){return postIdempotent<Reconciliation>('/api/v1/commerce/reconciliations',body);}
+export function setReconciliationActual(id:string,body:{actual_amount:string;notes?:string}){return postIdempotent<ReconciliationLine>(`/api/v1/commerce/reconciliation-lines/${encodeURIComponent(id)}/actual`,body);}
+export function resolveReconciliationLine(id:string,body:{status:'RESOLVED'|'ACKNOWLEDGED';notes?:string}){return postIdempotent<ReconciliationLine>(`/api/v1/commerce/reconciliation-lines/${encodeURIComponent(id)}/resolve`,body);}
+export function closeReconciliation(id:string){return postIdempotent<{id:string;business_date:string;status:string;closed_at:string}>(`/api/v1/commerce/reconciliations/${encodeURIComponent(id)}/close`,{});}
 export function getSaleReturns(){return getJson<SaleReturn[]>('/api/v1/commerce/returns');}
 export function createSaleReturn(saleId:string,body:{reason:string;inventory_location_id?:string|null;business_date:string;settlement_type:'NONE'|'REFUND'|'CUSTOMER_CREDIT';refund_channel_id?:string|null;lines:Array<{sale_line_id:string;quantity:string}>}){return getJson<SaleReturn>(`/api/v1/commerce/sales/${saleId}/returns`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
 
@@ -331,7 +374,8 @@ export type AccountingPeriod = { id:string; period_name:string; start_date:strin
 export type JournalEntry = { id:string; entry_date:string; source_type:string; source_id?:string|null; entry_role:string; reference?:string|null; description:string; currency_code:string; status:string; posted_at?:string|null; posted_by?:string|null; created_at:string };
 export type JournalLine = { id:string; line_no:number; account_id:string; account_code:string; account_name:string; description?:string|null; debit:string; credit:string; currency_code:string; party_id?:string|null };
 export type JournalEntryDetail = { entry:JournalEntry; lines:JournalLine[] };
-export type ExpenseRecord = { id:string; expense_date:string; reference:string; description:string; expense_account_id:string; expense_account_code:string; expense_account_name:string; payment_channel_id?:string|null; payment_channel_name?:string|null; currency_code:string; subtotal:string; tax_amount:string; total:string; status:string; journal_entry_id?:string|null; created_at:string; updated_at:string };
+export type ExpenseRecord = { id:string; expense_date:string; reference:string; description:string; expense_account_id:string; expense_account_code:string; expense_account_name:string; payment_channel_id?:string|null; payment_channel_name?:string|null; currency_code:string; subtotal:string; tax_amount:string; total:string; status:string; journal_entry_id?:string|null; reversal_journal_entry_id?:string|null; created_by?:string|null; posted_by?:string|null; created_at:string; updated_at:string };
+export type ExpenseHistoryEvent = { event_type:string; occurred_at:string; actor_email?:string|null; reason?:string|null };
 export type FiscalDocument = { id:string; source_type:string; source_id:string; document_type:string; currency_code:string; issue_date:string; status:string; document_number?:string|null; fdn?:string|null; verification_code?:string|null; qr_code?:string|null; efris_reference?:string|null; response_code?:string|null; response_message?:string|null; submitted_at?:string|null; accepted_at?:string|null; voided_at?:string|null; last_error?:string|null; created_at:string; updated_at:string };
 export type EfrisConfig = { id:string; enabled:boolean; integration_mode:string; registration_status:string; tin?:string|null; legal_name?:string|null; effective_date?:string|null; created_at:string; updated_at:string };
 export function getAccountingAccounts(){return getJson<AccountingAccount[]>('/api/v1/accounting/accounts');}
@@ -348,8 +392,11 @@ export function reverseJournalEntry(id:string){return getJson<{id:string;status:
 export function postSaleAccounting(id:string){return getJson<{sale_id:string;sale_journal_id:string;cogs_journal_id?:string|null}>(`/api/v1/accounting/sales/${id}/post`,{method:'POST',headers:{'Idempotency-Key':key()}});}
 export function postPaymentAccounting(id:string){return getJson<{payment_id:string;journal_entry_id:string}>(`/api/v1/accounting/payments/${id}/post`,{method:'POST',headers:{'Idempotency-Key':key()}});}
 export function getExpenses(){return getJson<ExpenseRecord[]>('/api/v1/accounting/expenses');}
-export function createExpense(body:{expense_date:string;reference:string;description:string;expense_account_id:string;payment_channel_id?:string|null;currency_code:string;subtotal:string;tax_amount?:string;supplier_party_id?:string|null}){return getJson<{id:string;status:string;total:string}>('/api/v1/accounting/expenses',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
-export function postExpense(id:string){return getJson<{expense_id:string;journal_entry_id:string;status:string}>(`/api/v1/accounting/expenses/${id}/post`,{method:'POST',headers:{'Idempotency-Key':key()}});}
+export function getExpenseHistory(id:string){return getJson<ExpenseHistoryEvent[]>(`/api/v1/accounting/expenses/${encodeURIComponent(id)}/history`);}
+export function createExpense(body:{expense_date:string;reference:string;description:string;expense_account_id:string;payment_channel_id:string;currency_code:string;subtotal:string;tax_amount?:string;supplier_party_id?:string|null}){return postIdempotent<{id:string;status:string;total:string;currency_code:string}>('/api/v1/accounting/expenses',body);}
+export function postExpense(id:string){return postIdempotent<{expense_id:string;journal_entry_id:string;status:string;total?:string;currency_code?:string}>(`/api/v1/accounting/expenses/${encodeURIComponent(id)}/post`,{});}
+export function voidExpense(id:string,reason:string){return postIdempotent<{expense_id:string;status:string}>(`/api/v1/accounting/expenses/${encodeURIComponent(id)}/void`,{reason});}
+export function reverseExpense(id:string,reason:string){return postIdempotent<{expense_id:string;status:string;reversal_journal_entry_id:string}>(`/api/v1/accounting/expenses/${encodeURIComponent(id)}/reverse`,{reason});}
 export function getEfrisConfig(){return getJson<EfrisConfig>('/api/v1/compliance/efris/config');}
 export function updateEfrisConfig(body:{enabled:boolean;integration_mode:string;registration_status:string;tin?:string|null;legal_name?:string|null;effective_date?:string|null}){return getJson<EfrisConfig>('/api/v1/compliance/efris/config',{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':key()},body:JSON.stringify(body)});}
 export function getFiscalDocuments(status?:string){return getJson<FiscalDocument[]>(`/api/v1/compliance/fiscal-documents${status?`?status=${encodeURIComponent(status)}`:''}`);}
@@ -386,6 +433,7 @@ export async function selectWorkspace(tenantId: string) {
 }
 export function getWorkspaceContext() { return getJson<WorkspaceContext>("/api/v1/workspace/context"); }
 export function getSetupProgress() { return getJson<SetupProgress>("/api/v1/workspace/setup/progress"); }
+export function initializeWorkspaceSetup() { return getJson<{status:string;created_defaults:string[];message:string;progress:SetupProgress}>("/api/v1/workspace/setup/initialize", {method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:"{}"}); }
 
 // Phase 3 Increment 03: member lifecycle, invitation lifecycle and branch scope.
 export type WorkspaceRole = { id: string; tenant_id: string; name: string; description?: string | null };

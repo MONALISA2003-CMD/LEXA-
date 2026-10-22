@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..catalog import begin_idempotency, emit_event, finish_idempotency, write_audit
-from ..commerce_rules import ensure_unique_return_line_ids, original_sale_inventory_unit_cost, remaining_refund_balance, prorate_return_line_amounts
+from ..commerce_rules import ensure_unique_return_line_ids, original_sale_inventory_unit_cost, remaining_refund_balance, prorate_return_line_amounts, safe_payment_channel_label, safe_payment_reference
 from ..branch_access import ensure_branch_access, ensure_location_access, require_full_branch_scope
 from ..dependencies import require_permission
 from ..inventory import post_ledger, tenant_location, tenant_variant
@@ -58,18 +58,25 @@ class CustomerCreate(Strict):
 
 
 class ChannelCreate(Strict):
-    name: str = Field(min_length=1, max_length=160)
+    name: str = Field(min_length=1, max_length=160, description="A friendly label such as MTN Line 1 or Stanbic")
     channel_type: str = Field(min_length=2, max_length=30)
-    provider: str | None = Field(default=None, max_length=100)
+    provider: str | None = Field(default=None, max_length=100, description="Optional institution or service name; never enter account details or credentials")
     currency_code: str = Field(min_length=3, max_length=3)
 
     @model_validator(mode="after")
     def validate_type(self):
+        self.name, self.provider = safe_payment_channel_label(self.name, self.provider)
         self.channel_type = self.channel_type.upper().strip()
         self.currency_code = self.currency_code.upper().strip()
         if self.channel_type not in CHANNEL_TYPES:
-            raise ValueError("Credit is a receivable, not a payment channel")
+            raise ValueError("Choose a supported payment method category")
+        if not self.name:
+            raise ValueError("Enter a name for this payment method")
         return self
+
+
+class ChannelDeactivate(Strict):
+    reason: str = Field(default="No longer used", min_length=3, max_length=300)
 
 
 class SaleLineIn(Strict):
@@ -84,6 +91,11 @@ class PaymentAllocationIn(Strict):
     payment_channel_id: UUID
     amount: Decimal = Field(gt=0)
     reference: str | None = Field(default=None, max_length=120)
+
+    @field_validator("reference")
+    @classmethod
+    def reference_is_not_a_secret(cls, value: str | None) -> str | None:
+        return safe_payment_reference(value)
 
 
 class SaleCreate(Strict):
@@ -107,6 +119,11 @@ class PaymentCreate(Strict):
     amount: Decimal = Field(gt=0)
     business_date: date = Field(default_factory=date.today)
     reference: str | None = Field(default=None, max_length=120)
+
+    @field_validator("reference")
+    @classmethod
+    def reference_is_not_a_secret(cls, value: str | None) -> str | None:
+        return safe_payment_reference(value)
 
 
 class ActualIn(Strict):
@@ -268,6 +285,46 @@ def create_channel(body: ChannelCreate, idempotency_key: str | None = Header(def
     row=db.execute(text("""INSERT INTO payment_channels(tenant_id,name,channel_type,provider,currency_code,active) VALUES(:t,:n,:ct,:p,:c,true) RETURNING id,tenant_id,name,channel_type,provider,currency_code,active,created_at,updated_at"""),{"t":str(tenant_id),"n":body.name.strip(),"ct":body.channel_type,"p":body.provider,"c":body.currency_code}).mappings().one()
     _emit(db,tenant_id,actor,"payment_channel.created","PAYMENT_CHANNEL_CREATED","payment_channel",row["id"],{"name":row["name"],"channel_type":row["channel_type"],"currency_code":row["currency_code"]},request_id)
     result=out(row); _finish(db,idem,201,result,"payment_channel",row["id"]); db.commit(); return result
+
+
+@router.post("/payment-channels/{channel_id}/deactivate")
+def deactivate_channel(
+    channel_id: UUID,
+    body: ChannelDeactivate,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    request_id: str | None = Header(default=None, alias="X-Request-ID"),
+    ctx=Depends(require_permission("financial.configure")),
+):
+    """Stop a payment method being selected for new entries without deleting history."""
+    db, actor, tenant_id, _ = ctx
+    payload = {"channel_id": str(channel_id), "reason": body.reason.strip()}
+    idem, cached, _, cached_body = _idempotency(db, tenant_id, idempotency_key, "commerce.payment_channel.deactivate", payload)
+    if cached:
+        return cached_body
+    try:
+        row = db.execute(text("""
+          SELECT id,tenant_id,name,channel_type,provider,currency_code,active,created_at,updated_at
+          FROM payment_channels WHERE tenant_id=:t AND id=:id FOR UPDATE
+        """), {"t": str(tenant_id), "id": str(channel_id)}).mappings().first()
+        if not row:
+            raise HTTPException(404, "Payment method not found")
+        if row["active"]:
+            db.execute(text("UPDATE payment_channels SET active=false,updated_at=now() WHERE tenant_id=:t AND id=:id"), {"t": str(tenant_id), "id": str(channel_id)})
+            _emit(db, tenant_id, actor, "payment_method.deactivated", "PAYMENT_METHOD_DEACTIVATED", "payment_channel", channel_id, {"name": row["name"], "reason": body.reason.strip()}, request_id)
+        updated = db.execute(text("""
+          SELECT id,tenant_id,name,channel_type,provider,currency_code,active,created_at,updated_at
+          FROM payment_channels WHERE tenant_id=:t AND id=:id
+        """), {"t": str(tenant_id), "id": str(channel_id)}).mappings().one()
+        result = out(updated)
+        _finish(db, idem, 200, result, "payment_channel", channel_id)
+        db.commit()
+        return result
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(400, "Could not update this payment method. Refresh and try again.") from exc
 
 
 @router.get("/products")
@@ -573,7 +630,13 @@ def create_reconciliation(body: ReconciliationCreate, idempotency_key: str | Non
             result=out(existing)
             _finish(db,idem,200,result,"reconciliation",existing["id"]); db.commit(); return result
         rid=db.execute(text("INSERT INTO daily_reconciliations(tenant_id,business_date,status,notes,created_by) VALUES(:t,:d,'OPEN',:n,:u) RETURNING id"),{"t":str(tenant_id),"d":body.business_date,"n":body.notes,"u":str(actor)}).scalar_one()
-        db.execute(text("""INSERT INTO daily_reconciliation_lines(tenant_id,reconciliation_id,payment_channel_id) SELECT :t,:r,id FROM payment_channels WHERE tenant_id=:t AND active=true"""),{"t":str(tenant_id),"r":str(rid)})
+        db.execute(text("""INSERT INTO daily_reconciliation_lines(tenant_id,reconciliation_id,payment_channel_id)
+          SELECT :t,:r,pc.id FROM payment_channels pc
+          WHERE pc.tenant_id=:t AND (
+            pc.active=true
+            OR EXISTS (SELECT 1 FROM payments p WHERE p.tenant_id=pc.tenant_id AND p.payment_channel_id=pc.id AND p.business_date=:d AND p.status='RECORDED')
+            OR EXISTS (SELECT 1 FROM refund_records rr WHERE rr.tenant_id=pc.tenant_id AND rr.payment_channel_id=pc.id AND rr.business_date=:d AND rr.status='RECORDED')
+          )"""),{"t":str(tenant_id),"r":str(rid),"d":body.business_date})
         _emit(db,tenant_id,actor,"reconciliation.started","RECONCILIATION_STARTED","reconciliation",rid,{"business_date":str(body.business_date)},request_id)
         result=db.execute(text("SELECT id,business_date,status,notes,closed_at,created_at FROM daily_reconciliations WHERE tenant_id=:t AND id=:r"),{"t":str(tenant_id),"r":str(rid)}).mappings().one(); result=out(result)
         _finish(db,idem,201,result,"reconciliation",rid); db.commit(); return result
@@ -582,43 +645,60 @@ def create_reconciliation(body: ReconciliationCreate, idempotency_key: str | Non
 
 
 @router.post("/reconciliation-lines/{line_id}/actual")
-def set_actual(line_id: UUID, body: ActualIn, request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.manage"))):
+def set_actual(line_id: UUID, body: ActualIn, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.manage"))):
     db,actor,tenant_id,_=ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
+    payload = body.model_dump(mode="json") | {"line_id": str(line_id)}
+    idem,cached,_,cached_body = _idempotency(db,tenant_id,idempotency_key,"commerce.reconciliation.actual",payload)
+    if cached: return cached_body
     try:
         db.execute(text("SELECT set_reconciliation_line_actual(:id,:a,:n,:u)"),{"id":str(line_id),"a":str(q(body.actual_amount)),"n":body.notes,"u":str(actor)})
         row=db.execute(text("SELECT id,reconciliation_id,payment_channel_id,expected_amount,actual_amount,variance,status,notes,reviewed_by,updated_at FROM daily_reconciliation_lines WHERE tenant_id=:t AND id=:id"),{"t":str(tenant_id),"id":str(line_id)}).mappings().first()
         if not row: raise HTTPException(404,"Reconciliation line not found")
-        _emit(db,tenant_id,actor,"reconciliation.actual_entered","ACTUAL_SETTLEMENT_ENTERED","reconciliation_line",line_id,{"actual_amount":str(q(body.actual_amount))},request_id); db.commit(); return out(row)
+        result = out(row)
+        _emit(db,tenant_id,actor,"reconciliation.actual_entered","ACTUAL_SETTLEMENT_ENTERED","reconciliation_line",line_id,{"actual_amount":str(q(body.actual_amount))},request_id)
+        _finish(db,idem,200,result,"reconciliation_line",line_id); db.commit(); return result
     except HTTPException: db.rollback(); raise
-    except Exception as exc: db.rollback(); raise HTTPException(400,str(exc)) from exc
+    except Exception as exc: db.rollback(); raise HTTPException(400,"The actual amount could not be saved. Try again.") from exc
 
 
 @router.post("/reconciliation-lines/{line_id}/resolve")
-def resolve_line(line_id: UUID, body: ResolveIn, request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.resolve"))):
+def resolve_line(line_id: UUID, body: ResolveIn, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.resolve"))):
     db,actor,tenant_id,_=ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
+    payload = body.model_dump(mode="json") | {"line_id": str(line_id)}
+    idem,cached,_,cached_body = _idempotency(db,tenant_id,idempotency_key,"commerce.reconciliation.resolve",payload)
+    if cached: return cached_body
     try:
         db.execute(text("SELECT resolve_reconciliation_line(:id,:s,:u,:n)"),{"id":str(line_id),"s":body.status,"u":str(actor),"n":body.notes})
         row=db.execute(text("SELECT id,reconciliation_id,payment_channel_id,expected_amount,actual_amount,variance,status,notes,reviewed_by,updated_at FROM daily_reconciliation_lines WHERE tenant_id=:t AND id=:id"),{"t":str(tenant_id),"id":str(line_id)}).mappings().first()
         if not row: raise HTTPException(404,"Reconciliation line not found")
-        _emit(db,tenant_id,actor,"reconciliation.variance_resolved","VARIANCE_RESOLVED","reconciliation_line",line_id,{"status":body.status},request_id); db.commit(); return out(row)
+        result = out(row)
+        _emit(db,tenant_id,actor,"reconciliation.variance_resolved","VARIANCE_RESOLVED","reconciliation_line",line_id,{"status":body.status},request_id)
+        _finish(db,idem,200,result,"reconciliation_line",line_id); db.commit(); return result
     except HTTPException: db.rollback(); raise
-    except Exception as exc: db.rollback(); raise HTTPException(400,str(exc)) from exc
+    except Exception as exc: db.rollback(); raise HTTPException(400,"The difference could not be marked as reviewed.") from exc
 
 
 @router.post("/reconciliations/{reconciliation_id}/close")
-def close_reconciliation(reconciliation_id: UUID, request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.close"))):
+def close_reconciliation(reconciliation_id: UUID, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("reconciliation.close"))):
     db,actor,tenant_id,_=ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
+    payload = {"reconciliation_id": str(reconciliation_id)}
+    idem,cached,_,cached_body = _idempotency(db,tenant_id,idempotency_key,"commerce.reconciliation.close",payload)
+    if cached: return cached_body
     try:
-        db.execute(text("SELECT close_daily_reconciliation(:id)"),{"id":str(reconciliation_id)})
-        db.execute(text("UPDATE daily_reconciliations SET closed_by=:u,updated_at=now() WHERE tenant_id=:t AND id=:id"),{"u":str(actor),"t":str(tenant_id),"id":str(reconciliation_id)})
-        row=db.execute(text("SELECT id,business_date,status,closed_at FROM daily_reconciliations WHERE tenant_id=:t AND id=:id"),{"t":str(tenant_id),"id":str(reconciliation_id)}).mappings().first()
-        if not row: raise HTTPException(404,"Reconciliation not found")
-        _emit(db,tenant_id,actor,"reconciliation.closed","DAY_CLOSED","reconciliation",reconciliation_id,{"business_date":str(row["business_date"])},request_id); db.commit(); return out(row)
+        existing = db.execute(text("SELECT id,business_date,status,closed_at FROM daily_reconciliations WHERE tenant_id=:t AND id=:id FOR UPDATE"),{"t":str(tenant_id),"id":str(reconciliation_id)}).mappings().first()
+        if not existing: raise HTTPException(404,"End-of-day check not found")
+        if existing["status"] != "CLOSED":
+            db.execute(text("SELECT close_daily_reconciliation(:id)"),{"id":str(reconciliation_id)})
+            db.execute(text("UPDATE daily_reconciliations SET closed_by=:u,updated_at=now() WHERE tenant_id=:t AND id=:id"),{"u":str(actor),"t":str(tenant_id),"id":str(reconciliation_id)})
+            _emit(db,tenant_id,actor,"reconciliation.closed","DAY_CLOSED","reconciliation",reconciliation_id,{"business_date":str(existing["business_date"])},request_id)
+        row=db.execute(text("SELECT id,business_date,status,closed_at FROM daily_reconciliations WHERE tenant_id=:t AND id=:id"),{"t":str(tenant_id),"id":str(reconciliation_id)}).mappings().one()
+        result = out(row)
+        _finish(db,idem,200,result,"reconciliation",reconciliation_id); db.commit(); return result
     except HTTPException: db.rollback(); raise
-    except Exception as exc: db.rollback(); raise HTTPException(400,str(exc)) from exc
+    except Exception as exc: db.rollback(); raise HTTPException(400,"This end-of-day check cannot be finished yet. Enter all actual amounts and review any differences.") from exc
 
 class ReturnLineIn(Strict):
     sale_line_id: UUID

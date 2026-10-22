@@ -4,7 +4,7 @@ import { useId } from "react";
 import type { AnalyticsDailyMetric } from "../lib/api";
 
 const money = (value: string | number, currencyCode?: string | null) => {
-  if (!currencyCode || !/^[A-Z]{3}$/.test(currencyCode)) return "Currency unavailable";
+  if (!currencyCode || !/^[A-Z]{3}$/.test(currencyCode)) return "Business currency not set";
   try { return new Intl.NumberFormat("en-UG", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(Number(value)); }
   catch { return `${currencyCode} ${Number(value).toLocaleString("en-UG", { maximumFractionDigits: 0 })}`; }
 };
@@ -85,7 +85,7 @@ export function SalesTrendChart({ daily, startDate, endDate, currencyCode }: {
     return <div className="chart-empty-state">
       <span className="chart-empty-mark" aria-hidden="true">⌁</span>
       <strong>No sales metrics in this period</strong>
-      <span>There are no daily analytics records between {dateLabel(startDate, "long")} and {dateLabel(endDate, "long")}. LEXA has not replaced missing data with zeroes.</span>
+      <span>No daily figures were recorded between {dateLabel(startDate, "long")} and {dateLabel(endDate, "long")}. Missing dates are left blank rather than shown as zero.</span>
     </div>;
   }
 
@@ -97,7 +97,7 @@ export function SalesTrendChart({ daily, startDate, endDate, currencyCode }: {
     </div>
     <svg className="sales-trend-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${titleId} ${descriptionId}`}>
       <title id={titleId}>Net sales and payments collected over time</title>
-      <desc id={descriptionId}>Two series are drawn from LEXA's daily analytics records. Gaps in returned dates are left as gaps; they are not interpreted as zero activity.</desc>
+      <desc id={descriptionId}>The lines use saved daily sales and payment figures. Missing dates are left blank rather than counted as zero activity.</desc>
       {yTicks.map((value, index) => {
         const y = yFor(value);
         return <g key={`y-${index}`}>
@@ -122,7 +122,7 @@ export function SalesTrendChart({ daily, startDate, endDate, currencyCode }: {
       </g>)}
     </svg>
     <details className="chart-data-details">
-      <summary>View the underlying daily data</summary>
+      <summary>View daily figures</summary>
       <div className="chart-data-table-wrap">
         <table className="data-table chart-data-table">
           <thead><tr><th scope="col">Business date</th><th scope="col">Net sales</th><th scope="col">Collected</th><th scope="col">Returns</th><th scope="col">Expenses</th></tr></thead>
@@ -136,5 +136,23 @@ export function SalesTrendChart({ daily, startDate, endDate, currencyCode }: {
         </table>
       </div>
     </details>
+  </div>;
+}
+
+
+/** Product comparison chart built only from saved report rows. */
+export function ProductPerformanceBars({ rows, currencyCode }: {
+  rows: Array<{ label: string; value: number; detail?: string }>;
+  currencyCode?: string | null;
+}) {
+  const safeRows = rows.filter(row => Number.isFinite(row.value)).slice(0, 8);
+  const maxValue = Math.max(1, ...safeRows.map(row => Math.max(0, row.value)));
+  if (!safeRows.length) return <div className="chart-empty-state"><strong>No product sales in this period</strong><span>Product comparisons will appear after sales are recorded.</span></div>;
+  return <div className="product-comparison-bars" role="img" aria-label="Product sales comparison">
+    {safeRows.map((row, index) => <div className="product-comparison-row" key={`${row.label}-${index}`}>
+      <div className="product-comparison-label"><strong>{row.label}</strong><small>{row.detail || ""}</small></div>
+      <div className="product-comparison-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
+      <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
+    </div>)}
   </div>;
 }

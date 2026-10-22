@@ -16,30 +16,31 @@ const charts = fs.readFileSync(new URL("components/dashboard-charts.tsx", root),
 const apiRoutes = fs.readFileSync(new URL("../../../apps/api/app/routes/analytics.py", import.meta.url), "utf8");
 
 test("Phase 4 reports apply a validated range, use workspace currency and distinguish unavailable from zero", () => {
-  assert.match(reports, /Apply period/);
+  assert.match(reports, /Show these dates/);
   assert.match(reports, /nextFrom > nextTo/);
   assert.match(reports, /getBusinessProfile\(\)/);
   assert.match(reports, /currency: currencyCode/);
-  assert.match(reports, /Source data was not confirmed/);
-  assert.match(reports, /All-time customer history; not filtered by the selected period/);
-  assert.match(reports, /Current inventory snapshot; not historical at the selected period/);
-  assert.match(reports, /No records for the selected reporting period/);
+  assert.match(reports, /Unavailable/);
+  assert.match(reports, /No records/);
+  assert.match(reports, /Customer history covers all dates, not just the selected period/);
+  assert.match(reports, /Shows current stock, not stock as it was on the selected dates/);
+  assert.match(reports, /No sales were recorded during these dates/);
 });
 
 test("Phase 5 returns can submit multiple sale lines and let the server enforce remaining quantities", () => {
   assert.match(commerce, /returnQuantities/);
   assert.match(commerce, /enteredLines\.map\(\(line\) => \(\{ sale_line_id: line\.sale_line_id, quantity: returnQuantities\[line\.sale_line_id\] \}\)\)/);
-  assert.match(commerce, /Previously returned quantity is also checked by the server/);
+  assert.match(commerce, /LEXA also checks the quantity already returned/);
   assert.match(commerce, /Items and return quantities/);
   assert.doesNotMatch(commerce, /setReturnLineId|returnLineId|returnQty/);
 });
 
 test("Phase 6 exposes age bands, unknown provenance and reconciliation status end-to-end", () => {
-  assert.match(inventory, /"Stock Age"/);
+  assert.match(inventory, /"Age of stock"/);
   assert.match(inventory, /getInventoryAgeing/);
-  assert.match(inventory, /Over 90d/);
-  assert.match(inventory, /UNKNOWN AGE/);
-  assert.match(inventory, /RECONCILE/);
+  assert.match(inventory, /Over 90 days/);
+  assert.match(inventory, /Unknown age/);
+  assert.match(inventory, /Review difference/);
   assert.match(api, /\/api\/v1\/inventory\/ageing/);
   assert.match(api, /aged_over_30/);
   assert.match(api, /unknown_age_quantity/);
@@ -58,12 +59,12 @@ test("Phase 6 stock health surfaces stockout and slow-movement exceptions from c
 
 test("Phase 4 inventory and product monetary displays never silently assume UGX", () => {
   assert.match(inventory, /getBusinessProfile\(\)/);
-  assert.match(inventory, /Currency unavailable/);
+  assert.match(inventory, /Business currency not set/);
   assert.match(products, /getBusinessProfile\(\)/);
-  assert.match(products, /Currency unavailable/);
+  assert.match(products, /Business currency not set/);
   assert.match(products, /style: "currency", currency,/);
   for (const source of [dashboard, commercePage, accounting, charts]) {
-    assert.match(source, /Currency unavailable/);
+    assert.match(source, /Business currency not set/);
     assert.doesNotMatch(source, /currencyCode\s*=\s*"UGX"|currency:\s*"UGX"/);
   }
   assert.match(dashboard, /getBusinessProfile\(\)/);

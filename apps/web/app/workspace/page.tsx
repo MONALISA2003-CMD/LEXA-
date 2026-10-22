@@ -32,18 +32,18 @@ export default function WorkspacePage() {
     } finally { setBusyId(""); }
   }
 
-  return <AppShell title="Workspace selection" eyebrow="Your access">
+  return <AppShell title="Switch business" eyebrow="Your businesses">
     <section className="panel" style={{ padding: "1.25rem", maxWidth: 860 }}>
-      <div className="panel-head"><div><p className="eyebrow">AUTHORIZED WORKSPACES</p><h2>Choose where to work</h2></div></div>
-      <p>These choices come from active memberships verified by LEXA. Only workspaces you are authorized to access appear here.</p>
+      <div className="panel-head"><div><p className="eyebrow">YOUR BUSINESSES</p><h2>Choose where to work</h2></div></div>
+      <p>Only businesses you have access to appear here.</p>
       {error && <div className="notice notice-error" role="alert">{error}</div>}
-      {loading ? <p role="status">Checking workspace memberships…</p> : items.length === 0 ? <div className="empty-state"><strong>No active workspace found</strong><span>Ask a workspace owner to send you an invitation.</span><Link href="/login" className="button button-soft">Return to sign in</Link></div> : <div className="workspace-choice-list">
+      {loading ? <p role="status">Loading your businesses…</p> : items.length === 0 ? <div className="empty-state"><strong>No business is available yet</strong><span>Ask the business owner to invite you.</span><Link href="/login" className="button button-soft">Return to sign in</Link></div> : <div className="workspace-choice-list">
         {items.map(item => <article key={item.tenant_id} className="workspace-choice" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", padding: "1rem 0", borderBottom: "1px solid var(--border, #ddd)" }}>
-          <div><strong>{item.tenant_name}</strong><div><small>{item.current ? "Current workspace" : "Active membership"}</small></div></div>
-          <button className="button button-dark" type="button" disabled={item.current || Boolean(busyId)} onClick={() => void choose(item)}>{busyId === item.tenant_id ? "Switching…" : item.current ? "Current" : "Open workspace"}</button>
+          <div><strong>{item.tenant_name}</strong><div><small>{item.current ? "Current business" : "Available to you"}</small></div></div>
+          <button className="button button-dark" type="button" disabled={item.current || Boolean(busyId)} onClick={() => void choose(item)}>{busyId === item.tenant_id ? "Switching…" : item.current ? "Current" : "Open business"}</button>
         </article>)}
       </div>}
-      <p style={{ marginTop: "1rem" }}><Link href="/onboarding" className="text-link">Continue workspace setup →</Link></p>
+      <p style={{ marginTop: "1rem" }}><Link href="/onboarding" className="text-link">Finish business setup →</Link></p>
     </section>
   </AppShell>;
 }

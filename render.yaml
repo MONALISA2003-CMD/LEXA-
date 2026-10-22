@@ -5,7 +5,7 @@ services:
     rootDir: apps/api
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /ready
+    healthCheckPath: /health  # Liveness only; /ready separately reports schema/dependency readiness
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.5

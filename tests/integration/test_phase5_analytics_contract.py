@@ -18,4 +18,4 @@ def test_phase5_analytics_api_and_reports_surface():
     assert '@router.get("/inventory-health")' in api
     assert '@router.post("/refresh")' in api
     assert "getAnalyticsOverview" in page
-    assert "Rebuild analytics" in page
+    assert "Refresh reports" in page

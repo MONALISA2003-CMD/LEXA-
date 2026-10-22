@@ -52,9 +52,9 @@ test('shared primitives are adopted by dashboard loading and product-status bran
   const products = readFileSync(resolve(webRoot, 'app/products/page.tsx'), 'utf8');
   assert.match(dashboard, /import \{ Skeleton \} from "\.\.\/components\/ui"/);
   assert.match(dashboard, /function LoadingPlaceholder\(/);
-  assert.match(dashboard, /<LoadingPlaceholder label="Loading operational exceptions…"/);
-  assert.match(dashboard, /<LoadingPlaceholder label="Loading daily business metrics…"/);
-  assert.match(chart, /View the underlying daily data/);
+  assert.match(dashboard, /<LoadingPlaceholder label="Loading items that need attention…"/);
+  assert.match(dashboard, /<LoadingPlaceholder label="Loading the sales trend…"/);
+  assert.match(chart, /View daily figures/);
   assert.match(products, /import \{ Badge, ResponsiveDataTable \} from "\.\.\/\.\.\/components\/ui"/);
   assert.match(products, /<Badge variant=\{product\.status === "ACTIVE" \? "success" : "neutral"\}>/);
 });

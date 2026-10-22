@@ -23,7 +23,7 @@ const workflow = readFileSync(path.resolve(web, '..', '..', '.github', 'workflow
 });
 
 test('supplier terms, effective supplier costs, landed cost and explicit invoice exceptions are visible', () => {
-  for (const phrase of ['Payment terms (days)', 'Use supplier price', 'landed_costs', 'WAITING_RECEIPT', 'Approve pre-receipt exception', 'Drafts do not change stock until posted.']) {
+  for (const phrase of ['Payment terms (days)', 'Use supplier price', 'landed_costs', 'WAITING_RECEIPT', 'Allow bill before delivery', 'Draft deliveries do not change stock until you record them.']) {
     assert.ok(page.includes(phrase), `missing workflow/guardrail wording ${phrase}`);
   }
   assert.match(api, /Idempotency-Key/);

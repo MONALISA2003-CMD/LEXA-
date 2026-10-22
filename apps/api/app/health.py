@@ -9,6 +9,24 @@ from .config import settings
 EXPECTED_DATABASE = "neondb"
 REQUIRED_AUTH_MIGRATION = "028_phase0_auth_rls_runtime_hardening"
 REQUIRED_AUTH_FUNCTION = "public.lexa_find_session_by_refresh_hash(text)"
+# The API must not report full readiness while the transactional modules expect
+# schema changes that have not been installed. Migration 032 is intentionally
+# excluded: it is documented as QA-branch-only in migrations/SOURCE_RECOVERY.md.
+REQUIRED_APP_MIGRATIONS = (
+    "033_phase5_refund_settlement_consistency",
+    "034_phase5_return_accounting_journals",
+    "035_phase5_none_return_receivable_guard",
+    "036_phase6_inventory_intelligence",
+    "037_phase6_inventory_ageing_index",
+    "038_phase6_movement_health_indexes",
+    "039_phase7_supplier_ledger_landed_costs",
+    "040_phase8_finance_workflows",
+)
+REQUIRED_SCHEMA_COLUMNS = (
+    ("suppliers", "supplier_party_id"),
+    ("expense_records", "reversal_journal_entry_id"),
+    ("analytics_daily_business_metrics", "expense_reversals_total"),
+)
 logger = logging.getLogger("lexa.health")
 REQUIRED_TABLES = (
     "schema_migrations",
@@ -41,6 +59,13 @@ REQUIRED_TABLES = (
     "stock_count_lines",
     "inventory_transfers",
     "inventory_transfer_lines",
+    # Purchasing and finance records referenced by the current API release.
+    "purchase_landed_costs",
+    "purchase_landed_cost_allocations",
+    "supplier_bills",
+    "supplier_payments",
+    "supplier_payment_allocations",
+    "supplier_ledger_entries",
 )
 
 
@@ -144,10 +169,59 @@ def check_database() -> tuple[bool, str | dict[str, object] | None]:
             present = {row[0] for row in result}
             missing = [table for table in REQUIRED_TABLES if table not in present]
             if missing:
+                logger.warning(
+                    "application_schema_readiness_failed",
+                    extra={
+                        "missing_tables": missing,
+                        "database": actual["database"],
+                        "project_id": actual["project_id"],
+                        "branch_id": actual["branch_id"],
+                    },
+                )
                 if settings.app_env.strip().lower() != "production":
                     return False, {
                         "code": "LEXA_SCHEMA_NOT_READY",
                         "missing_tables": missing,
+                    }
+                return False, "LEXA_SCHEMA_NOT_READY"
+
+            # Check the exact migrations required by this API release. Full names
+            # are used because historical migration number prefixes can collide.
+            migration_result = connection.execute(
+                text("SELECT version FROM public.schema_migrations WHERE version = ANY(:required_versions)"),
+                {"required_versions": list(REQUIRED_APP_MIGRATIONS)},
+            )
+            present_migrations = {str(row[0]) for row in migration_result}
+            missing_migrations = [v for v in REQUIRED_APP_MIGRATIONS if v not in present_migrations]
+
+            column_result = connection.execute(text("""
+                SELECT table_name, column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND (
+                    (table_name = 'suppliers' AND column_name = 'supplier_party_id') OR
+                    (table_name = 'expense_records' AND column_name = 'reversal_journal_entry_id') OR
+                    (table_name = 'analytics_daily_business_metrics' AND column_name = 'expense_reversals_total')
+                )
+            """))
+            present_columns = {(str(row[0]), str(row[1])) for row in column_result}
+            missing_columns = [f"{table}.{column}" for table, column in REQUIRED_SCHEMA_COLUMNS if (table, column) not in present_columns]
+
+            if missing_migrations or missing_columns:
+                logger.warning(
+                    "application_schema_readiness_failed",
+                    extra={
+                        "missing_migrations": missing_migrations,
+                        "missing_columns": missing_columns,
+                        "database": actual["database"],
+                        "project_id": actual["project_id"],
+                        "branch_id": actual["branch_id"],
+                    },
+                )
+                if settings.app_env.strip().lower() != "production":
+                    return False, {
+                        "code": "LEXA_SCHEMA_NOT_READY",
+                        "missing_migrations": missing_migrations,
+                        "missing_columns": missing_columns,
                     }
                 return False, "LEXA_SCHEMA_NOT_READY"
 

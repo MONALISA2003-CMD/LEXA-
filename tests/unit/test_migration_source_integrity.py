@@ -90,7 +90,7 @@ def test_phase6_clean_replay_manifest_and_new_migration_are_additive_and_tenant_
 def test_deployment_docs_distinguish_liveness_from_readiness():
     guide = (ROOT / "docs/DEPLOYMENT_RENDER_VERCEL.md").read_text()
     render = (ROOT / "render.yaml").read_text()
-    assert "healthCheckPath: /ready" in render
+    assert "healthCheckPath: /health" in render
     assert "`/ready`" in guide
     assert "`/health` is process liveness only" in guide
     assert "name: LEXA" in render

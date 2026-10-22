@@ -6,7 +6,7 @@ PAGE = ROOT / "apps/web/app/commerce/page.tsx"
 
 def test_commerce_page_covers_core_workflows():
     source = PAGE.read_text()
-    for label in ("Sell", "Customers", "Payment Channels", "Receivables", "Reconciliation", "Returns", "Sales History"):
+    for label in ("New sale", "Customers", "Payment methods", "Customer balances", "End-of-day check", "Returns", "Past sales"):
         assert f'"{label}"' in source
     for action in ("createCommerceSale", "createCommerceCustomer", "createPaymentChannel", "payReceivable", "createReconciliation", "setReconciliationActual", "resolveReconciliationLine", "closeReconciliation", "createSaleReturn"):
         assert action in source

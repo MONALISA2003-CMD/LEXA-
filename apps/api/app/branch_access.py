@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from .models import Branch, Location, TenantMembership, Warehouse
+from .models import Branch, Location, MembershipRole, Role, TenantMembership, Warehouse
 from .workspace_models import MembershipBranchAssignment
 
 
@@ -18,6 +18,18 @@ def assigned_branch_ids(db: Session, *, tenant_id: UUID, user_id: UUID) -> set[U
     ))
     if not membership_id:
         raise HTTPException(status_code=403, detail="Active workspace membership required")
+    # Owners and administrators manage the whole workspace. PostgreSQL's
+    # lexa_can_access_branch() already grants these roles full branch scope; keep
+    # Python guards aligned so the same user is not rejected by a stricter helper.
+    roles = set(db.scalars(
+        select(Role.name)
+        .join(MembershipRole, MembershipRole.role_id == Role.id)
+        .where(MembershipRole.membership_id == membership_id, Role.tenant_id == tenant_id)
+    ).all())
+    if roles.intersection({"Owner", "Administrator", "Admin"}):
+        return set(db.scalars(select(Branch.id).where(
+            Branch.tenant_id == tenant_id, Branch.status == "ACTIVE"
+        )).all())
     return set(db.scalars(
         select(MembershipBranchAssignment.branch_id)
         .join(Branch, (Branch.id == MembershipBranchAssignment.branch_id) & (Branch.tenant_id == MembershipBranchAssignment.tenant_id))
@@ -79,8 +91,16 @@ def require_full_branch_scope(db: Session, *, tenant_id: UUID, user_id: UUID) ->
         Branch.tenant_id == tenant_id, Branch.status == "ACTIVE"
     )).all())
     assigned = assigned_branch_ids(db, tenant_id=tenant_id, user_id=user_id)
-    if not active_branches or not active_branches.issubset(assigned):
-        raise HTTPException(status_code=403, detail="This operation spans the workspace; access to every active branch is required")
+    if not active_branches:
+        raise HTTPException(status_code=409, detail={
+            "code": "WORKSPACE_SETUP_REQUIRED",
+            "message": "Finish setting up your business locations before opening this view.",
+        })
+    if not active_branches.issubset(assigned):
+        raise HTTPException(status_code=403, detail={
+            "code": "BRANCH_ACCESS_REQUIRED",
+            "message": "Your access needs to include every branch shown in this report. Ask your workspace owner to review it.",
+        })
     # Tenant-wide rollups/rebuilds would otherwise touch legacy locations that bypass
     # branch scope through a NULL or inactive branch link.
     unscoped_location = db.scalar(select(Location.id)

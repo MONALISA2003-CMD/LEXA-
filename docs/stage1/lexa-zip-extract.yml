@@ -1,0 +1,171 @@
+name: LEXA ZIP Extractor
+
+on:
+  push:
+    paths:
+      - "**/*.zip"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lexa-zip-extractor
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    name: Validate and extract canonical LEXA source
+    if: "!contains(github.event.head_commit.message, '[lexa-extractor]')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate, normalize and extract source packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path, PurePosixPath
+          from zipfile import ZipFile, BadZipFile
+          import shutil
+
+          ROOT = Path('.').resolve()
+          PROTECTED_PREFIXES = (PurePosixPath('.github/workflows'),)
+          PROTECTED_FILES = {PurePosixPath('.github/dependabot.yml')}
+          MANIFEST_NAMES = {'DELETE.txt', '.lexa-delete'}
+          REQUIRED_MARKERS = ('apps/web/package.json', 'apps/api/app/main.py')
+
+          def validate(name: str) -> PurePosixPath:
+              p = PurePosixPath(name)
+              if p.is_absolute() or '..' in p.parts or not p.parts:
+                  raise RuntimeError(f'Unsafe path in ZIP: {name}')
+              return p
+
+          def protected(path: PurePosixPath) -> bool:
+              if path in PROTECTED_FILES:
+                  return True
+              return any(path == prefix or prefix in path.parents for prefix in PROTECTED_PREFIXES)
+
+          def detect_wrapper(names: list[str]) -> str | None:
+              # A valid package is either at ZIP root or under exactly one wrapper
+              # such as LEXA/ or source/. Ambiguous archives fail closed.
+              candidates = set()
+              for name in names:
+                  normalized = name.rstrip('/')
+                  for marker in REQUIRED_MARKERS:
+                      suffix = '/' + marker
+                      if normalized == marker:
+                          candidates.add('')
+                      elif normalized.endswith(suffix):
+                          candidates.add(normalized[:-len(suffix)])
+              valid = []
+              for prefix in candidates:
+                  def has(path: str) -> bool:
+                      key = f'{prefix}/{path}' if prefix else path
+                      return key in names
+                  if all(has(marker) for marker in REQUIRED_MARKERS):
+                      if any(n == (f'{prefix}/migrations' if prefix else 'migrations') or n.startswith((f'{prefix}/migrations/' if prefix else 'migrations/')) for n in names):
+                          valid.append(prefix)
+              if len(valid) == 1:
+                  return valid[0]
+              if not valid:
+                  return None
+              raise RuntimeError(f'ZIP contains multiple possible LEXA source roots: {valid}')
+
+          archives = sorted(p for p in ROOT.rglob('*.zip') if '.git' not in p.parts)
+          if not archives:
+              print('No ZIP packages found; nothing to do.')
+              raise SystemExit(0)
+
+          for archive in archives:
+              print(f'Processing {archive.relative_to(ROOT)}')
+              delete_entries: list[str] = []
+              try:
+                  with ZipFile(archive, 'r') as zf:
+                      names = [n for n in zf.namelist() if not n.endswith('/')]
+                      for name in names:
+                          validate(name)
+                      wrapper = detect_wrapper(names)
+                      # ZIPs unrelated to LEXA source are not extracted by this workflow.
+                      if wrapper is None:
+                          print(f'Skipping ZIP without a recognizable LEXA source tree: {archive.name}')
+                          archive.unlink()
+                          continue
+
+                      manifest_paths = [n for n in names if PurePosixPath(n).name in MANIFEST_NAMES]
+                      for manifest in manifest_paths:
+                          for line in zf.read(manifest).decode('utf-8').splitlines():
+                              entry = line.strip()
+                              if not entry or entry.startswith('#'):
+                                  continue
+                              candidate = validate(entry)
+                              if wrapper and candidate.parts and candidate.parts[0] == wrapper:
+                                  stripped = candidate.parts[1:]
+                                  # A path that collapses to empty only names the
+                                  # package wrapper itself; it is not a repository deletion.
+                                  if not stripped:
+                                      continue
+                                  candidate = PurePosixPath(*stripped)
+                              delete_entries.append(candidate.as_posix())
+
+                      for name in names:
+                          entry = validate(name)
+                          if entry.name in MANIFEST_NAMES:
+                              continue
+                          if wrapper:
+                              if entry.parts[0] != wrapper:
+                                  # Ignore adjacent documentation/archive wrapper entries.
+                                  continue
+                              entry = PurePosixPath(*entry.parts[1:])
+                              if not entry.parts:
+                                  continue
+                          if protected(entry):
+                              print(f'Protected automation path skipped: {entry}')
+                              continue
+                          destination = ROOT.joinpath(*entry.parts)
+                          destination.parent.mkdir(parents=True, exist_ok=True)
+                          with zf.open(name, 'r') as source, destination.open('wb') as target:
+                              shutil.copyfileobj(source, target)
+                          print(f'Extracted canonical path: {entry}')
+              except BadZipFile as exc:
+                  raise RuntimeError(f'Invalid ZIP archive: {archive}') from exc
+
+              for entry_text in delete_entries:
+                  entry = validate(entry_text)
+                  if protected(entry):
+                      print(f'Protected deletion blocked: {entry}')
+                      continue
+                  target = ROOT.joinpath(*entry.parts)
+                  try:
+                      target.resolve().relative_to(ROOT)
+                  except ValueError as exc:
+                      raise RuntimeError(f'Deletion outside repository blocked: {entry}') from exc
+                  if not target.exists():
+                      continue
+                  if target.is_dir():
+                      shutil.rmtree(target)
+                  else:
+                      target.unlink()
+                  print(f'Removed obsolete path: {entry}')
+              archive.unlink(missing_ok=True)
+              print(f'Finished {archive.name}')
+          PY
+
+      - name: Review and commit extracted files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short
+          git config user.name "lexa-automation[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: extract canonical LEXA source [lexa-extractor]"
+          git push
