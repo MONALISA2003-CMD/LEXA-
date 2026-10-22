@@ -10,6 +10,15 @@ printf '\n== Frontend contract and report export tests ==\n'
 printf '\n== Python source compilation ==\n'
 python -m compileall -q apps/api/app
 printf 'Python compilation passed.\n'
+printf '\n== Stage 1 migration recovery manifest consistency ==\n'
+python scripts/check_migration_recovery_manifest.py
+
+printf '\n== Stage 1 migration source reconciliation (semantic replay remains separate) ==\n'
+python scripts/check_migration_sources.py --strict
+
+printf '\n== Stage 1–5 frontend action and destination audit ==\n'
+node scripts/audit_frontend_actions.mjs
+
 printf '\n== Migration manifest / hash validation (plan only) ==\n'
 python scripts/run_clean_migration_replay.py --plan-only
 

@@ -37,14 +37,18 @@ export default function CustomersPage() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     const results = await Promise.allSettled([getCommerceCustomers(search), getReceivables(), getBusinessProfile()]);
-    if (results[0].status === "fulfilled") {
-      setCustomers(results[0].value);
-      setSelected(current => current || results[0].value[0]?.party_id || "");
-    } else setError(userFacingError(results[0].reason, "Customer details could not be loaded. Please try again."));
-    if (results[1].status === "fulfilled") setReceivables(results[1].value);
-    else setError(current => current || userFacingError(results[1].reason, "Customer balances could not be loaded. Please try again."));
-    if (results[2].status === "fulfilled") {
-      const code = results[2].value.currency_code?.toUpperCase();
+    const customerResult = results[0];
+    if (customerResult.status === "fulfilled") {
+      const loadedCustomers = customerResult.value;
+      setCustomers(loadedCustomers);
+      setSelected(current => current || loadedCustomers[0]?.party_id || "");
+    } else setError(userFacingError(customerResult.reason, "Customer details could not be loaded. Please try again."));
+    const receivableResult = results[1];
+    if (receivableResult.status === "fulfilled") setReceivables(receivableResult.value);
+    else setError(current => current || userFacingError(receivableResult.reason, "Customer balances could not be loaded. Please try again."));
+    const profileResult = results[2];
+    if (profileResult.status === "fulfilled") {
+      const code = profileResult.value?.currency_code?.toUpperCase();
       if (code && /^[A-Z]{3}$/.test(code)) setCurrency(code); else setCurrency(null);
     }
     setLoading(false);

@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "project": "LEXA",
-  "candidate": "2.13.0+stage4-5.candidate.20261022",
+  "candidate": "2.13.1+stage1-5-buildfix.candidate.20261022",
   "date": "2026-10-22",
   "layout": "repository-root-overlay",
   "stages": {
@@ -14,13 +14,19 @@
   "deployed": false,
   "acceptance": {
     "backend_tests_passed": 262,
-    "frontend_contract_tests_passed": 53,
+    "frontend_contract_tests_passed": 54,
     "typescript_tsx_syntax_files": 35,
     "typescript_tsx_syntax_errors": 0,
     "python_compileall": true,
-    "clean_db_replay": "NOT_RUN",
-    "full_node24_build": "NOT_RUN",
-    "authenticated_browser_e2e": "NOT_RUN"
+    "clean_db_replay": "PLAN_ONLY_PASS; live Neon lexa-live read-only audit confirms migration ledger stops at 031 and lacks 033–040",
+    "full_node24_build": "NOT RUN: local Node is 22.16.0; npm ci --offline blocked by ENOTCACHED for undici-types@6.21.0. Known Vercel type errors are patched in candidate; new remote build required.",
+    "authenticated_browser_e2e": "NOT_RUN",
+    "typescript_tsx_syntax": "PASS 35 files, 0 syntax errors with global TS 5.8.3; full Node 24 project typecheck/build not run locally",
+    "live_vercel_deployment": "ERROR on main cf25deac57832ac897f76a86b03928664a85ddb6; fix patched in source but unverified remotely",
+    "stable_frontend_alias": "lexa-green.vercel.app remains on prior READY commit f1e0e2f1373d7912ae1cab694615990071ef07b4",
+    "live_database_schema": "Neon LEXA/lexa-live latest ledger 031; supplier_bills, supplier_payments, supplier_ledger_entries and Phase 8 reversal postconditions absent; no SQL applied",
+    "render": "PENDING user confirmation for My Workspace; no service mutation",
+    "zip_extracted_acceptance_runner": "PASS: 262 backend tests, 54 frontend contract tests, Python compileall, migration source checks, frontend action audit and 44-input plan/hash check; full Node 24 build and live replay/e2e explicitly blocked/not run."
   },
   "research_sources": [
     "https://www.tdi.texas.gov/styleguide/style-guide-for-data-visualization-tools.html",

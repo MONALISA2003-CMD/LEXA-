@@ -1,6 +1,6 @@
 {
-  "package": "LEXA Stage 4 Reporting + Stage 5 Acceptance Candidate",
-  "version": "2.13.0+stage4-5.candidate.20261022",
+  "package": "LEXA Stages 1–5 Build-Fix Candidate (Live Drift Audit)",
+  "version": "2.13.1+stage1-5-buildfix.candidate.20261022",
   "layout": "repository-root",
   "changes": [
     "Added tenant-scoped chart of accounts, accounting periods, journal entries and journal lines",
@@ -151,7 +151,11 @@
     "Stage 4: added stock-cost value by location, customer balance, business-location sales and payment-method charts backed by authorized application data.",
     "Stage 5: clean replay manifest extended to migration 040 and postcondition checks cover Phase 8 expense correction/posting/reporting schema.",
     "Stage 5: evidence checker requires Phase 8 postconditions and immutable source SHA; acceptance runner contains separate opt-in read-only reports and staging-only sales/purchasing journeys.",
-    "Stage 5: canonical source paths and ZIP wrapper normalization are preserved; no production SQL or live deployment is performed by this package."
+    "Stage 5: canonical source paths and ZIP wrapper normalization are preserved; no production SQL or live deployment is performed by this package.",
+    "Patched verified Vercel TypeScript failures in Finance and Customers Promise.allSettled narrowing and nullable profile currency access.",
+    "Corrected supplier-bill UI field to match_variance, matching the backend response type.",
+    "Added frontend regression assertions for the exact Vercel TypeScript failures observed on main commit cf25deac57832ac897f76a86b03928664a85ddb6.",
+    "Added dated Stage 1–5 live audit: latest Vercel deployment fails typechecking; stable alias remains on older READY commit; current Neon lexa-live migration ledger only reaches 031 and lacks Phase 7 supplier tables plus Phase 8 reversal schema."
   ],
   "protected_paths": [
     ".github/workflows/"
@@ -161,10 +165,10 @@
   "seed_reset": false,
   "product_deletion": false,
   "description": "Full-source LEXA Phase 7 finalization candidate. Includes two fixes for TypeScript errors observed in the current Vercel baseline and regression contracts. GitHub write access was denied; current main does not contain the packaged CI workflow; disposable replay, authenticated staging E2E, candidate deployment parity and production rollout remain pending. Historical six-source replacement disposition remains closed.",
-  "package_version": "2.13.0+stage4-5.candidate.20261022",
+  "package_version": "2.13.1+stage1-5-buildfix.candidate.20261022",
   "phase": 5,
-  "phase_name": "Stage 4 Reporting and Stage 5 Acceptance",
-  "phase_status": "IMPLEMENTED_SOURCE_CANDIDATE_NOT_ACCEPTED",
+  "phase_name": "Stages 1–5 — Vercel Build Fix, Reporting and Acceptance",
+  "phase_status": "BUILD_ERRORS_PATCHED_SOURCE_CANDIDATE_LIVE_ACCEPTANCE_BLOCKED",
   "canonical_neon": {
     "project_id": "wispy-mud-75323042",
     "branch_id": "br-soft-star-b1dj2m2w",
@@ -232,22 +236,28 @@
     "production_database_mutation": false,
     "production_deployment_performed": false
   },
-  "release": "stage4-stage5-candidate-2026-10-22",
-  "release_name": "Stage 4 reports, Stage 5 acceptance harness and Phase 8 migration verification",
+  "release": "stages1-5-buildfix-candidate-2026-10-22",
+  "release_name": "Stages 1–5 canonical source, Vercel TypeScript build fixes, reporting and live parity audit",
   "source_baseline": "Derived from GitHub main dd8fe8f60310831ef80809fe2e517ae80bafd0b2; canonical source changes remain local/unpublished because GitHub write operations returned 403.",
   "canonical_source_parity": false,
-  "release_status": "Source candidate only. Stage 4 reporting changes and Stage 5 acceptance safeguards are implemented and targeted tests pass; clean disposable PostgreSQL replay, Node 24 full build/typecheck, authenticated browser journeys and live Vercel/Render parity remain unverified. No production DB or deployment changes performed.",
+  "release_status": "Source candidate only. Known Vercel TypeScript errors are patched and regression tests pass. Current Vercel alias remains on an older READY deployment; the connected Neon lexa-live branch is missing migrations 033–040 plus supplier bill/payment/ledger and Phase 8 reversal schema. Render account logs await workspace confirmation. No live deployment or database changes were made.",
   "validation_summary": {
     "strategy_basis": "Stage 4/5 roadmap and approved product blueprint: Home is a concise overview, Finance holds detailed money workflows, Reports provides visual analysis, and AI stays blocked until Phase 8 acceptance.",
     "stage4": "Implemented common report periods, real loaded data, accessible chart/table pairs, exact values, selected-range display, correct snapshot scope, CSV export and safe drill-through.",
     "stage5": "Implemented migration 040 manifest/postconditions, source-SHA-bound evidence verification and explicit opt-in browser acceptance lanes. Stage 5 not accepted until real disposable database replay and authenticated staging tests pass.",
     "payment_boundary": "Recording only; no provider integration, payment transfer, automatic provider verification or credentials.",
     "backend_tests": "262 passed, 0 failed.",
-    "frontend_contract_tests": "53 passed, 0 failed.",
-    "typescript_syntax": "35 TS/TSX files transpiled, 0 syntax errors; not a full typecheck.",
+    "frontend_contract_tests": "54 passed, 0 failed, from fresh ZIP extraction.",
+    "typescript_syntax": "35 TS/TSX files transpiled using global TypeScript 5.8.3, 0 syntax errors; actual Node 24/TypeScript 5.9.3 typecheck/build not run because package dependency install was unavailable.",
     "migration_replay": "44 input paths/hashes pass plan-only; bundle SHA-256 15555832b8153b52f412937de6f153e96afb1c6f6187a15b487b5e874ed5ae46; SQL not executed.",
     "release_acceptance": "Pending actual clean replay through migration 040, evidence checker, Node 24 typecheck/build, authenticated browser journeys and live source/schema parity.",
-    "production_changes": "None."
+    "production_changes": "None.",
+    "live_database": "Read-only audit of Neon LEXA / lexa-live found latest schema_migrations row 031_phase3_auth_surface_rls; no 032–040 rows. supplier_bills, supplier_payments, supplier_ledger_entries and five migration-040 postconditions are absent. No SQL was applied.",
+    "vercel": "Latest main deployment dpl_9XjcgzpSnBFo3gPNkSxFbo8Rmmdd fails npm run build during TypeScript: PromiseSettledResult narrowing in accounting/customers, nullable customer profile currency, and nonexistent SupplierBill.match_difference. Candidate fixes and regression test added; not yet verified by a new remote build.",
+    "frontend_alias": "lexa-green.vercel.app resolves to previous READY deployment at commit f1e0e2f1373d7912ae1cab694615990071ef07b4; current main commit cf25deac57832ac897f76a86b03928664a85ddb6 failed its Vercel build.",
+    "render": "Not inspected via account connector: Render requires workspace selection; only candidate My Workspace (tea-d9cssgflk1mc73br1cp0) was surfaced and needs user confirmation. No Render mutation.",
+    "archive_verification": "411 repository-root files; ZIP CRC passes; fresh extraction reran 262 backend tests, 54 frontend tests, Python compilation, migration/source checks, frontend action audit, and 44-input plan hash validation; no secret env files, caches, node_modules, or build outputs packaged.",
+    "offline_npm_install": "Attempted npm ci --offline; blocked by missing cached undici-types@6.21.0 (ENOTCACHED) and project engine Node 24.x vs local Node 22.16.0; no dependency install completed."
   },
   "final_gate_report": "PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md",
   "local_repair_readme": "PHASE5_INCREMENT_03_README_2026-10-21.md",
@@ -426,7 +436,7 @@
     ]
   },
   "stage5_acceptance": {
-    "status": "HARNESS_IMPLEMENTED_ACCEPTANCE_PENDING",
+    "status": "BUILD_FIX_CANDIDATE_SOURCE_CHECKS_PASS_LIVE_ACCEPTANCE_BLOCKED",
     "migration_manifest_inputs": 44,
     "migration_bundle_sha256": "15555832b8153b52f412937de6f153e96afb1c6f6187a15b487b5e874ed5ae46",
     "phase8_migration": "migrations/040_phase8_finance_workflows.sql",
@@ -445,11 +455,49 @@
     ],
     "acceptance_complete": false,
     "blockers": [
-      "GitHub write/publish blocked by 403",
-      "Node 24 full build not run",
-      "PostgreSQL clean replay not run",
-      "authenticated staging browser journeys not run",
-      "Vercel/Render/database parity not verified"
+      "GitHub connector write/publish blocked by HTTP 403; branch/PR not created in remote repository.",
+      "Project npm ci/typecheck/build not run locally: Node 24 is unavailable and offline npm cache lacks undici-types@6.21.0; patched known Vercel TypeScript errors still need remote build verification.",
+      "Node 24 project npm ci/typecheck/build not run locally; Vercel errors patched but new remote build has not verified the fix.",
+      "Neon lexa-live migration ledger stops at 031; 033–040 absent; supplier billing/ledger tables and Phase 8 reversal schema/metric/foreign key/status constraint absent. Requires reviewed migration rollout after isolated clean replay and backup.",
+      "Six historically missing SQL sources are permanently designated reconstructed-equivalent sources; semantic clean replay/security validation remains pending.",
+      "Authenticated report, sales and purchasing browser journeys have not been run against staging.",
+      "Render service/deploy/log/source parity not inspected pending explicit confirmation of My Workspace.",
+      "Vercel stable frontend alias remains on older READY commit; new source is not live because main deployment fails TypeScript build.",
+      "Vercel env values for LEXA_API_URL/NEXT_PUBLIC_API_URL remain encrypted to this connector, so the actual backend origins have not been confirmed."
     ]
+  },
+  "live_deployment_audit": {
+    "date": "2026-10-22",
+    "github": {
+      "repository": "MONALISA2003-CMD/LEXA-",
+      "main_sha": "cf25deac57832ac897f76a86b03928664a85ddb6",
+      "write_attempt": "HTTP 403 Resource not accessible by integration"
+    },
+    "vercel": {
+      "project": "lexa",
+      "project_id": "prj_QicfCnse8LU6hnq4ik9liHc289VW",
+      "latest_deployment": "dpl_9XjcgzpSnBFo3gPNkSxFbo8Rmmdd",
+      "latest_state": "ERROR",
+      "stable_alias": "lexa-green.vercel.app",
+      "stable_alias_sha": "f1e0e2f1373d7912ae1cab694615990071ef07b4",
+      "known_errors_patched_in_candidate": true,
+      "verified_remote_fix": false
+    },
+    "neon": {
+      "project_id": "wispy-mud-75323042",
+      "project_name": "LEXA",
+      "branch_id": "br-soft-star-b1dj2m2w",
+      "branch_name": "lexa-live",
+      "latest_migration": "031_phase3_auth_surface_rls",
+      "supplier_bill_tables_present": false,
+      "phase8_reversal_postconditions_present": false,
+      "modified": false
+    },
+    "render": {
+      "status": "PENDING_WORKSPACE_CONFIRMATION",
+      "candidate_workspace": "My Workspace",
+      "workspace_id": "tea-d9cssgflk1mc73br1cp0",
+      "mutated": false
+    }
   }
 }

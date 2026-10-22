@@ -168,14 +168,18 @@ export default function AccountingPage() {
       if (results[0].status === "fulfilled") setDashboard(results[0].value); else failures.push(labels[0]);
       if (results[1].status === "fulfilled") setChannels(results[1].value); else failures.push(labels[1]);
       if (results[2].status === "fulfilled") setReceivables(results[2].value); else failures.push(labels[2]);
-      if (results[3].status === "fulfilled") {
-        setReconciliations(results[3].value);
-        setSelectedReconciliationId(current => current && results[3].value.some(r => r.id === current) ? current : results[3].value[0]?.id || "");
+      const reconciliationResult = results[3];
+      if (reconciliationResult.status === "fulfilled") {
+        const loadedReconciliations = reconciliationResult.value;
+        setReconciliations(loadedReconciliations);
+        setSelectedReconciliationId(current => current && loadedReconciliations.some(r => r.id === current) ? current : loadedReconciliations[0]?.id || "");
       } else failures.push(labels[3]);
       if (results[4].status === "fulfilled") setExpenses(results[4].value); else failures.push(labels[4]);
-      if (results[5].status === "fulfilled") {
-        setAccounts(results[5].value);
-        setExpenseAccountId(current => current || results[5].value.find(a => a.account_type === "EXPENSE" && a.status === "ACTIVE" && a.allow_posting)?.id || "");
+      const accountResult = results[5];
+      if (accountResult.status === "fulfilled") {
+        const loadedAccounts = accountResult.value;
+        setAccounts(loadedAccounts);
+        setExpenseAccountId(current => current || loadedAccounts.find(a => a.account_type === "EXPENSE" && a.status === "ACTIVE" && a.allow_posting)?.id || "");
       } else failures.push(labels[5]);
       if (results[6].status === "fulfilled") setSupplierBalances(results[6].value); else failures.push(labels[6]);
       if (code) {
