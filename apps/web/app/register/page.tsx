@@ -3,7 +3,9 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { login, register, setAccessToken, type RegisterRequest } from "../../lib/api";
+import { login, register, setAccessToken, type RegisterRequest,
+  userFacingError,
+} from "../../lib/api";
 import { FormField, StatusBanner } from "../../components/ui";
 
 type CountryChoice = { code: string; name: string; currency: string; currencyName: string };
@@ -104,7 +106,7 @@ export default function RegisterPage() {
         setError("Your business was created, but automatic sign-in did not finish. Sign in with the account you just created; your setup has been saved.");
       }
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "We couldn't create your business. Check the details and try again.");
+      setError(userFacingError(exception, "We couldn't create your business. Check the details and try again."));
     } finally {
       setBusy(false);
     }

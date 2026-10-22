@@ -38,6 +38,7 @@ import {
   type Reconciliation,
   type ReconciliationLine,
   type SaleReturn,
+  userFacingError,
 } from "../../lib/api";
 
 function money(v: string | number, currencyCode?: string | null) {
@@ -185,7 +186,7 @@ export default function CommercePage() {
         setReturnQuantities(Object.fromEntries(detail.lines.map((line) => [line.sale_line_id, ""])));
       }
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Unable to load commerce workspace");
+      setMessage(userFacingError(e, "Your sales page could not be loaded. Check your connection and try again."));
     } finally {
       setBusy(false);
     }
@@ -215,13 +216,13 @@ export default function CommercePage() {
       setMessage("Customer created.");
       await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not create customer");
+      setMessage(userFacingError(e, "The customer could not be added. Check the details and try again."));
     }
   }
 
   async function submitChannel(e: FormEvent) {
     e.preventDefault();
-    if (!currencyCode) { setMessage("Set your business currency in Business details first."); return; }
+    if (!currencyCode) { setMessage("Choose your business currency in Business settings before recording money."); return; }
     try {
       await createPaymentChannel({ name: channelName, channel_type: channelType, provider: provider || undefined, currency_code: currencyCode });
       setChannelName("");
@@ -229,7 +230,7 @@ export default function CommercePage() {
       setMessage("Payment method added.");
       await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not add the payment method");
+      setMessage(userFacingError(e, "The payment method could not be added. Check the details and try again."));
     }
   }
 
@@ -266,7 +267,7 @@ export default function CommercePage() {
       setSalesHistory(result);
       setSelectedSaleDetail(null);
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not load sales history");
+      setMessage(userFacingError(e, "Sales history could not be loaded. Try again."));
     } finally {
       setHistoryLoading(false);
     }
@@ -278,7 +279,7 @@ export default function CommercePage() {
       const detail = await getCommerceSale(id);
       setSelectedSaleDetail(detail);
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not load sale details");
+      setMessage(userFacingError(e, "Sale details could not be loaded. Try again."));
     } finally {
       setSaleDetailLoading(false);
     }
@@ -288,7 +289,7 @@ export default function CommercePage() {
     e.preventDefault();
     if (submittingSale) return;
     try {
-      if (!currencyCode) throw new Error("Set your business currency in Business details first.");
+      if (!currencyCode) throw new Error("Choose your business currency in Business settings before recording money.");
       if (!locationId || cart.length === 0) throw new Error("Select a location and add at least one cart item.");
       const payments = paymentRows
         .filter((x) => Number(x.amount) > 0)
@@ -321,7 +322,7 @@ export default function CommercePage() {
     } catch (e) {
       // Keep the same idempotency key and unchanged payload on retry so a lost
       // response cannot accidentally create a second sale.
-      setMessage(e instanceof Error ? e.message : "Could not complete sale. Check the status before retrying.");
+      setMessage(userFacingError(e, "The sale could not be completed. Check the sales history before trying again."));
     } finally {
       setSubmittingSale(false);
     }
@@ -337,7 +338,7 @@ export default function CommercePage() {
 
   async function submitReceivablePayment(event: FormEvent<HTMLFormElement>, id: string) {
     event.preventDefault();
-    if (!currencyCode) { setMessage("Set your business currency in Business details first."); return; }
+    if (!currencyCode) { setMessage("Choose your business currency in Business settings before recording money."); return; }
     const row = receivables.find(item => item.id === id);
     if (!row) { setMessage("Customer balance could not be found. Refresh and try again."); return; }
     const amountValue = Number(receivableAmount);
@@ -351,7 +352,7 @@ export default function CommercePage() {
       setPayingReceivableId("");
       await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not record the payment. Check the details and try again.");
+      setMessage(userFacingError(e, "The payment could not be recorded. Check the details and try again."));
     }
   }
 
@@ -360,10 +361,10 @@ export default function CommercePage() {
     try {
       const x = await createReconciliation({ business_date: today() });
       setSelectedRecon(x.id);
-      setMessage("Daily reconciliation opened.");
+      setMessage("Today's end-of-day check is ready.");
       await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not open reconciliation");
+      setMessage(userFacingError(e, "Today's end-of-day check could not be opened. Try again."));
     }
   }
 
@@ -375,7 +376,7 @@ export default function CommercePage() {
       setMessage("Actual amount saved.");
       await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not save actual");
+      setMessage(userFacingError(e, "The amount could not be saved. Check it and try again."));
     }
   }
 
@@ -385,7 +386,7 @@ export default function CommercePage() {
       setMessage("Variance acknowledged.");
       await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not acknowledge variance");
+      setMessage(userFacingError(e, "The difference could not be marked as reviewed. Try again."));
     }
   }
 
@@ -396,7 +397,7 @@ export default function CommercePage() {
       setMessage("Business day closed.");
       await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Reconciliation cannot be closed yet");
+      setMessage(userFacingError(e, "The business day cannot be closed yet. Review the remaining differences and try again."));
     }
   }
 
@@ -412,13 +413,13 @@ export default function CommercePage() {
       setReturnSettlement("NONE");
       setReturnReason("");
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not load sale");
+      setMessage(userFacingError(e, "The sale could not be loaded. Try again."));
     }
   }
 
   async function submitReturn(e: FormEvent) {
     e.preventDefault();
-    if (!currencyCode) { setMessage("Set your business currency in Business details first."); return; }
+    if (!currencyCode) { setMessage("Choose your business currency in Business settings before recording money."); return; }
     if (!returnSale) {
       setMessage("Select a completed sale first.");
       return;
@@ -449,7 +450,7 @@ export default function CommercePage() {
       await refresh();
       await loadReturnSale(returnSale.id);
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not process return");
+      setMessage(userFacingError(e, "The return could not be recorded. Check the details and try again."));
     }
   }
 
@@ -583,7 +584,7 @@ export default function CommercePage() {
               <label>From<input type="date" value={salesStartDate} onChange={(e) => setSalesStartDate(e.target.value)} /></label>
               <label>To<input type="date" value={salesEndDate} onChange={(e) => setSalesEndDate(e.target.value)} /></label>
               <button className="secondary" type="submit" disabled={historyLoading}>{historyLoading ? "Searching…" : "Apply filters"}</button>
-              <button className="secondary" type="button" onClick={() => { setSalesSearch(""); setSalesStatus(""); setSalesStartDate(""); setSalesEndDate(""); setSalesBranchId(""); setTimeout(() => void getCommerceSales({limit:200}).then(setSalesHistory).catch((e) => setMessage(e instanceof Error ? e.message : "Could not refresh history")),0); }} disabled={historyLoading}>Clear</button>
+              <button className="secondary" type="button" onClick={() => { setSalesSearch(""); setSalesStatus(""); setSalesStartDate(""); setSalesEndDate(""); setSalesBranchId(""); setTimeout(() => void getCommerceSales({limit:200}).then(setSalesHistory).catch((e) => setMessage(userFacingError(e, "Sales history could not be refreshed. Try again."))),0); }} disabled={historyLoading}>Clear</button>
             </form>
             <div className="workflow-list">{salesHistory.length ? salesHistory.map((s) => <div className="workflow-row sale-history-row" key={s.id}><div><strong>{s.customer_name || "Walk-in"}</strong><small>{short(s.id)} · {recordStatusLabel(s.status)} · {new Date(s.created_at).toLocaleString()}</small></div><span>{moneyInWorkspace(s.total)}</span><span className={Number(s.amount_due) > 0 ? "status warn" : "status good"}>{Number(s.amount_due) > 0 ? `Due ${moneyInWorkspace(s.amount_due)}` : "PAID"}</span><button className="secondary" type="button" onClick={() => void openSaleDetail(s.id)}>View sale</button></div>) : <div className="empty-inline">No sales match these filters.</div>}</div>
             {saleDetailLoading && <div className="inline-message" role="status">Loading sale details…</div>}

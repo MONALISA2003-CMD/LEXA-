@@ -159,7 +159,7 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
     return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`app-nav-item ${active ? "active" : ""}`}><span className="app-nav-icon"><NavGlyph name={icon}/></span><b>{label}</b></Link>;
   });
   const moreActive = moreWorkspaces.some(([href]) => pathname === href || pathname.startsWith(`${href}/`)) || !quickNav.some(([href]) => href === "/" ? pathname === "/" : pathname.startsWith(href));
-  const serviceLabel = serviceState === "ready" ? "Connection available" : serviceState === "checking" ? "Checking connection" : serviceState === "degraded" ? "Connection needs attention" : "Connection unavailable";
+  const serviceLabel = serviceState === "ready" ? "Your business is ready" : serviceState === "checking" ? "Checking that everything is ready" : serviceState === "degraded" ? "A few things need attention" : "Could not check business status";
 
   return <div className="app-shell">
     <aside className={`app-sidebar ${open ? "open" : ""}`} aria-label="Main navigation">
@@ -173,7 +173,7 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
       </nav>
       <div className="sidebar-foot">
         <span className={`status-dot ${authState === "ready" && serviceState === "ready" ? "" : "warning"}`} />
-        <span className="sidebar-session-label">{authState === "ready" ? "Signed in" : authState === "checking" ? "Checking access" : authState === "signed_out" ? "Signed out" : "Connection issue"}</span>
+        <span className="sidebar-session-label">{authState === "ready" ? "Signed in" : authState === "checking" ? "Checking sign-in" : authState === "signed_out" ? "Signed out" : "Could not open your business"}</span>
         
         <button type="button" className="sidebar-signout" onClick={signOut}>Sign out</button>
       </div>
@@ -201,7 +201,7 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
         {authState !== "ready" ? (
           <div className="workspace-section" role={authState === "unavailable" ? "alert" : "status"} aria-live="polite">
             {authState === "checking" && <><span className="section-label">WELCOME BACK</span><h2>Opening your business…</h2><p>We’re checking your access before showing your saved records.</p></>}
-            {authState === "signed_out" && <><span className="section-label">SIGN IN REQUIRED</span><h2>Your session has ended</h2><p>Returning you to sign in. You can also open the sign-in page directly.</p><Link className="text-link" href="/login">Go to sign in</Link></>}
+            {authState === "signed_out" && <><span className="section-label">SIGN IN REQUIRED</span><h2>You’ve been signed out</h2><p>Returning you to sign in. You can also open the sign-in page directly.</p><Link className="text-link" href="/login">Go to sign in</Link></>}
             {authState === "unavailable" && <><span className="section-label">CONNECTION ISSUE</span><h2>We couldn’t open your business</h2><p>Your saved records have not been reported as changed. Check your connection and try again.</p><div className="header-actions"><button type="button" className="button button-soft" onClick={retrySession}>Try again</button><Link className="button button-soft" href="/login">Sign in again</Link></div></>}
           </div>
         ) : !setupProgressChecked ? (

@@ -9,6 +9,7 @@ import {
   getPrices, getProduct, getProducts, getUnits, getVariants, updateVariant,
   type Barcode, type Brand, type Category, type InventoryBalance,
   type PriceList, type Product, type ProductPrice, type Unit, type Variant,
+  userFacingError,
 } from "../../lib/api";
 
 type DetailTab = "Overview" | "Variants" | "Pricing" | "Barcodes" | "Inventory";
@@ -68,7 +69,7 @@ export default function ProductsPage() {
       // must not replace a newer result with a stale error.
       if (signal?.aborted || requestId !== productRequestId.current) return;
       setCatalogState("error");
-      setMessage(error instanceof Error ? error.message : "Unable to load the product products.");
+      setMessage(userFacingError(error, "Unable to load the product products."));
     }
   }
 
@@ -83,7 +84,7 @@ export default function ProductsPage() {
       setReferencesState("success");
     } catch (error) {
       setReferencesState("error");
-      setMessage(error instanceof Error ? error.message : "Products reference data could not be loaded.");
+      setMessage(userFacingError(error, "Products reference data could not be loaded."));
     }
   }
 
@@ -113,13 +114,13 @@ export default function ProductsPage() {
     try {
       const [nextPrices, nextBarcodes, nextBalances] = await Promise.all([getPrices({ variant_id: variant.id }), getBarcodes(variant.id), getInventoryBalances({ variant_id: variant.id })]);
       setPrices(nextPrices); setBarcodes(nextBarcodes); setBalances(nextBalances);
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to load pack-size or option details."); }
+    } catch (error) { setMessage(userFacingError(error, "Unable to load pack-size or option details.")); }
   }
 
   async function loadProductDetail(product: Product, preferredVariantId?: string) {
     setSelected(product); setTab("Overview"); setSelectedVariant(null); setPrices([]); setBarcodes([]); setBalances([]);
     try { const nextVariants = await getVariants(product.id); setVariants(nextVariants); const next = nextVariants.find((v) => v.id === preferredVariantId) || nextVariants[0] || null; if (next) await loadVariantDetail(next); }
-    catch (error) { setMessage(error instanceof Error ? error.message : "Unable to load product details."); }
+    catch (error) { setMessage(userFacingError(error, "Unable to load product details.")); }
   }
 
   async function addProduct(event: FormEvent) {
@@ -127,7 +128,7 @@ export default function ProductsPage() {
     try {
       const product = await createProduct({ name: productName.trim(), description: productDescription.trim() || null, category_id: category, brand_id: brand || null, has_variants: true });
       setProductName(""); setProductDescription(""); setMessage("Product created. Add a pack size or option and a product code before selling it."); await loadCatalog(); await loadProductDetail(product);
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not create the product."); } finally { setBusy(false); }
+    } catch (error) { setMessage(userFacingError(error, "Could not create the product.")); } finally { setBusy(false); }
   }
 
   async function addVariant(event: FormEvent) {
@@ -135,35 +136,35 @@ export default function ProductsPage() {
     try {
       const variant = await createVariant({ product_id: selected.id, name: variantName.trim(), sku: sku.trim().toUpperCase(), base_unit_id: unit, costing_method: variantCosting });
       setVariantName(""); setSku(""); setMessage("Pack size or option saved with its own product code and purchase-cost method."); await loadProductDetail(selected, variant.id); setTab("Variants");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not save this pack size or option."); } finally { setBusy(false); }
+    } catch (error) { setMessage(userFacingError(error, "Could not save this pack size or option.")); } finally { setBusy(false); }
   }
 
   async function toggleVariantStatus(variant: Variant) {
     setBusy(true);
     try { const updated = await updateVariant(variant.id, { status: variant.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" }); setMessage(`Product option ${updated.status === "ACTIVE" ? "made available" : "made unavailable"}.`); if (selected) await loadProductDetail(selected, updated.id); }
-    catch (error) { setMessage(error instanceof Error ? error.message : "Could not update this pack size or option."); } finally { setBusy(false); }
+    catch (error) { setMessage(userFacingError(error, "Could not update this pack size or option.")); } finally { setBusy(false); }
   }
 
   async function addBarcode(event: FormEvent) {
     event.preventDefault(); if (!selectedVariant || !barcode.trim()) return; setBusy(true);
     try { await createBarcode({ variant_id: selectedVariant.id, barcode: barcode.trim(), barcode_type: barcodeType, is_primary: barcodePrimary }); setBarcode(""); setBarcodePrimary(false); setMessage("Barcode added to the selected pack size or option."); await loadVariantDetail(selectedVariant); setTab("Barcodes"); }
-    catch (error) { setMessage(error instanceof Error ? error.message : "Could not create the barcode."); } finally { setBusy(false); }
+    catch (error) { setMessage(userFacingError(error, "Could not create the barcode.")); } finally { setBusy(false); }
   }
 
   async function addPriceList(event: FormEvent) {
     event.preventDefault(); if (!priceListName.trim() || !effectiveFrom) return; setBusy(true);
     try { const created = await createPriceList({ name: priceListName.trim(), currency: priceListCurrency, price_type: priceListType, effective_from: iso(effectiveFrom) }); setPriceListName(""); setPriceListId(created.id); setMessage("Price list created. Now set prices for each pack size or option."); await loadCatalogReferences(); }
-    catch (error) { setMessage(error instanceof Error ? error.message : "Could not create the price list."); } finally { setBusy(false); }
+    catch (error) { setMessage(userFacingError(error, "Could not create the price list.")); } finally { setBusy(false); }
   }
 
   async function addPrice(event: FormEvent) {
     event.preventDefault(); if (!selectedVariant || !priceListId || !priceValue || !effectiveFrom) return; setBusy(true);
     try { await createPrice({ price_list_id: priceListId, variant_id: selectedVariant.id, unit_price: priceValue, minimum_quantity: minimumQuantity || "1", effective_from: iso(effectiveFrom) }); setPriceValue(""); setMinimumQuantity("1"); setMessage("Selling price saved to the selected price list."); await loadVariantDetail(selectedVariant); setTab("Pricing"); }
-    catch (error) { setMessage(error instanceof Error ? error.message : "Could not create the price."); } finally { setBusy(false); }
+    catch (error) { setMessage(userFacingError(error, "Could not create the price.")); } finally { setBusy(false); }
   }
 
   return <AppShell title="Products" eyebrow="Products">
-    <div className="module-toolbar"><div><strong>Products</strong><span>{catalogState === "loading" ? "Checking current products…" : catalogState === "error" ? "Products unavailable" : `${products.length} products · pack sizes, product codes, barcodes and prices`}</span>{referencesState === "error" && <small className="form-field-error">Some products reference data is unavailable; refresh before creating records.</small>}</div><div className="toolbar-actions"><button type="button" className="button button-soft" onClick={() => { void loadCatalog(); void loadCatalogReferences(); }} disabled={catalogState === "loading" || busy}>Refresh</button><button type="button" className="button button-dark" onClick={() => document.getElementById("new-product")?.scrollIntoView({behavior:"smooth"})}>+ New product</button></div></div>
+    <div className="module-toolbar"><div><strong>Products</strong><span>{catalogState === "loading" ? "Loading products…" : catalogState === "error" ? "Products unavailable" : `${products.length} products · pack sizes, product codes, barcodes and prices`}</span>{referencesState === "error" && <small className="form-field-error">Some product details could not be loaded. Refresh before adding a new product.</small>}</div><div className="toolbar-actions"><button type="button" className="button button-soft" onClick={() => { void loadCatalog(); void loadCatalogReferences(); }} disabled={catalogState === "loading" || busy}>Refresh</button><button type="button" className="button button-dark" onClick={() => document.getElementById("new-product")?.scrollIntoView({behavior:"smooth"})}>+ New product</button></div></div>
     {message && <div className="notice">{message}</div>}
 
     <div className="workspace-grid">

@@ -10,6 +10,7 @@ import {
   getVariantOptions, getWarehouses, postAdjustment, postStockCount, receiveTransfer, submitStockCount,
   updateCountLines, type Branch, type InventoryAdjustment, type InventoryAgeing, type InventoryBalance, type InventoryLedger, type InventoryMovementHealth, type ReplenishmentPolicy, type ReplenishmentRecommendation,
   type Location, type StockCount, type Transfer, type VariantOption, type Warehouse,
+  userFacingError,
 } from "../../lib/api";
 
 type Tab = "Stock" | "Ledger" | "Adjustments" | "Counts" | "Transfers" | "Locations" | "Stock Health" | "Replenishment" | "Stock Age";
@@ -145,9 +146,9 @@ export default function InventoryPage() {
       if (!locationWarehouse && w[0]) setLocationWarehouse(w[0].id);
       if (!selectedCountId && cnt[0]) setSelectedCountId(cnt[0].id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to load inventory.");
+      setError(userFacingError(e, "Unable to load inventory."));
       setHasLoaded(false); setLocations([]); setWarehouses([]); setBranches([]); setVariants([]); setAdjustments([]); setCounts([]); setTransfers([]); setIntegrity("unavailable");
-      if (requestId === stockRequestId.current) { setBalances([]); setLedger([]); setStockError(e instanceof Error ? e.message : "Unable to load inventory balances."); }
+      if (requestId === stockRequestId.current) { setBalances([]); setLedger([]); setStockError(userFacingError(e, "Unable to load inventory balances.")); }
     }
     finally { setBusy(false); }
   }
@@ -170,7 +171,7 @@ export default function InventoryPage() {
         setBalances(nextBalances); setLedger(nextLedger); setStockError("");
       } catch (e) {
         if (controller.signal.aborted || requestId !== stockRequestId.current) return;
-        setStockError(e instanceof Error ? e.message : "Unable to refresh the filtered stock data.");
+        setStockError(userFacingError(e, "Unable to refresh the filtered stock data."));
       } finally {
         if (!controller.signal.aborted && requestId === stockRequestId.current) setFiltersBusy(false);
       }
@@ -194,7 +195,7 @@ export default function InventoryPage() {
       setReplenishmentPolicies(policies); setReplenishmentRecommendations(recommendations.items);
     } catch (e) {
       if (requestId !== replenishmentRequestId.current) return;
-      setReplenishmentError(e instanceof Error ? e.message : "Restock suggestions could not be loaded.");
+      setReplenishmentError(userFacingError(e, "Restock suggestions could not be loaded."));
       setReplenishmentPolicies([]); setReplenishmentRecommendations([]);
     } finally { if (requestId === replenishmentRequestId.current) setReplenishmentBusy(false); }
   }
@@ -205,7 +206,7 @@ export default function InventoryPage() {
       const result = await getInventoryMovementHealth(locationFilter || undefined);
       setMovementHealthRows(result.items);
     } catch (e) {
-      setMovementHealthError(e instanceof Error ? e.message : "Stock checks could not be loaded.");
+      setMovementHealthError(userFacingError(e, "Stock checks could not be loaded."));
       setMovementHealthRows([]);
     } finally { setMovementHealthBusy(false); }
   }
@@ -213,7 +214,7 @@ export default function InventoryPage() {
   async function loadAgeing() {
     setAgeingBusy(true); setAgeingError("");
     try { const result = await getInventoryAgeing(locationFilter || undefined); setAgeingRows(result.items); }
-    catch (e) { setAgeingError(e instanceof Error ? e.message : "Stock age could not be checked."); setAgeingRows([]); }
+    catch (e) { setAgeingError(userFacingError(e, "Stock age could not be checked.")); setAgeingRows([]); }
     finally { setAgeingBusy(false); }
   }
 
@@ -231,7 +232,7 @@ export default function InventoryPage() {
       setMessage("Restock reminders saved. Suggestions now reflect completed sales and returns.");
       await loadReplenishment();
     } catch (e) {
-      setReplenishmentError(e instanceof Error ? e.message : "Restock reminders could not be saved.");
+      setReplenishmentError(userFacingError(e, "Restock reminders could not be saved."));
     } finally { setReplenishmentBusy(false); }
   }
 
@@ -249,20 +250,20 @@ export default function InventoryPage() {
     if (!adjustLocation || !lines.length) { setMessage("Select a location and at least one non-zero adjustment line."); return; }
     setBusy(true);
     try { await createAdjustment({ location_id: adjustLocation, reason_code: adjustReason, notes: adjustNotes || null, lines }); setAdjustLines([{ variantId: "", quantity: "", unitCost: "" }]); setAdjustNotes(""); setMessage("Adjustment created as a draft. Approval is required before posting."); setTab("Adjustments"); await load(); }
-    catch (e) { setMessage(e instanceof Error ? e.message : "Could not create the adjustment."); } finally { setBusy(false); }
+    catch (e) { setMessage(userFacingError(e, "Could not create the adjustment.")); } finally { setBusy(false); }
   }
 
   async function runAdjustmentAction(id: string, action: "approve" | "post") {
     setBusy(true);
     try { if (action === "approve") await approveAdjustment(id); else await postAdjustment(id); setMessage(action === "approve" ? "Adjustment approved. It is ready to post." : "Stock correction recorded."); await load(); }
-    catch (e) { setMessage(e instanceof Error ? e.message : "Inventory action could not be completed."); } finally { setBusy(false); }
+    catch (e) { setMessage(userFacingError(e, "Inventory action could not be completed.")); } finally { setBusy(false); }
   }
 
   async function createCount(event: FormEvent) {
     event.preventDefault(); if (!countLocation || countVariantIds.length === 0) { setMessage("Choose a location and one or more products to count."); return; }
     setBusy(true);
     try { const created = await createStockCount({ location_id: countLocation, scope_description: countScope || null, variant_ids: countVariantIds }); setSelectedCountId(created.id); setCountVariantIds([]); setCountScope(""); setMessage("Stock count opened. Enter physical quantities before submission."); setTab("Counts"); await load(); }
-    catch (e) { setMessage(e instanceof Error ? e.message : "Could not create the stock count."); } finally { setBusy(false); }
+    catch (e) { setMessage(userFacingError(e, "Could not create the stock count.")); } finally { setBusy(false); }
   }
 
   async function saveCountLines() {
@@ -271,13 +272,13 @@ export default function InventoryPage() {
     if (!lines.length) { setMessage("Enter at least one counted quantity."); return; }
     setBusy(true);
     try { await updateCountLines(selectedCount.id, { lines }); setMessage("Counted quantities saved. Review variances before submission."); await load(); }
-    catch (e) { setMessage(e instanceof Error ? e.message : "Could not save counted quantities."); } finally { setBusy(false); }
+    catch (e) { setMessage(userFacingError(e, "Could not save counted quantities.")); } finally { setBusy(false); }
   }
 
   async function runCountAction(id: string, action: "submit" | "approve" | "post") {
     setBusy(true);
     try { if (action === "submit") await submitStockCount(id); if (action === "approve") await approveStockCount(id); if (action === "post") await postStockCount(id); setMessage(action === "submit" ? "Stock count submitted for approval." : action === "approve" ? "Stock count approved." : "Stock count saved. Any differences are now recorded as stock corrections."); await load(); }
-    catch (e) { setMessage(e instanceof Error ? e.message : "Stock count action could not be completed."); } finally { setBusy(false); }
+    catch (e) { setMessage(userFacingError(e, "Stock count action could not be completed.")); } finally { setBusy(false); }
   }
 
   async function submitTransfer(event: FormEvent) {
@@ -286,7 +287,7 @@ export default function InventoryPage() {
     if (!transferFrom || !transferTo || transferFrom === transferTo || !lines.length) { setMessage("Choose different source/destination locations and at least one quantity."); return; }
     setBusy(true);
     try { const created = await createTransfer({ source_location_id: transferFrom, destination_location_id: transferTo, notes: transferNotes || null, lines }); setTransferLines([{ variantId: "", quantity: "" }]); setTransferNotes(""); setMessage("Transfer created as draft. Approval and dispatch happen before destination receipt."); setTab("Transfers"); await load(); }
-    catch (e) { setMessage(e instanceof Error ? e.message : "Could not create the transfer."); } finally { setBusy(false); }
+    catch (e) { setMessage(userFacingError(e, "Could not create the transfer.")); } finally { setBusy(false); }
   }
 
   async function runTransferAction(id: string, action: "approve" | "dispatch" | "receive" | "complete") {
@@ -303,21 +304,21 @@ export default function InventoryPage() {
         await receiveTransfer(id, { lines });
       }
       setMessage(action === "receive" ? "Transfer receipt recorded at the destination." : `Transfer ${action} completed.`); await load();
-    } catch (e) { setMessage(e instanceof Error ? e.message : "Transfer action could not be completed."); } finally { setBusy(false); }
+    } catch (e) { setMessage(userFacingError(e, "Transfer action could not be completed.")); } finally { setBusy(false); }
   }
 
   async function submitWarehouse(event: FormEvent) {
     event.preventDefault(); if (!warehouseName.trim() || !warehouseCode.trim()) return;
     setBusy(true);
     try { const created = await createWarehouse({ name: warehouseName.trim(), code: warehouseCode.trim().toUpperCase(), branch_id: warehouseBranch || null }); setWarehouseName(""); setWarehouseCode(""); setMessage(`Warehouse ${created.name} created.`); await load(); }
-    catch (e) { setMessage(e instanceof Error ? e.message : "Could not create warehouse."); } finally { setBusy(false); }
+    catch (e) { setMessage(userFacingError(e, "Could not create warehouse.")); } finally { setBusy(false); }
   }
 
   async function submitLocation(event: FormEvent) {
     event.preventDefault(); if (!locationName.trim() || !locationCode.trim() || !locationWarehouse) return;
     setBusy(true);
     try { const created = await createLocation({ name: locationName.trim(), code: locationCode.trim().toUpperCase(), warehouse_id: locationWarehouse }); setLocationName(""); setLocationCode(""); setMessage(`Location ${created.name} created.`); await load(); }
-    catch (e) { setMessage(e instanceof Error ? e.message : "Could not create location."); } finally { setBusy(false); }
+    catch (e) { setMessage(userFacingError(e, "Could not create location.")); } finally { setBusy(false); }
   }
 
   const total = balances.reduce((sum, row) => sum + Number(row.stock_value), 0);

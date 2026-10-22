@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "LEXA | Your business, clearly.",
-  description: "Sales, stock, customers and finance in one clear business workspace.",
+  description: "Sales, stock, customers and money in one clear place.",
   icons: {
     icon: [
       { url: "/lexa-mark.svg", type: "image/svg+xml" },

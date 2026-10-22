@@ -156,3 +156,39 @@ export function ProductPerformanceBars({ rows, currencyCode }: {
     </div>)}
   </div>;
 }
+
+
+/** Clear expense-category comparison built from posted expense records only. */
+export function ExpenseCategoryBars({ rows, currencyCode }: {
+  rows: Array<{ label: string; value: number; detail?: string }>;
+  currencyCode?: string | null;
+}) {
+  const safeRows = rows.filter(row => Number.isFinite(row.value) && row.value >= 0).sort((a, b) => b.value - a.value).slice(0, 8);
+  const maxValue = Math.max(1, ...safeRows.map(row => row.value));
+  if (!safeRows.length) return <div className="chart-empty-state"><strong>No recorded expenses in this period</strong><span>Expense categories will appear here after an expense is recorded.</span></div>;
+  return <div className="product-comparison-bars" role="img" aria-label="Expenses by category">
+    {safeRows.map((row, index) => <div className="product-comparison-row" key={`${row.label}-${index}`}>
+      <div className="product-comparison-label"><strong>{row.label}</strong><small>{row.detail || "Recorded expenses"}</small></div>
+      <div className="product-comparison-track expense-comparison-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
+      <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
+    </div>)}
+  </div>;
+}
+
+
+/** Recorded customer receipts by the payment-method names configured by the owner. */
+export function PaymentMethodBars({ rows, currencyCode }: {
+  rows: Array<{ label: string; value: number; detail?: string }>;
+  currencyCode?: string | null;
+}) {
+  const safeRows = rows.filter(row => Number.isFinite(row.value) && row.value >= 0).sort((a, b) => b.value - a.value).slice(0, 8);
+  const maxValue = Math.max(1, ...safeRows.map(row => row.value));
+  if (!safeRows.length) return <div className="chart-empty-state"><strong>No recorded payments in this period</strong><span>Payment methods will appear here after customer payments are recorded.</span></div>;
+  return <div className="product-comparison-bars" role="img" aria-label="Money recorded by payment method">
+    {safeRows.map((row, index) => <div className="product-comparison-row" key={`${row.label}-${index}`}>
+      <div className="product-comparison-label"><strong>{row.label}</strong><small>{row.detail || "Recorded customer payments"}</small></div>
+      <div className="product-comparison-track payment-method-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
+      <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
+    </div>)}
+  </div>;
+}

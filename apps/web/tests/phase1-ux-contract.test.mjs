@@ -21,7 +21,7 @@ assert.match(shell, /\["\/sales", "Sales"/);
 assert.match(shell, /Business settings/);
 assert.match(shell, /aria-label="Quick navigation"/);
 assert.match(shell, /getReadiness\(\)/);
-assert.match(shell, /Checking connection/);
+assert.match(shell, /Checking that everything is ready/);
 assert.match(shell, /PageHeader/);
 
 // Shared components and list states are actually consumed by the primary lists.

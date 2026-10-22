@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AppShell } from "../../components/app-shell";
-import { getWorkspaceOptions, selectWorkspace, type WorkspaceOption } from "../../lib/api";
+import { getWorkspaceOptions, selectWorkspace, type WorkspaceOption,
+  userFacingError,
+} from "../../lib/api";
 
 export default function WorkspacePage() {
   const router = useRouter();
@@ -15,7 +17,7 @@ export default function WorkspacePage() {
   useEffect(() => {
     let active = true;
     void getWorkspaceOptions().then(result => { if (active) setItems(result.items); })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : "Could not load your workspaces."); })
+      .catch(e => { if (active) setError(userFacingError(e, "Could not load your workspaces.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
@@ -28,7 +30,7 @@ export default function WorkspacePage() {
       router.replace("/");
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "LEXA could not switch workspaces.");
+      setError(userFacingError(e, "LEXA could not switch workspaces."));
     } finally { setBusyId(""); }
   }
 

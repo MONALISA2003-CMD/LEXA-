@@ -17,6 +17,7 @@ import {
   type BusinessProfile,
   type Location,
   type Warehouse,
+  userFacingError,
 } from "../../lib/api";
 
 type LoadState = "loading" | "ready" | "partial";
@@ -24,7 +25,7 @@ type ProfileForm = { legal_name: string; display_name: string; country_code: str
 const emptyProfile: ProfileForm = { legal_name: "", display_name: "", country_code: "UG", currency_code: "UGX" };
 
 function describeError(value: unknown): string {
-  return value instanceof Error ? value.message : "LEXA could not complete this request. Please try again.";
+  return userFacingError(value, "LEXA could not complete this request. Please try again.");
 }
 
 function Field({ id, label, children, hint }: { id: string; label: string; children: ReactNode; hint?: string }) {

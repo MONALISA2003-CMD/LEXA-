@@ -42,6 +42,7 @@ import {
   type Reconciliation,
   type ReconciliationLine,
   type SupplierBalance,
+  userFacingError,
 } from "../../lib/api";
 
 type Tab = "Summary" | "Expenses" | "Customer balances" | "End-of-day check" | "Payment methods" | "Financial reports";
@@ -70,7 +71,7 @@ function statusLabel(value: string) {
   return map[value] || value.replaceAll("_", " ").toLowerCase();
 }
 function errorMessage(error: unknown, fallback: string) {
-  const raw = error instanceof Error ? error.message : "";
+  const raw = userFacingError(error, "");
   if (!raw || /UndefinedTable|UndefinedColumn|ProgrammingError|OperationalError|psycopg|sqlalchemy|Traceback|relation .* does not exist|column .* does not exist|public\.[a-z_]+|SELECT .* FROM|INSERT INTO/i.test(raw)) return fallback;
   return raw.length > 220 ? fallback : raw;
 }
@@ -414,7 +415,7 @@ export default function AccountingPage() {
       <div className="notice" role="note">LEXA records the payment method you select. It does not move money or confirm payments with MTN, Airtel or a bank. Never enter PINs, passwords, one-time codes or account sign-in details in LEXA.</div>
       {error && <div className="notice notice-error" role="alert">{error}</div>}
       {message && !error && <div className="notice" role="status">{message}</div>}
-      {!currencyCode && <div className="notice notice-error" role="status">Business currency is unavailable. Set it in <Link href="/settings">Settings</Link> before recording money.</div>}
+      {!currencyCode && <div className="notice notice-error" role="status">Your business currency has not been set. Choose it in <Link href="/settings">Business settings</Link> before recording money.</div>}
 
       <nav className="module-tabs" aria-label="Finance sections">
         {tabs.map(item => <button key={item} type="button" className={tab === item ? "active" : ""} onClick={() => { setTab(item); setError(""); setMessage(""); }}>{item}</button>)}
@@ -425,7 +426,7 @@ export default function AccountingPage() {
       {tab === "Summary" && <>
         <section className="metric-strip" aria-label="Today's finance summary">
           <div><span>Sales today</span><strong>{dashboard ? money(dashboard.sales.sales, currencyCode) : "Unavailable"}</strong></div>
-          <div><span>Money recorded as received today</span><strong>{dashboard ? money(dashboard.sales.collected, currencyCode) : "Unavailable"}</strong></div>
+          <div><span>Money recorded today</span><strong>{dashboard ? money(dashboard.sales.collected, currencyCode) : "Unavailable"}</strong></div>
           <div><span>Customers still owe</span><strong>{dashboard ? money(dashboard.outstanding_receivables, currencyCode) : money(totalReceivables, currencyCode)}</strong></div>
           <div><span>Supplier bills still to pay</span><strong>{money(totalSupplierPayables, currencyCode)}</strong></div>
         </section>
@@ -523,7 +524,7 @@ export default function AccountingPage() {
 
       {tab === "Payment methods" && <>
         <section className="workspace-section"><div className="section-head"><div><span className="section-label">HOW YOUR BUSINESS RECEIVES MONEY</span><h2>Payment methods</h2><p>Create names that your staff will recognize, such as Cash, MTN Line 1, Airtel Line 1, Stanbic or Centenary Bank.</p></div></div>
-          <div className="notice" role="note">LEXA only records what your team enters. Do not enter phone or bank account numbers, PINs, passwords, one-time codes, API keys or other sign-in details.</div>
+          <div className="notice" role="note">LEXA only records what your team enters. Never enter PINs, passwords, one-time codes or banking sign-in details.</div>
           <form className="command-form" onSubmit={handleCreatePaymentMethod}>
             <label>Payment method name<input value={channelName} onChange={e => setChannelName(e.target.value)} placeholder="e.g. MTN Line 1 or Stanbic" maxLength={160} required /></label>
             <div className="form-grid"><label>Type<select value={channelType} onChange={e => setChannelType(e.target.value)}><option value="CASH">Cash</option><option value="MOBILE_MONEY">Mobile money</option><option value="BANK">Bank</option><option value="CARD">Card</option><option value="CHEQUE">Cheque</option><option value="OTHER">Other</option></select></label><label>Institution or service (optional)<input value={channelProvider} onChange={e => setChannelProvider(e.target.value)} placeholder="e.g. MTN" maxLength={100}/></label></div>

@@ -14,10 +14,10 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
-from ..branch_access import ensure_location_access
+from ..branch_access import assigned_branch_ids, ensure_branch_access, ensure_location_access, require_full_branch_scope
 from ..catalog import emit_event, finish_idempotency, write_audit, begin_idempotency
 from ..dependencies import require_permission
 from ..inventory import post_ledger, tenant_variant
@@ -316,6 +316,52 @@ def _order_lines(db: Session, tenant_id: UUID, order_id: UUID) -> list[dict[str,
     """, {"tenant_id": str(tenant_id), "order_id": str(order_id)})
 
 
+
+def _many_branch_scoped(
+    db: Session, sql: str, params: dict[str, Any], *, tenant_id: UUID, user_id: UUID, branch_column: str
+) -> list[dict[str, Any]]:
+    """Read records tied to a branch, limited to the caller's active branch assignments."""
+    branch_ids = assigned_branch_ids(db, tenant_id=tenant_id, user_id=user_id)
+    if not branch_ids:
+        # Gives a useful setup/access response rather than an unexplained empty list.
+        require_full_branch_scope(db, tenant_id=tenant_id, user_id=user_id)
+        return []
+    if "__BRANCH_SCOPE__" not in sql:
+        raise ValueError("Branch-scoped query is missing its branch filter")
+    sql = sql.replace("__BRANCH_SCOPE__", f"{branch_column} IN :accessible_branches")
+    statement = text(sql).bindparams(bindparam("accessible_branches", expanding=True))
+    scoped_params = {**params, "accessible_branches": [str(branch_id) for branch_id in sorted(branch_ids, key=str)]}
+    return [dict(row) for row in db.execute(statement, scoped_params).mappings().all()]
+
+
+def _ensure_order_access(db: Session, *, tenant_id: UUID, user_id: UUID, order_id: UUID, lock: bool = False) -> dict[str, Any]:
+    order = _order(db, tenant_id, order_id, lock=lock)
+    order_branch = UUID(str(order["branch_id"]))
+    ensure_branch_access(db, tenant_id=tenant_id, user_id=user_id, branch_id=order_branch)
+    location_branch = ensure_location_access(
+        db, tenant_id=tenant_id, user_id=user_id, location_id=UUID(str(order["receiving_location_id"]))
+    )
+    if location_branch != order_branch:
+        raise HTTPException(409, detail={
+            "code": "PURCHASE_LOCATION_MISMATCH",
+            "message": "This order is linked to a different stock location. Ask the business owner to correct the order before continuing.",
+        })
+    return order
+
+
+
+def _ensure_receipt_location_matches_order(receipt: dict[str, Any], order: dict[str, Any]) -> None:
+    """Prevent a receipt from moving stock into a different location than its order."""
+    if UUID(str(receipt["receiving_location_id"])) != UUID(str(order["receiving_location_id"])):
+        raise HTTPException(409, detail={
+            "code": "PURCHASE_RECEIPT_LOCATION_MISMATCH",
+            "message": "This delivery is linked to a different stock location. Ask the business owner to correct it before continuing.",
+        })
+
+def _require_workspace_finance_scope(db: Session, *, tenant_id: UUID, user_id: UUID) -> None:
+    """Supplier bills/payments and their ledger are workspace-wide until entries carry a branch."""
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=user_id)
+
 def _write_status(db: Session, tenant_id: UUID, actor: UUID, order_id: UUID, before: str | None, after: str, reason: str | None = None):
     db.execute(text("INSERT INTO public.purchase_order_status_history(tenant_id,purchase_order_id,from_status,to_status,actor_user_id,reason) VALUES(:tenant_id,:order_id,:before,:after,:actor,:reason)"), {"tenant_id": str(tenant_id), "order_id": str(order_id), "before": before, "after": after, "actor": str(actor), "reason": reason})
 
@@ -332,6 +378,9 @@ def _receipt_lines(db: Session, tenant_id: UUID, receipt_id: UUID) -> list[dict[
 @router.get("/summary")
 def purchasing_summary(ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
+    # Supplier totals are tenant-wide until the ledger is branch-attributed.
+    # Fail closed rather than expose another branch's obligations to a partial-scope user.
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=actor)
     # Never add balances in different currencies. Return a separate subtotal per currency.
     return _one(db, """
       SELECT (SELECT count(*) FROM public.supplier_profiles sp WHERE sp.tenant_id=:t AND sp.status='ACTIVE') AS active_suppliers,
@@ -353,6 +402,7 @@ def purchasing_summary(ctx=Depends(require_permission("purchasing.read"))):
 @router.get("/suppliers")
 def list_suppliers(q: str | None = None, status: str = Query("ACTIVE", pattern=r"^(ACTIVE|INACTIVE|ARCHIVED|ALL)$"), limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     query = """
       SELECT p.id AS supplier_party_id,p.display_name AS name,p.legal_name,p.email,p.phone,p.status AS party_status,
              sp.currency_code,sp.payment_terms_days,sp.default_receiving_location_id,sp.tax_number,sp.notes,sp.status AS profile_status,
@@ -369,6 +419,7 @@ def list_suppliers(q: str | None = None, status: str = Query("ACTIVE", pattern=r
 @router.post("/suppliers")
 def create_supplier(body: SupplierCreate, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("purchasing.manage"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     payload = body.model_dump(mode="json")
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier.create", idempotency_key, payload)
     if replay: return replay[1]
@@ -395,6 +446,7 @@ def create_supplier(body: SupplierCreate, idempotency_key: str | None = Header(N
 @router.patch("/suppliers/{supplier_party_id}")
 def update_supplier(supplier_party_id: UUID, body: SupplierUpdate, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("purchasing.manage"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     payload = {"supplier_party_id": str(supplier_party_id), **body.model_dump(exclude_unset=True, mode="json")}
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier.update", idempotency_key, payload)
     if replay: return replay[1]
@@ -415,7 +467,7 @@ def update_supplier(supplier_party_id: UUID, body: SupplierUpdate, idempotency_k
     if values.get("status") == "ARCHIVED":
         used = db.execute(text("""
           SELECT EXISTS(SELECT 1 FROM public.purchase_orders WHERE tenant_id=:t AND supplier_party_id=:p AND status NOT IN ('CANCELLED','CLOSED'))
-              OR EXISTS(SELECT 1 FROM public.purchase_returns r JOIN public.purchase_receipts pr ON pr.tenant_id=r.tenant_id AND pr.id=r.purchase_receipt_id JOIN public.purchase_orders po ON po.tenant_id=pr.tenant_id AND po.id=pr.purchase_order_id WHERE r.tenant_id=:t AND po.supplier_party_id=:p AND r.status IN ('REQUESTED','APPROVED'))
+              OR EXISTS(SELECT 1 FROM public.purchase_returns r JOIN public.purchase_receipts pr ON pr.tenant_id=r.tenant_id AND pr.id=r.purchase_receipt_id AND r.receiving_location_id=pr.receiving_location_id JOIN public.purchase_orders po ON po.tenant_id=pr.tenant_id AND po.id=pr.purchase_order_id WHERE r.tenant_id=:t AND po.supplier_party_id=:p AND r.status IN ('REQUESTED','APPROVED'))
               OR EXISTS(SELECT 1 FROM public.supplier_bills WHERE tenant_id=:t AND supplier_party_id=:p AND status='DRAFT')
               OR EXISTS(SELECT 1 FROM public.supplier_payments WHERE tenant_id=:t AND supplier_party_id=:p AND status='DRAFT')
               OR EXISTS(SELECT 1 FROM public.supplier_ledger_entries WHERE tenant_id=:t AND supplier_party_id=:p
@@ -449,6 +501,7 @@ def update_supplier(supplier_party_id: UUID, body: SupplierUpdate, idempotency_k
 @router.get("/suppliers/{supplier_party_id}/costs")
 def supplier_costs(supplier_party_id: UUID, variant_id: UUID | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     _supplier(db, tenant_id, supplier_party_id, active=False)
     return _many(db, """
       SELECT c.*,pv.sku,pv.name AS variant_name,pr.name AS product_name
@@ -462,6 +515,7 @@ def supplier_costs(supplier_party_id: UUID, variant_id: UUID | None = None, limi
 @router.post("/suppliers/{supplier_party_id}/costs")
 def set_supplier_cost(supplier_party_id: UUID, body: SupplierCostCreate, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("purchasing.manage"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier_cost.create", idempotency_key, {"supplier_party_id": str(supplier_party_id), **body.model_dump(mode="json")})
     if replay: return replay[1]
     supplier = _supplier(db, tenant_id, supplier_party_id)
@@ -477,16 +531,17 @@ def set_supplier_cost(supplier_party_id: UUID, body: SupplierCostCreate, idempot
 @router.get("/purchase-orders")
 def list_purchase_orders(status: str | None = None, supplier_party_id: UUID | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
-    return _many(db, """
+    return _many_branch_scoped(db, """
       SELECT po.*,p.display_name AS supplier_name,b.name AS branch_name,l.name AS receiving_location_name,
         (SELECT count(*) FROM public.purchase_order_lines pol WHERE pol.tenant_id=po.tenant_id AND pol.purchase_order_id=po.id) AS line_count,
         (SELECT coalesce(sum(pol.received_quantity),0) FROM public.purchase_order_lines pol WHERE pol.tenant_id=po.tenant_id AND pol.purchase_order_id=po.id) AS received_units
       FROM public.purchase_orders po JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id
       JOIN public.branches b ON b.tenant_id=po.tenant_id AND b.id=po.branch_id
       JOIN public.locations l ON l.tenant_id=po.tenant_id AND l.id=po.receiving_location_id
-      WHERE po.tenant_id=:t AND (:status IS NULL OR po.status=:status) AND (:supplier IS NULL OR po.supplier_party_id=:supplier)
+      JOIN public.warehouses wh ON wh.tenant_id=l.tenant_id AND wh.id=l.warehouse_id AND wh.branch_id=po.branch_id
+      WHERE po.tenant_id=:t AND __BRANCH_SCOPE__ AND (:status IS NULL OR po.status=:status) AND (:supplier IS NULL OR po.supplier_party_id=:supplier)
       ORDER BY po.created_at DESC LIMIT :limit
-    """, {"t": str(tenant_id), "status": status, "supplier": str(supplier_party_id) if supplier_party_id else None, "limit": limit})
+    """, {"t": str(tenant_id), "status": status, "supplier": str(supplier_party_id) if supplier_party_id else None, "limit": limit}, tenant_id=tenant_id, user_id=actor, branch_column="po.branch_id")
 
 
 @router.post("/purchase-orders")
@@ -518,7 +573,7 @@ def create_purchase_order(body: PurchaseOrderCreate, idempotency_key: str | None
 @router.get("/purchase-orders/{order_id}")
 def get_purchase_order(order_id: UUID, ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
-    row = _order(db, tenant_id, order_id)
+    row = _ensure_order_access(db, tenant_id=tenant_id, user_id=actor, order_id=order_id)
     row["lines"] = _order_lines(db, tenant_id, order_id)
     row["status_history"] = _many(db, "SELECT id,from_status,to_status,actor_user_id,reason,created_at FROM public.purchase_order_status_history WHERE tenant_id=:t AND purchase_order_id=:id ORDER BY created_at,id", {"t": str(tenant_id), "id": str(order_id)})
     row["receipts"] = _many(db, "SELECT id,receipt_number,status,received_at,posted_at,landed_cost_total FROM public.purchase_receipts WHERE tenant_id=:t AND purchase_order_id=:id ORDER BY created_at DESC", {"t": str(tenant_id), "id": str(order_id)})
@@ -526,7 +581,7 @@ def get_purchase_order(order_id: UUID, ctx=Depends(require_permission("purchasin
 
 
 def _transition_order(db: Session, tenant_id: UUID, actor: UUID, order_id: UUID, target: str, allowed: set[str], reason: str | None = None, idem_row=None):
-    row = _order(db, tenant_id, order_id, lock=True)
+    row = _ensure_order_access(db, tenant_id=tenant_id, user_id=actor, order_id=order_id, lock=True)
     before = row["status"]
     if before not in allowed: raise HTTPException(409, f"Cannot move purchase order from {before} to {target}")
     db.execute(text("UPDATE public.purchase_orders SET status=:target,updated_at=now(),submitted_by=CASE WHEN :target='SUBMITTED' THEN :actor ELSE submitted_by END,submitted_at=CASE WHEN :target='SUBMITTED' THEN now() ELSE submitted_at END,approved_by=CASE WHEN :target='OPEN' THEN :actor ELSE approved_by END,approved_at=CASE WHEN :target='OPEN' THEN now() ELSE approved_at END,cancelled_by=CASE WHEN :target='CANCELLED' THEN :actor ELSE cancelled_by END,cancelled_at=CASE WHEN :target='CANCELLED' THEN now() ELSE cancelled_at END,closed_by=CASE WHEN :target='CLOSED' THEN :actor ELSE closed_by END,closed_at=CASE WHEN :target='CLOSED' THEN now() ELSE closed_at END WHERE tenant_id=:t AND id=:id"), {"target": target, "actor": str(actor), "t": str(tenant_id), "id": str(order_id)})
@@ -586,7 +641,7 @@ def create_receipt(order_id: UUID, body: ReceiptCreate, idempotency_key: str | N
     db, actor, tenant_id, _ = ctx
     idem, replay = _idempotency(db, tenant_id, "purchasing.receipt.create", idempotency_key, body.model_dump(mode="json") | {"order_id": str(order_id)})
     if replay: return replay[1]
-    order = _order(db, tenant_id, order_id, lock=True)
+    order = _ensure_order_access(db, tenant_id=tenant_id, user_id=actor, order_id=order_id, lock=True)
     if order["status"] not in {"OPEN", "PARTIALLY_RECEIVED"}: raise HTTPException(409, "Only an approved, not-yet-complete purchase order can receive stock")
     ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=order["receiving_location_id"])
     line_rows = {UUID(str(row["id"])): row for row in _order_lines(db, tenant_id, order_id)}
@@ -621,14 +676,16 @@ def create_receipt(order_id: UUID, body: ReceiptCreate, idempotency_key: str | N
 @router.get("/receipts")
 def list_receipts(status: str | None = None, purchase_order_id: UUID | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
-    return _many(db, "SELECT r.*,po.po_number,p.display_name AS supplier_name,l.name AS location_name,po.currency_code,(SELECT count(*) FROM public.purchase_receipt_lines rl WHERE rl.tenant_id=r.tenant_id AND rl.receipt_id=r.id) AS line_count FROM public.purchase_receipts r JOIN public.purchase_orders po ON po.tenant_id=r.tenant_id AND po.id=r.purchase_order_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id JOIN public.locations l ON l.tenant_id=r.tenant_id AND l.id=r.receiving_location_id WHERE r.tenant_id=:t AND (:status IS NULL OR r.status=:status) AND (:po IS NULL OR r.purchase_order_id=:po) ORDER BY r.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "po": str(purchase_order_id) if purchase_order_id else None, "limit": limit})
+    return _many_branch_scoped(db, "SELECT r.*,po.po_number,p.display_name AS supplier_name,l.name AS location_name,po.currency_code,(SELECT count(*) FROM public.purchase_receipt_lines rl WHERE rl.tenant_id=r.tenant_id AND rl.receipt_id=r.id) AS line_count FROM public.purchase_receipts r JOIN public.purchase_orders po ON po.tenant_id=r.tenant_id AND po.id=r.purchase_order_id AND r.receiving_location_id=po.receiving_location_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id JOIN public.locations l ON l.tenant_id=r.tenant_id AND l.id=r.receiving_location_id JOIN public.warehouses wh ON wh.tenant_id=l.tenant_id AND wh.id=l.warehouse_id AND wh.branch_id=po.branch_id WHERE r.tenant_id=:t AND __BRANCH_SCOPE__ AND (:status IS NULL OR r.status=:status) AND (:po IS NULL OR r.purchase_order_id=:po) ORDER BY r.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "po": str(purchase_order_id) if purchase_order_id else None, "limit": limit}, tenant_id=tenant_id, user_id=actor, branch_column="po.branch_id")
 
 
 @router.get("/receipts/{receipt_id}")
 def get_receipt(receipt_id: UUID, ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
-    row = _one(db, "SELECT r.*,po.po_number,po.currency_code,po.supplier_party_id,p.display_name AS supplier_name,l.name AS location_name FROM public.purchase_receipts r JOIN public.purchase_orders po ON po.tenant_id=r.tenant_id AND po.id=r.purchase_order_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id JOIN public.locations l ON l.tenant_id=r.tenant_id AND l.id=r.receiving_location_id WHERE r.tenant_id=:t AND r.id=:id", {"t": str(tenant_id), "id": str(receipt_id)})
+    row = _one(db, "SELECT r.*,po.po_number,po.currency_code,po.supplier_party_id,po.branch_id,p.display_name AS supplier_name,l.name AS location_name FROM public.purchase_receipts r JOIN public.purchase_orders po ON po.tenant_id=r.tenant_id AND po.id=r.purchase_order_id AND r.receiving_location_id=po.receiving_location_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id JOIN public.locations l ON l.tenant_id=r.tenant_id AND l.id=r.receiving_location_id JOIN public.warehouses wh ON wh.tenant_id=l.tenant_id AND wh.id=l.warehouse_id AND wh.branch_id=po.branch_id WHERE r.tenant_id=:t AND r.id=:id", {"t": str(tenant_id), "id": str(receipt_id)})
     if not row: raise HTTPException(404, "Purchase receipt not found")
+    ensure_branch_access(db, tenant_id=tenant_id, user_id=actor, branch_id=UUID(str(row["branch_id"])))
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=UUID(str(row["receiving_location_id"])))
     row["lines"] = _receipt_lines(db, tenant_id, receipt_id)
     row["landed_costs"] = _many(db, "SELECT * FROM public.purchase_landed_costs WHERE tenant_id=:t AND receipt_id=:id ORDER BY created_at,id", {"t": str(tenant_id), "id": str(receipt_id)})
     row["allocations"] = _many(db, "SELECT a.*,c.cost_code,c.description,l.purchase_order_line_id FROM public.purchase_landed_cost_allocations a JOIN public.purchase_landed_costs c ON c.tenant_id=a.tenant_id AND c.id=a.landed_cost_id JOIN public.purchase_receipt_lines l ON l.tenant_id=a.tenant_id AND l.id=a.receipt_line_id WHERE a.tenant_id=:t AND c.receipt_id=:id ORDER BY c.created_at,l.created_at", {"t": str(tenant_id), "id": str(receipt_id)})
@@ -643,7 +700,8 @@ def post_receipt(receipt_id: UUID, idempotency_key: str | None = Header(None, al
     receipt = _one(db, "SELECT * FROM public.purchase_receipts WHERE tenant_id=:t AND id=:id FOR UPDATE", {"t": str(tenant_id), "id": str(receipt_id)})
     if not receipt: raise HTTPException(404, "Purchase receipt not found")
     if receipt["status"] != "DRAFT": raise HTTPException(409, "Only a draft receipt can be posted")
-    order = _order(db, tenant_id, receipt["purchase_order_id"], lock=True)
+    order = _ensure_order_access(db, tenant_id=tenant_id, user_id=actor, order_id=receipt["purchase_order_id"], lock=True)
+    _ensure_receipt_location_matches_order(receipt, order)
     if order["status"] not in {"OPEN", "PARTIALLY_RECEIVED"}: raise HTTPException(409, "Purchase order is no longer open for receiving")
     ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=receipt["receiving_location_id"])
     lines = _receipt_lines(db, tenant_id, receipt_id)
@@ -681,6 +739,9 @@ def cancel_receipt(receipt_id: UUID, body: dict[str, Any] | None = None, idempot
     if replay: return replay[1]
     receipt = _one(db, "SELECT * FROM public.purchase_receipts WHERE tenant_id=:t AND id=:id FOR UPDATE", {"t": str(tenant_id), "id": str(receipt_id)})
     if not receipt: raise HTTPException(404, "Purchase receipt not found")
+    order = _ensure_order_access(db, tenant_id=tenant_id, user_id=actor, order_id=receipt["purchase_order_id"])
+    _ensure_receipt_location_matches_order(receipt, order)
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=receipt["receiving_location_id"])
     if receipt["status"] != "DRAFT": raise HTTPException(409, "Only a draft receipt can be cancelled; posted stock must be corrected with a reversal")
     db.execute(text("UPDATE public.purchase_receipts SET status='CANCELLED' WHERE tenant_id=:t AND id=:id"), {"t": str(tenant_id), "id": str(receipt_id)})
     _audit(db, tenant_id, actor, "purchasing.receipt.cancelled", "purchase_receipt", receipt_id, "purchasing.receipt.cancelled.v1", {"reason": reason})
@@ -690,7 +751,7 @@ def cancel_receipt(receipt_id: UUID, body: dict[str, Any] | None = None, idempot
 @router.get("/returns")
 def list_returns(status: str | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
-    return _many(db, "SELECT r.*,pr.receipt_number,po.po_number,p.display_name AS supplier_name,po.currency_code,(SELECT coalesce(sum(rl.quantity*rl.supplier_credit_unit_cost),0) FROM public.purchase_return_lines rl WHERE rl.tenant_id=r.tenant_id AND rl.purchase_return_id=r.id) AS return_value FROM public.purchase_returns r JOIN public.purchase_receipts pr ON pr.tenant_id=r.tenant_id AND pr.id=r.purchase_receipt_id JOIN public.purchase_orders po ON po.tenant_id=pr.tenant_id AND po.id=pr.purchase_order_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id WHERE r.tenant_id=:t AND (:status IS NULL OR r.status=:status) ORDER BY r.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "limit": limit})
+    return _many_branch_scoped(db, "SELECT r.*,pr.receipt_number,po.po_number,p.display_name AS supplier_name,po.currency_code,(SELECT coalesce(sum(rl.quantity*rl.supplier_credit_unit_cost),0) FROM public.purchase_return_lines rl WHERE rl.tenant_id=r.tenant_id AND rl.purchase_return_id=r.id) AS return_value FROM public.purchase_returns r JOIN public.purchase_receipts pr ON pr.tenant_id=r.tenant_id AND pr.id=r.purchase_receipt_id AND r.receiving_location_id=pr.receiving_location_id JOIN public.purchase_orders po ON po.tenant_id=pr.tenant_id AND po.id=pr.purchase_order_id AND pr.receiving_location_id=po.receiving_location_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id JOIN public.locations l ON l.tenant_id=r.tenant_id AND l.id=r.receiving_location_id JOIN public.warehouses wh ON wh.tenant_id=l.tenant_id AND wh.id=l.warehouse_id AND wh.branch_id=po.branch_id WHERE r.tenant_id=:t AND __BRANCH_SCOPE__ AND (:status IS NULL OR r.status=:status) ORDER BY r.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "limit": limit}, tenant_id=tenant_id, user_id=actor, branch_column="po.branch_id")
 
 
 @router.post("/returns")
@@ -700,8 +761,9 @@ def create_return(body: PurchaseReturnCreate, idempotency_key: str | None = Head
     if replay: return replay[1]
     receipt = _one(db, "SELECT * FROM public.purchase_receipts WHERE tenant_id=:t AND id=:id FOR UPDATE", {"t": str(tenant_id), "id": str(body.purchase_receipt_id)})
     if not receipt or receipt["status"] != "POSTED": raise HTTPException(409, "Returns require a posted goods receipt")
-    order = _order(db, tenant_id, receipt["purchase_order_id"])
+    order = _ensure_order_access(db, tenant_id=tenant_id, user_id=actor, order_id=receipt["purchase_order_id"])
     ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=receipt["receiving_location_id"])
+    _ensure_receipt_location_matches_order(receipt, order)
     source_lines = {UUID(str(row["id"])): row for row in _receipt_lines(db, tenant_id, body.purchase_receipt_id)}
     total = ZERO
     resolved = []
@@ -727,8 +789,10 @@ def create_return(body: PurchaseReturnCreate, idempotency_key: str | None = Head
 @router.get("/returns/{return_id}")
 def get_return(return_id: UUID, ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
-    row = _one(db, "SELECT r.*,pr.receipt_number,po.po_number,po.currency_code,po.supplier_party_id,p.display_name AS supplier_name FROM public.purchase_returns r JOIN public.purchase_receipts pr ON pr.tenant_id=r.tenant_id AND pr.id=r.purchase_receipt_id JOIN public.purchase_orders po ON po.tenant_id=pr.tenant_id AND po.id=pr.purchase_order_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id WHERE r.tenant_id=:t AND r.id=:id", {"t": str(tenant_id), "id": str(return_id)})
+    row = _one(db, "SELECT r.*,pr.receipt_number,po.po_number,po.currency_code,po.supplier_party_id,po.branch_id,p.display_name AS supplier_name FROM public.purchase_returns r JOIN public.purchase_receipts pr ON pr.tenant_id=r.tenant_id AND pr.id=r.purchase_receipt_id AND r.receiving_location_id=pr.receiving_location_id JOIN public.purchase_orders po ON po.tenant_id=pr.tenant_id AND po.id=pr.purchase_order_id AND pr.receiving_location_id=po.receiving_location_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id JOIN public.locations l ON l.tenant_id=r.tenant_id AND l.id=r.receiving_location_id JOIN public.warehouses wh ON wh.tenant_id=l.tenant_id AND wh.id=l.warehouse_id AND wh.branch_id=po.branch_id WHERE r.tenant_id=:t AND r.id=:id", {"t": str(tenant_id), "id": str(return_id)})
     if not row: raise HTTPException(404, "Supplier return not found")
+    ensure_branch_access(db, tenant_id=tenant_id, user_id=actor, branch_id=UUID(str(row["branch_id"])))
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=UUID(str(row["receiving_location_id"])))
     row["lines"] = _many(db, "SELECT rl.*,pv.sku,pv.name AS variant_name,pr.name AS product_name FROM public.purchase_return_lines rl JOIN public.product_variants pv ON pv.tenant_id=rl.tenant_id AND pv.id=rl.variant_id JOIN public.products pr ON pr.tenant_id=pv.tenant_id AND pr.id=pv.product_id WHERE rl.tenant_id=:t AND rl.purchase_return_id=:id ORDER BY rl.created_at", {"t": str(tenant_id), "id": str(return_id)})
     return row
 
@@ -741,6 +805,12 @@ def cancel_return(return_id: UUID, body: dict[str, Any] | None = None, idempoten
     if replay: return replay[1]
     row = _one(db, "SELECT * FROM public.purchase_returns WHERE tenant_id=:t AND id=:id FOR UPDATE", {"t": str(tenant_id), "id": str(return_id)})
     if not row: raise HTTPException(404, "Supplier return not found")
+    source_receipt = _one(db, "SELECT receiving_location_id,purchase_order_id FROM public.purchase_receipts WHERE tenant_id=:t AND id=:id", {"t": str(tenant_id), "id": str(row["purchase_receipt_id"])})
+    if not source_receipt: raise HTTPException(404, "The original delivery for this return was not found")
+    _ensure_order_access(db, tenant_id=tenant_id, user_id=actor, order_id=source_receipt["purchase_order_id"])
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=source_receipt["receiving_location_id"])
+    if UUID(str(row["receiving_location_id"])) != UUID(str(source_receipt["receiving_location_id"])):
+        raise HTTPException(409, detail={"code": "PURCHASE_RETURN_LOCATION_MISMATCH", "message": "This return is linked to a different stock location. Ask the business owner to correct it before continuing."})
     if row["status"] != "REQUESTED": raise HTTPException(409, "Only a requested supplier return can be cancelled; approved or posted returns require controlled reversal")
     db.execute(text("UPDATE public.purchase_returns SET status='CANCELLED',updated_at=now() WHERE tenant_id=:t AND id=:id"), {"t": str(tenant_id), "id": str(return_id)})
     _audit(db, tenant_id, actor, "purchasing.return.cancelled", "purchase_return", return_id, "purchasing.return.cancelled.v1", {"return_number": row["return_number"], "reason": reason})
@@ -754,6 +824,12 @@ def approve_return(return_id: UUID, idempotency_key: str | None = Header(None, a
     if replay: return replay[1]
     row = _one(db, "SELECT * FROM public.purchase_returns WHERE tenant_id=:t AND id=:id FOR UPDATE", {"t": str(tenant_id), "id": str(return_id)})
     if not row: raise HTTPException(404, "Supplier return not found")
+    source_receipt = _one(db, "SELECT receiving_location_id,purchase_order_id FROM public.purchase_receipts WHERE tenant_id=:t AND id=:id", {"t": str(tenant_id), "id": str(row["purchase_receipt_id"])})
+    if not source_receipt: raise HTTPException(404, "The original delivery for this return was not found")
+    _ensure_order_access(db, tenant_id=tenant_id, user_id=actor, order_id=source_receipt["purchase_order_id"])
+    ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=source_receipt["receiving_location_id"])
+    if UUID(str(row["receiving_location_id"])) != UUID(str(source_receipt["receiving_location_id"])):
+        raise HTTPException(409, detail={"code": "PURCHASE_RETURN_LOCATION_MISMATCH", "message": "This return is linked to a different stock location. Ask the business owner to correct it before continuing."})
     if row["status"] != "REQUESTED": raise HTTPException(409, "Only a requested supplier return can be approved")
     db.execute(text("UPDATE public.purchase_returns SET status='APPROVED',approved_by=:actor,approved_at=now(),updated_at=now() WHERE tenant_id=:t AND id=:id"), {"actor": str(actor), "t": str(tenant_id), "id": str(return_id)})
     _audit(db, tenant_id, actor, "purchasing.return.approved", "purchase_return", return_id, "purchasing.return.approved.v1", {"return_number": row["return_number"]})
@@ -769,8 +845,12 @@ def post_return(return_id: UUID, idempotency_key: str | None = Header(None, alia
     if not row: raise HTTPException(404, "Supplier return not found")
     if row["status"] != "APPROVED": raise HTTPException(409, "Supplier return must be approved before posting")
     receipt = _one(db, "SELECT * FROM public.purchase_receipts WHERE tenant_id=:t AND id=:id", {"t": str(tenant_id), "id": str(row["purchase_receipt_id"])})
-    order = _order(db, tenant_id, receipt["purchase_order_id"])
+    if not receipt:
+        raise HTTPException(404, "The original delivery for this return was not found")
+    order = _ensure_order_access(db, tenant_id=tenant_id, user_id=actor, order_id=receipt["purchase_order_id"])
     ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=row["receiving_location_id"])
+    if UUID(str(row["receiving_location_id"])) != UUID(str(receipt["receiving_location_id"])) or UUID(str(receipt["receiving_location_id"])) != UUID(str(order["receiving_location_id"])):
+        raise HTTPException(409, detail={"code": "PURCHASE_RETURN_LOCATION_MISMATCH", "message": "This return is linked to a different stock location. Ask the business owner to correct it before continuing."})
     lines = _many(db, "SELECT * FROM public.purchase_return_lines WHERE tenant_id=:t AND purchase_return_id=:id ORDER BY id FOR UPDATE", {"t": str(tenant_id), "id": str(return_id)})
     total = ZERO
     for line in lines:
@@ -786,12 +866,14 @@ def post_return(return_id: UUID, idempotency_key: str | None = Header(None, alia
 @router.get("/supplier-bills")
 def list_supplier_bills(status: str | None = None, supplier_party_id: UUID | None = None, due_before: date | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     return _many(db, "SELECT b.*,p.display_name AS supplier_name,coalesce((SELECT sum(a.amount) FROM public.supplier_payment_allocations a JOIN public.supplier_payments sp ON sp.tenant_id=a.tenant_id AND sp.id=a.payment_id WHERE a.tenant_id=b.tenant_id AND a.bill_id=b.id AND sp.status='POSTED'),0) AS paid_amount,b.total-coalesce((SELECT sum(a.amount) FROM public.supplier_payment_allocations a JOIN public.supplier_payments sp ON sp.tenant_id=a.tenant_id AND sp.id=a.payment_id WHERE a.tenant_id=b.tenant_id AND a.bill_id=b.id AND sp.status='POSTED'),0) AS allocated_outstanding FROM public.supplier_bills b JOIN public.parties p ON p.tenant_id=b.tenant_id AND p.id=b.supplier_party_id WHERE b.tenant_id=:t AND (:status IS NULL OR b.status=:status) AND (:supplier IS NULL OR b.supplier_party_id=:supplier) AND (:due_before IS NULL OR b.due_date<=:due_before) ORDER BY b.due_date,b.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "supplier": str(supplier_party_id) if supplier_party_id else None, "due_before": due_before, "limit": limit})
 
 
 @router.post("/supplier-bills")
 def create_supplier_bill(body: SupplierBillCreate, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("purchasing.bills.manage"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier_bill.create", idempotency_key, body.model_dump(mode="json"))
     if replay: return replay[1]
     supplier = _supplier(db, tenant_id, body.supplier_party_id)
@@ -828,6 +910,7 @@ def create_supplier_bill(body: SupplierBillCreate, idempotency_key: str | None =
 @router.post("/supplier-bills/{bill_id}/post")
 def post_supplier_bill(bill_id: UUID, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("purchasing.bills.manage"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier_bill.post", idempotency_key, {"bill_id": str(bill_id)})
     if replay: return replay[1]
     bill = _one(db, "SELECT * FROM public.supplier_bills WHERE tenant_id=:t AND id=:id FOR UPDATE", {"t": str(tenant_id), "id": str(bill_id)})
@@ -846,6 +929,7 @@ def post_supplier_bill(bill_id: UUID, idempotency_key: str | None = Header(None,
 @router.post("/supplier-bills/{bill_id}/accept-variance")
 def accept_supplier_bill_variance(bill_id: UUID, body: SupplierBillVarianceOverride, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("purchasing.approve"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier_bill.accept_variance", idempotency_key, {"bill_id": str(bill_id), "reason": body.reason.strip()})
     if replay: return replay[1]
     bill = _one(db, "SELECT * FROM public.supplier_bills WHERE tenant_id=:t AND id=:id FOR UPDATE", {"t": str(tenant_id), "id": str(bill_id)})
@@ -864,6 +948,7 @@ def accept_supplier_bill_variance(bill_id: UUID, body: SupplierBillVarianceOverr
 @router.post("/supplier-bills/{bill_id}/void")
 def void_supplier_bill(bill_id: UUID, body: dict[str, Any] | None = None, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("purchasing.bills.manage"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     reason = (body or {}).get("reason")
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier_bill.void", idempotency_key, {"bill_id": str(bill_id), "reason": reason})
     if replay: return replay[1]
@@ -878,12 +963,14 @@ def void_supplier_bill(bill_id: UUID, body: dict[str, Any] | None = None, idempo
 @router.get("/supplier-payments")
 def list_supplier_payments(status: str | None = None, supplier_party_id: UUID | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     return _many(db, "SELECT py.*,p.display_name AS supplier_name,(SELECT coalesce(sum(a.amount),0) FROM public.supplier_payment_allocations a WHERE a.tenant_id=py.tenant_id AND a.payment_id=py.id) AS allocated_amount,py.amount-(SELECT coalesce(sum(a.amount),0) FROM public.supplier_payment_allocations a WHERE a.tenant_id=py.tenant_id AND a.payment_id=py.id) AS unallocated_amount FROM public.supplier_payments py JOIN public.parties p ON p.tenant_id=py.tenant_id AND p.id=py.supplier_party_id WHERE py.tenant_id=:t AND (:status IS NULL OR py.status=:status) AND (:supplier IS NULL OR py.supplier_party_id=:supplier) ORDER BY py.payment_date DESC,py.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "supplier": str(supplier_party_id) if supplier_party_id else None, "limit": limit})
 
 
 @router.post("/supplier-payments")
 def create_supplier_payment(body: SupplierPaymentCreate, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("purchasing.payments.manage"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier_payment.create", idempotency_key, body.model_dump(mode="json"))
     if replay: return replay[1]
     supplier = _supplier(db, tenant_id, body.supplier_party_id, active=False)
@@ -905,6 +992,7 @@ def create_supplier_payment(body: SupplierPaymentCreate, idempotency_key: str | 
 @router.post("/supplier-payments/{payment_id}/post")
 def post_supplier_payment(payment_id: UUID, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("purchasing.payments.manage"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier_payment.post", idempotency_key, {"payment_id": str(payment_id)})
     if replay: return replay[1]
     payment = _one(db, "SELECT * FROM public.supplier_payments WHERE tenant_id=:t AND id=:id FOR UPDATE", {"t": str(tenant_id), "id": str(payment_id)})
@@ -928,6 +1016,7 @@ def post_supplier_payment(payment_id: UUID, idempotency_key: str | None = Header
 @router.post("/supplier-payments/{payment_id}/void")
 def void_supplier_payment(payment_id: UUID, body: dict[str, Any] | None = None, idempotency_key: str | None = Header(None, alias="Idempotency-Key"), ctx=Depends(require_permission("purchasing.payments.manage"))):
     db, actor, tenant_id, _ = ctx
+    _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     reason = (body or {}).get("reason")
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier_payment.void", idempotency_key, {"payment_id": str(payment_id), "reason": reason})
     if replay: return replay[1]
@@ -942,6 +1031,7 @@ def void_supplier_payment(payment_id: UUID, body: dict[str, Any] | None = None, 
 @router.get("/supplier-balances")
 def supplier_balances(supplier_party_id: UUID | None = None, currency_code: str | None = None, include_zero: bool = False, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=actor)
     if currency_code and not __import__("re").fullmatch(r"[A-Za-z]{3}", currency_code): raise HTTPException(422, "Currency code must be a three-letter code")
     return _many(db, """
       WITH ledger AS (
@@ -967,6 +1057,7 @@ def supplier_balances(supplier_party_id: UUID | None = None, currency_code: str 
 @router.get("/supplier-ledger/{supplier_party_id}")
 def supplier_ledger(supplier_party_id: UUID, currency_code: str | None = None, limit: int = Query(200, ge=1, le=1000), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=actor)
     _supplier(db, tenant_id, supplier_party_id, active=False)
     rows = _many(db, "SELECT * FROM public.supplier_ledger_entries WHERE tenant_id=:t AND supplier_party_id=:p AND (:cc IS NULL OR upper(currency_code)=upper(:cc)) ORDER BY occurred_at,id LIMIT :limit", {"t": str(tenant_id), "p": str(supplier_party_id), "cc": currency_code.upper() if currency_code else None, "limit": limit})
     running: dict[str, Decimal] = {}

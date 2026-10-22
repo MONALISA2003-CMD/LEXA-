@@ -68,10 +68,13 @@ test('authenticated Command Centre analytics and inventory summary remain usable
   const response = await page.goto('/');
   expect(response, 'dashboard navigation did not produce a document response').not.toBeNull();
   expect(response!.status()).toBeLessThan(400);
-  await expect(page.getByRole('heading', { name: 'Command Centre' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Net sales vs money collected' })).toBeVisible();
-  await expect(page.getByText('Inventory value', { exact: true })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Analytics date range' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Business overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sales and money recorded' })).toBeVisible();
+  await expect(page.getByText('Stock value', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Finance at a glance' })).toBeVisible();
+  await expect(page.getByText('Customers who owe you', { exact: true })).toBeVisible();
+  await expect(page.getByText('Supplier bills to pay', { exact: true })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Sales reporting period' })).toBeVisible();
 
   await page.getByRole('button', { name: '7d', exact: true }).click();
   await expect(page.getByText(/Last 7 days/i).first()).toBeVisible();
@@ -84,7 +87,7 @@ test('authenticated Command Centre analytics and inventory summary remain usable
     scroll: document.documentElement.scrollWidth,
   }));
   expect(dimensions.scroll, 'Command Centre overflows on a 390px viewport').toBeLessThanOrEqual(dimensions.client + 1);
-  const refreshButton = page.getByRole('button', { name: /Refresh data|Refreshing/i });
+  const refreshButton = page.getByRole('button', { name: /Refresh|Refreshing/i }).first();
   await refreshButton.click();
   await expect(refreshButton).toBeEnabled({ timeout: 15_000 });
   expect(pageErrors, 'browser runtime errors were logged').toEqual([]);

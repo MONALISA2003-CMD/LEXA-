@@ -13,6 +13,7 @@ import {
   type BusinessProfile,
   type InventorySummary,
   type ReplenishmentRecommendation,
+  userFacingError,
 } from "../../lib/api";
 
 function formatMoney(value: string | number | undefined, currency: string | null) {
@@ -26,7 +27,7 @@ function formatMoney(value: string | number | undefined, currency: string | null
 }
 
 function safeError(reason: unknown) {
-  return reason instanceof Error ? reason.message : "This information could not be loaded. Please try again.";
+  return userFacingError(reason, "This information could not be loaded. Please try again.");
 }
 
 export default function IntelligencePage() {

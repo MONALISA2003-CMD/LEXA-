@@ -3,7 +3,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { acceptWorkspaceInvitation, previewWorkspaceInvitation } from "../../lib/api";
+import { acceptWorkspaceInvitation, previewWorkspaceInvitation,
+  userFacingError,
+} from "../../lib/api";
 
 type Preview = { email: string; workspace_name: string; expires_at: string };
 export default function InvitePage() {
@@ -24,7 +26,7 @@ export default function InvitePage() {
     if (window.location.hash) window.history.replaceState(null, "", window.location.pathname);
     if (!value) { setError("This invitation link is missing its token. Ask the workspace owner to issue a new link."); setLoading(false); return () => { active = false; }; }
     void previewWorkspaceInvitation(value).then(result => { if (active) setPreview(result); })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : "This invitation is invalid or expired."); })
+      .catch(e => { if (active) setError(userFacingError(e, "This invitation is invalid or expired.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
@@ -32,7 +34,7 @@ export default function InvitePage() {
     event.preventDefault(); if (busy || !token) return;
     setBusy(true); setError("");
     try { await acceptWorkspaceInvitation(token, password); router.replace("/"); router.refresh(); }
-    catch (e) { setError(e instanceof Error ? e.message : "The invitation could not be accepted."); }
+    catch (e) { setError(userFacingError(e, "The invitation could not be accepted.")); }
     finally { setBusy(false); }
   }
   return <main className="public-page"><section className="public-cta" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: "1rem" }}><div className="command-form" style={{ width: "min(520px, 100%)" }}>

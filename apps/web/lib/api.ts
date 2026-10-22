@@ -316,6 +316,8 @@ export type AnalyticsBranchMetric = { branch_id:string; branch_name?:string|null
 export type AnalyticsOverview = { from_date:string; to_date:string; currency_code:string; totals:{sales_total:string;returns_total:string;net_sales:string;payments_collected:string;refunds_total:string;credit_created:string;expenses_total:string;expense_reversals_total:string;net_cash_movement:string;sale_count:number}; daily:AnalyticsDailyMetric[] };
 export function getAnalyticsOverview(fromDate:string,toDate:string,currency:string){return getJson<AnalyticsOverview>(`/api/v1/analytics/overview?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}`);}
 export function getAnalyticsDaily(fromDate:string,toDate:string,currency:string){return getJson<AnalyticsDailyMetric[]>(`/api/v1/analytics/daily?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}`);}
+export type AnalyticsPaymentMethodMetric = { channel_id:string|null; channel_name:string; channel_type:string; currency_code:string; recorded_amount:string; payment_count:number };
+export function getAnalyticsPaymentsByChannel(fromDate:string,toDate:string,currency:string){return getJson<AnalyticsPaymentMethodMetric[]>(`/api/v1/analytics/payments-by-channel?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}`);}
 export function getAnalyticsProducts(fromDate:string,toDate:string,currency:string){return getJson<AnalyticsProductMetric[]>(`/api/v1/analytics/products?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}&limit=100`);}
 export type AnalyticsProductSummary = { variant_id:string; product_id:string; sku?:string|null; product_name?:string|null; variant_name?:string|null; units_sold:string; sales_amount:string; discount_amount:string; tax_amount:string; returns_units:string; returns_amount:string; net_sales:string; cogs:string; gross_margin:string; currency_code:string };
 export function getAnalyticsProductSummary(fromDate:string,toDate:string,currency:string,limit=5){return getJson<AnalyticsProductSummary[]>(`/api/v1/analytics/products/summary?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}&limit=${encodeURIComponent(String(limit))}`);}
@@ -571,7 +573,15 @@ export type SupplierLedgerEntry = {
 function purchasingPost<T>(path: string, body?: unknown) {
   return getJson<T>(path, { method: "POST", headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), "Idempotency-Key": key() }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
-export function getPurchasingSummary() { return getJson<Record<string, string | number>>('/api/v1/purchasing/summary'); }
+export type PurchasingSummary = {
+  active_suppliers: number;
+  open_purchase_orders: number;
+  draft_receipts: number;
+  pending_supplier_returns: number;
+  overdue_supplier_bills: number;
+  supplier_balances_by_currency: Array<{ currency_code: string; net_balance: string | number; payable: string | number; supplier_credit: string | number }>;
+};
+export function getPurchasingSummary() { return getJson<PurchasingSummary>('/api/v1/purchasing/summary'); }
 export function getPurchasingSuppliers(params: { q?: string; status?: string } = {}) { const p=new URLSearchParams(); Object.entries(params).forEach(([k,v])=>v&&p.set(k,v)); return getJson<PurchasingSupplier[]>(`/api/v1/purchasing/suppliers${p.size?`?${p}`:''}`); }
 export function createPurchasingSupplier(body: {name:string;code?:string;legal_name?:string|null;email?:string|null;phone?:string|null;currency_code:string;payment_terms_days:number;default_receiving_location_id?:string|null;tax_number?:string|null;notes?:string|null}) { return purchasingPost<PurchasingSupplier>('/api/v1/purchasing/suppliers', body); }
 export function updatePurchasingSupplier(id:string, body:Partial<{name:string;legal_name:string|null;email:string|null;phone:string|null;currency_code:string;payment_terms_days:number;default_receiving_location_id:string|null;tax_number:string|null;notes:string|null;status:'ACTIVE'|'INACTIVE'|'ARCHIVED'}>) { return getJson<PurchasingSupplier>(`/api/v1/purchasing/suppliers/${encodeURIComponent(id)}`, { method:'PATCH', headers:{'Content-Type':'application/json','Idempotency-Key':key()}, body:JSON.stringify(body) }); }

@@ -8,6 +8,7 @@ import {
   getBusinessProfile,
   updateBusinessProfile,
   type BusinessProfile,
+  userFacingError,
 } from "../../lib/api";
 
 type ProfileDraft = {
@@ -76,7 +77,7 @@ export default function SettingsPage() {
         currency_code: saved.currency_code,
       } : emptyDraft);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Your business details could not be loaded. Try again.");
+      setError(userFacingError(reason, "Your business details could not be loaded. Try again."));
     } finally {
       setLoading(false);
     }
@@ -110,7 +111,7 @@ export default function SettingsPage() {
       setDraft({ legal_name: saved.legal_name, display_name: saved.display_name, country_code: saved.country_code, currency_code: saved.currency_code });
       setSuccess("Your business details have been saved.");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Your details were not saved. Please try again.");
+      setError(userFacingError(reason, "Your details were not saved. Please try again."));
     } finally {
       setSaving(false);
     }

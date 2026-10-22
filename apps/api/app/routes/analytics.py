@@ -35,6 +35,48 @@ def overview(start_date: date, end_date: date, currency_code: str = Query(..., m
     }
     return {"from_date":str(start_date),"to_date":str(end_date),"currency_code":currency_code.upper(),"totals":{k:(str(v) if isinstance(v,Decimal) else v) for k,v in totals.items()},"daily":[out(r) for r in rows]}
 
+
+@router.get("/payments-by-channel")
+def payments_by_channel(
+    start_date: date,
+    end_date: date,
+    currency_code: str = Query(..., min_length=3, max_length=3),
+    ctx=Depends(require_permission("analytics.read")),
+):
+    """Return recorded customer-sale payments grouped by the owner's payment-method names."""
+    db, actor_id, tenant_id, _ = ctx
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=actor_id)
+    rows = db.execute(text("""
+        SELECT
+            p.payment_channel_id AS channel_id,
+            COALESCE(pc.name, 'Not specified') AS channel_name,
+            COALESCE(pc.channel_type, 'OTHER') AS channel_type,
+            p.currency_code,
+            SUM(p.amount) AS recorded_amount,
+            COUNT(p.id) AS payment_count
+        FROM payments p
+        JOIN sales s
+          ON s.tenant_id = p.tenant_id
+         AND s.transaction_id = p.transaction_id
+         AND s.status = 'COMPLETED'
+        LEFT JOIN payment_channels pc
+          ON pc.tenant_id = p.tenant_id
+         AND pc.id = p.payment_channel_id
+        WHERE p.tenant_id = :tenant_id
+          AND p.status = 'RECORDED'
+          AND p.currency_code = :currency_code
+          AND p.business_date BETWEEN :start_date AND :end_date
+        GROUP BY p.payment_channel_id, COALESCE(pc.name, 'Not specified'), COALESCE(pc.channel_type, 'OTHER'), p.currency_code
+        ORDER BY SUM(p.amount) DESC, channel_name ASC
+        LIMIT 100
+    """), {
+        "tenant_id": str(tenant_id),
+        "currency_code": currency_code.upper(),
+        "start_date": start_date,
+        "end_date": end_date,
+    }).mappings().all()
+    return [out(row) for row in rows]
+
 @router.get("/daily")
 def daily(start_date: date, end_date: date, currency_code: str = Query(..., min_length=3, max_length=3), ctx=Depends(require_permission("analytics.read"))):
     db, _, tenant_id, _ = ctx

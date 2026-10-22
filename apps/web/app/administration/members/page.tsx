@@ -9,6 +9,7 @@ import {
   replaceWorkspaceRolePermissions, resendWorkspaceInvitation,
   revokeWorkspaceInvitation, updateWorkspaceMemberStatus,
   type Branch, type WorkspaceInvitation, type WorkspaceMember, type WorkspacePermission, type WorkspaceRole,
+  userFacingError,
 } from "../../../lib/api";
 
 export default function MembersAdminPage() {
@@ -45,7 +46,7 @@ export default function MembersAdminPage() {
       setMemberRoleDrafts(Object.fromEntries(memberResult.items.map(member => [member.id, member.roles.map(role => role.id)])));
       setRoleId(current => current && roleResult.some(role => role.id === current) ? current : roleResult.find(role => role.name.toLowerCase() !== "owner")?.id || roleResult[0]?.id || "");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Team access could not be loaded. No changes are available until it can be verified.");
+      setError(userFacingError(e, "Team access could not be loaded. No changes are available until it can be verified."));
     } finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -63,14 +64,14 @@ export default function MembersAdminPage() {
       if (result.invite_url) setLastInviteUrl(`${window.location.origin}${result.invite_url}`);
       setEmail(""); setInviteBranchIds([]);
       await load();
-    } catch (e) { setError(e instanceof Error ? e.message : "Invitation could not be created."); }
+    } catch (e) { setError(userFacingError(e, "Invitation could not be created.")); }
     finally { setBusy(false); }
   }
 
   async function saveBranches(member: WorkspaceMember) {
     setBusy(true); setError(""); setMessage("");
     try { await replaceWorkspaceMemberBranches(member.id, memberBranchDrafts[member.id] || []); setMessage(`Access saved for ${member.email}.`); await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Branch assignments could not be saved."); }
+    catch (e) { setError(userFacingError(e, "Branch assignments could not be saved.")); }
     finally { setBusy(false); }
   }
 
@@ -80,7 +81,7 @@ export default function MembersAdminPage() {
     try {
       const role = await createWorkspaceRole({ name: newRoleName.trim(), description: newRoleDescription.trim() || undefined });
       setNewRoleName(""); setNewRoleDescription(""); setMessage(`Role “${role.name}” created. Assign only the permissions this role needs.`); await load();
-    } catch (e) { setError(e instanceof Error ? e.message : "Role could not be created."); }
+    } catch (e) { setError(userFacingError(e, "Role could not be created.")); }
     finally { setBusy(false); }
   }
 
@@ -90,7 +91,7 @@ export default function MembersAdminPage() {
     try {
       await replaceWorkspaceRolePermissions(role.id, rolePermissionDrafts[role.id] || []);
       setMessage(`Permissions saved for role ${role.name}.`); await load();
-    } catch (e) { setError(e instanceof Error ? e.message : "Role permissions could not be saved."); }
+    } catch (e) { setError(userFacingError(e, "Role permissions could not be saved.")); }
     finally { setBusy(false); }
   }
 
@@ -102,28 +103,28 @@ export default function MembersAdminPage() {
       await replaceWorkspaceMemberRoles(member.id, selected);
       setMessage(`Roles saved for ${member.email}.`);
       await load();
-    } catch (e) { setError(e instanceof Error ? e.message : "Role assignments could not be saved."); }
+    } catch (e) { setError(userFacingError(e, "Role assignments could not be saved.")); }
     finally { setBusy(false); }
   }
 
   async function changeStatus(member: WorkspaceMember, status: "ACTIVE" | "INACTIVE") {
     setBusy(true); setError(""); setMessage("");
     try { await updateWorkspaceMemberStatus(member.id, status); setMessage(`Membership for ${member.email} is now ${status.toLowerCase()}.`); await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Membership status could not be changed."); }
+    catch (e) { setError(userFacingError(e, "Membership status could not be changed.")); }
     finally { setBusy(false); }
   }
 
   async function resend(invitation: WorkspaceInvitation) {
     setBusy(true); setError(""); setMessage(""); setLastInviteUrl("");
     try { const result = await resendWorkspaceInvitation(invitation.id); setMessage(result.message || "A fresh invite link was issued. The previous token has been invalidated."); if (result.invite_url) setLastInviteUrl(`${window.location.origin}${result.invite_url}`); await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Invitation could not be resent."); }
+    catch (e) { setError(userFacingError(e, "Invitation could not be resent.")); }
     finally { setBusy(false); }
   }
 
   async function revoke(invitation: WorkspaceInvitation) {
     setBusy(true); setError(""); setMessage("");
     try { await revokeWorkspaceInvitation(invitation.id); setMessage(`Invitation for ${invitation.email} revoked.`); await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Invitation could not be revoked."); }
+    catch (e) { setError(userFacingError(e, "Invitation could not be revoked.")); }
     finally { setBusy(false); }
   }
 

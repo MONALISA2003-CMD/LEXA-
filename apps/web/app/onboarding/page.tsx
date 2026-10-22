@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "../../components/app-shell";
-import { getSetupProgress, initializeWorkspaceSetup, type SetupProgress } from "../../lib/api";
+import { getSetupProgress, initializeWorkspaceSetup, type SetupProgress,
+  userFacingError,
+} from "../../lib/api";
 
 export default function OnboardingPage() {
   const [progress, setProgress] = useState<SetupProgress | null>(null);
@@ -14,7 +16,7 @@ export default function OnboardingPage() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try { setProgress(await getSetupProgress()); }
-    catch (e) { setProgress(null); setError(e instanceof Error ? e.message : "Setup progress could not be verified."); }
+    catch (e) { setProgress(null); setError(userFacingError(e, "Setup progress could not be verified.")); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -22,7 +24,7 @@ export default function OnboardingPage() {
     if (preparing) return;
     setPreparing(true); setError(""); setMessage("");
     try { const result = await initializeWorkspaceSetup(); setMessage(result.message); setProgress(result.progress); }
-    catch (e) { setError(e instanceof Error ? e.message : "We couldn't finish setting up your business. Please try again."); }
+    catch (e) { setError(userFacingError(e, "We couldn't finish setting up your business. Please try again.")); }
     finally { setPreparing(false); }
   }
   return <AppShell title="Business setup" eyebrow="Let’s get your business ready">

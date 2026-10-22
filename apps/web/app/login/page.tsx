@@ -3,7 +3,9 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { login, setAccessToken, WorkspaceSelectionError, type WorkspaceChoice } from "../../lib/api";
+import { login, setAccessToken, WorkspaceSelectionError, type WorkspaceChoice,
+  userFacingError,
+} from "../../lib/api";
 import { FormField, StatusBanner } from "../../components/ui";
 import { safeReturnPath as resolveSafeReturnPath } from "../../lib/navigation.mjs";
 
@@ -36,7 +38,7 @@ export default function LoginPage() {
         setChoices(e.workspaces);
         setError(e.workspaces.length ? "Choose which business to open." : "This account is not linked to an active business. Ask the business owner for help.");
       } else {
-        setError(e instanceof Error ? e.message : "We could not sign you in. Check your details and try again.");
+        setError(userFacingError(e, "We could not sign you in. Check your details and try again."));
       }
     } finally {
       setBusy(false);

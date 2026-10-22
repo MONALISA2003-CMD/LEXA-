@@ -1158,3 +1158,166 @@ body { background: var(--lexa-canvas); color: var(--lexa-text, #14213D); }
 .auth-story-logo { box-shadow: 0 6px 18px rgba(16,185,129,.25); }
 .auth-story-brand strong { color: #FFFFFF; font-size: 20px; letter-spacing: .15em; }
 .auth-story-brand small { color: #B0C7D7; }
+
+/* Stage 3 — consistent Emerald Fusion design system across existing screens. */
+:root {
+  --emerald: #10B981;
+  --emerald-dark: #087F5B;
+  --emerald-soft: #E5F8F0;
+  --teal: #13B8B0;
+  --electric-blue: #496CFF;
+  --sunshine: #FFC857;
+  --coral: #FF806E;
+  --navy: #13233F;
+  --navy-2: #203963;
+  --blue: #496CFF;
+  --cyan: #13B8B0;
+  --ink: #182840;
+  --muted: #617189;
+  --line: #DCE5EB;
+  --paper: #FFFFFF;
+  --soft: #F5F8FA;
+  --soft-blue: #EDF3FF;
+  --soft-green: #EAF8F1;
+  --focus-ring: #496CFF;
+}
+
+html { scroll-behavior: smooth; }
+body { color: var(--ink); background: var(--soft); }
+button, input, select, textarea { font: inherit; }
+:where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid rgba(73,108,255,.72);
+  outline-offset: 3px;
+}
+
+/* Shared page rhythm: larger type, less cramped spacing, clearer hierarchy. */
+.app-content { width: 100%; max-width: 1640px; margin-inline: auto; }
+.page-heading h1, .standard-page-header h1 { color: var(--navy); font-size: clamp(26px, 2.4vw, 34px); letter-spacing: -.035em; line-height: 1.12; }
+.page-heading p, .standard-page-header p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+.section-label, .section-head .section-label, .panel .eyebrow { color: #0B8C67; font-size: 10px; letter-spacing: .12em; }
+.panel, .workspace-section, .section, .sale-detail-panel, .operation-form, .operation-list, .operation-detail {
+  border-color: var(--line);
+  border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(19,35,63,.035);
+}
+.panel h2, .workspace-section h2, .section-head h2, .panel-head h2 { color: var(--navy); font-size: 18px; letter-spacing: -.02em; line-height: 1.3; }
+.panel-subtitle, .panel-head p, .section-head p { color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+/* Main actions are unmistakably LEXA green; secondary actions remain quiet. */
+.button-dark, .primary, .auth-submit {
+  color: #FFFFFF;
+  background: var(--emerald-dark);
+  border-color: var(--emerald-dark);
+  box-shadow: 0 5px 14px rgba(8,127,91,.15);
+}
+.button-dark:hover, .primary:hover, .auth-submit:hover:not(:disabled) {
+  background: #066C4D;
+  border-color: #066C4D;
+}
+.button-soft, .secondary {
+  color: var(--navy);
+  background: #FFFFFF;
+  border-color: #D4E1E5;
+}
+.button-soft:hover, .secondary:hover { background: #F0FAF5; border-color: #A8DCC7; }
+.button, .primary, .secondary, .top-actions button { min-height: 40px; }
+
+/* Brand navigation: high contrast, quieter inactive items, clear selected state. */
+.app-sidebar, .sidebar { background: linear-gradient(180deg, #13233F 0%, #102B37 100%); }
+.app-nav-item, .sidebar-item { transition: background .16s ease, color .16s ease, transform .16s ease; }
+.app-nav-item:hover, .sidebar-item:hover { background: rgba(255,255,255,.07); color: #FFFFFF; }
+.app-nav-item.active, .sidebar-item.active { background: linear-gradient(100deg, rgba(16,185,129,.22), rgba(19,184,176,.10)); color: #FFFFFF; box-shadow: inset 3px 0 0 var(--emerald); }
+.app-nav-item.active .app-nav-icon, .sidebar-item.active .sidebar-icon { color: #77E4BB; background: rgba(16,185,129,.15); }
+.app-brand strong, .sidebar-brand-link span { letter-spacing: .12em; }
+.app-brand-logo, .lexa-sidebar-mark { filter: none; }
+.app-topbar { border-bottom-color: #E5ECEF; background: rgba(255,255,255,.94); backdrop-filter: blur(14px); }
+.workspace-switch, .top-search { border-color: #DCE7E9; }
+.workspace-switch:hover, .top-search:focus-within { border-color: #92D5BC; box-shadow: 0 0 0 3px rgba(16,185,129,.08); }
+.mobile-nav a.active, .mobile-nav button.active { color: var(--emerald-dark); background: var(--emerald-soft); }
+.mobile-nav { border-color: #D5E5DE; }
+
+/* Dashboard numbers: breathing room and a purposeful colour rhythm. */
+.command-toolbar { align-items: center; }
+.command-toolbar > div:first-child strong { color: var(--navy); font-size: 16px; }
+.command-toolbar > div:first-child span { color: var(--muted); font-size: 13px; line-height: 1.55; }
+.command-kpis { gap: 12px; }
+.command-kpi { border-radius: 16px; padding: 17px; border-color: #DFE9E8; box-shadow: 0 5px 20px rgba(19,35,63,.035); }
+.command-kpi:nth-child(1) { background: linear-gradient(145deg,#FFFFFF 55%,#E8F9F0); }
+.command-kpi:nth-child(2) { background: linear-gradient(145deg,#FFFFFF 55%,#E8F9F6); }
+.command-kpi:nth-child(3) { background: linear-gradient(145deg,#FFFFFF 55%,#EEF1FF); }
+.command-kpi:nth-child(4) { background: linear-gradient(145deg,#FFFFFF 55%,#FFF6DF); }
+.command-kpi > span { color: #56677D; font-size: 12px; font-weight: 650; letter-spacing: 0; }
+.command-kpi strong { color: var(--navy); font-size: clamp(20px,1.8vw,28px); line-height: 1.2; overflow-wrap: anywhere; }
+.command-kpi small { color: #687991; font-size: 11px; line-height: 1.45; }
+.phase4-analytics-grid, .phase4-operations-grid, .phase4-lower-grid { gap: 16px; }
+.panel.command-panel { padding: 17px; border-radius: 18px; }
+.panel-head { gap: 14px; }
+.panel-link { color: var(--emerald-dark); font-size: 12px; }
+.panel-link:hover { color: #065F46; text-decoration: underline; }
+.period-button.active { color: #FFFFFF; background: var(--emerald-dark); border-color: var(--emerald-dark); }
+.top-product-rank { color: var(--emerald-dark); background: var(--emerald-soft); }
+.product-bar-track span { background: linear-gradient(90deg,var(--emerald),var(--teal),var(--electric-blue)); }
+.attention-dot.danger { background: var(--coral); }
+.attention-dot.warning { background: #E4A72B; }
+.attention-dot.info { background: var(--electric-blue); }
+.work-card, .quick-links a { border-color: #E1E9EA; background: #FFFFFF; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.work-card:hover, .quick-links a:hover { transform: translateY(-1px); border-color: #A8DCC7; box-shadow: 0 7px 18px rgba(19,35,63,.07); }
+.work-card small, .quick-links a small { color: #60758B; font-size: 11px; line-height: 1.5; }
+
+/* Stage 2: compact finance panel on Home, while detailed analysis stays in Finance/Reports. */
+.finance-overview { margin: 0 0 16px; padding: 17px 18px; background: linear-gradient(120deg,#FFFFFF 0%,#FBFEFC 72%,#F1FBF7 100%); }
+.finance-overview-head { margin-bottom: 12px; }
+.finance-overview-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.finance-overview-card { min-width: 0; display: grid; grid-template-columns: 38px minmax(0,1fr); column-gap: 12px; align-items: center; padding: 14px; border: 1px solid #DDEBE5; border-radius: 14px; background: #FFFFFF; transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease; }
+.finance-overview-card:hover { border-color: #9ED9C0; transform: translateY(-1px); box-shadow: 0 7px 18px rgba(19,35,63,.06); }
+.finance-overview-icon { grid-row: span 3; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; color: #FFFFFF; background: linear-gradient(145deg,var(--emerald),var(--teal)); font-size: 21px; font-weight: 800; }
+.finance-supplier-balance .finance-overview-icon { background: linear-gradient(145deg,var(--electric-blue),#6F8AFF); }
+.finance-overview-label { color: #56677D; font-size: 12px; font-weight: 700; line-height: 1.4; }
+.finance-overview-card strong { color: var(--navy); font-size: clamp(18px,1.8vw,25px); line-height: 1.3; overflow-wrap: anywhere; }
+.finance-overview-card small { color: #697B8F; font-size: 11px; line-height: 1.5; }
+
+/* Forms and records: consistent readable labels, input heights, and table scanability. */
+label, .form-field-label, .operation-form label, .operation-detail label { color: #43566E; font-size: 12px; font-weight: 650; line-height: 1.4; }
+input:not([type="checkbox"]):not([type="radio"]), select, textarea { border-color: #CEDDDE; border-radius: 10px; color: var(--navy); background: #FFFFFF; }
+input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus { border-color: var(--emerald); outline: 3px solid rgba(16,185,129,.12); }
+.data-table, table { font-size: 13px; }
+th, .data-table th { color: #52667B; font-size: 11px; letter-spacing: .045em; }
+td, .data-table td { color: #2D4059; }
+.empty-state, .empty, .empty-inline { border-radius: 13px; line-height: 1.6; }
+.empty-state strong, .empty strong { color: var(--navy); font-size: 14px; }
+.empty-state span, .empty p, .empty-inline { color: #62748A; font-size: 12px; }
+.notice, .status-banner { border-radius: 12px; }
+
+/* Login and first-run setup feel related to the same recognizable brand. */
+.auth-story { background: radial-gradient(ellipse at 15% 6%,rgba(16,185,129,.32),transparent 38%),radial-gradient(ellipse at 95% 90%,rgba(73,108,255,.24),transparent 42%),linear-gradient(145deg,#13233F 0%,#103A3D 100%); }
+.auth-story-kicker { color: #9BE8CA; }
+.auth-submit { min-height: 48px; font-size: 14px; }
+.auth-card { border-color: #E0EAE6; box-shadow: 0 22px 70px rgba(19,35,63,.11); }
+.auth-card h2 { color: var(--navy); letter-spacing: -.035em; }
+.auth-form-footer a, .auth-form-footer .text-link { color: var(--emerald-dark); }
+.setup-welcome-art { background: radial-gradient(circle at 18% 20%,rgba(255,200,87,.46),transparent 26%),linear-gradient(140deg,#E6FBF1,#E4F8F6 52%,#E8EDFF); }
+.setup-welcome-mark { background: linear-gradient(135deg,var(--emerald),var(--teal) 60%,var(--electric-blue)); }
+
+@media (max-width: 800px) {
+  .finance-overview { padding: 14px; }
+  .finance-overview-grid { grid-template-columns: minmax(0,1fr); gap: 9px; }
+  .finance-overview-card { grid-template-columns: 36px minmax(0,1fr); padding: 12px; }
+  .finance-overview-card strong { font-size: 20px; }
+  .command-toolbar > div:first-child strong { font-size: 15px; }
+  .panel.command-panel { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+
+/* Stage 3 — category chart accents and visible status clarity. */
+.expense-comparison-track { background: #FFF0E8; }
+.expense-comparison-track span { background: linear-gradient(90deg, #FF806E, #FFC857); }
+.notice, .inline-message, .inline-message p { line-height: 1.55; }
+.empty-inline, .empty-state span, .data-state p { overflow-wrap: anywhere; }
+.button:disabled, .primary:disabled, .secondary:disabled { cursor: not-allowed; opacity: .62; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+
+.payment-method-track span{background:linear-gradient(90deg,#13B8B0,#10B981)}
