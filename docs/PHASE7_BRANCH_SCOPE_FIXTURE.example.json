@@ -1,0 +1,8 @@
+{
+  "environment": "staging",
+  "disposable_scope": true,
+  "reset_strategy": "dispose_test_tenant",
+  "actor_role": "manager",
+  "restricted_purchase_order_id": "REPLACE_WITH_DRAFT_PO_UUID_ON_UNASSIGNED_BRANCH",
+  "notes": "The purchase order must belong to the fixture tenant but a branch where this manager has no membership; it should be a disposable DRAFT order. The security acceptance intentionally attempts cancel and expects 403/404. Never use production credentials or records."
+}

@@ -169,3 +169,4 @@ jobs:
           fi
           git commit -m "chore: extract canonical LEXA source [lexa-extractor]"
           git push
+          

@@ -1,0 +1,10 @@
+{
+  "environment": "staging",
+  "disposable_scope": true,
+  "reset_strategy": "dispose_test_tenant",
+  "actor_role": "manager",
+  "location_id": "REPLACE_WITH_ASSIGNED_LOCATION_UUID",
+  "restricted_location_id": "REPLACE_WITH_SAME_TENANT_UNASSIGNED_LOCATION_UUID",
+  "variant_id": "REPLACE_WITH_TRACKED_VARIANT_UUID",
+  "notes": "Use only on a separately hosted sanitized staging stack with disposable tenant data. restricted_location_id must belong to the same tenant but be outside the actor's assigned branch/location scope. Use a separate Playwright storage state. Never use production identifiers or credentials."
+}

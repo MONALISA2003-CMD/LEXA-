@@ -194,4 +194,3 @@ INSERT INTO permissions(code,description) VALUES ('analytics.read','View busines
 INSERT INTO role_permissions(role_id,permission_id) SELECT r.id,p.id FROM roles r JOIN permissions p ON p.code='analytics.read' WHERE r.name IN ('Owner','Admin','Manager','Accountant','Auditor') ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions(role_id,permission_id) SELECT r.id,p.id FROM roles r JOIN permissions p ON p.code='analytics.refresh' WHERE r.name IN ('Owner','Admin') ON CONFLICT DO NOTHING;
 INSERT INTO schema_migrations(version) VALUES('021_phase5_analytics_foundation') ON CONFLICT(version) DO NOTHING;
-COMMIT;

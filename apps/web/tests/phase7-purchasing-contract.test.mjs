@@ -31,7 +31,7 @@ test('supplier terms, effective supplier costs, landed cost and explicit invoice
 
 test('Phase 7 E2E is enabled in Playwright but fails closed unless explicit staging safeguards are present', () => {
   assert.match(pkg.scripts['test:e2e:phase7'], /phase7-purchasing-acceptance\.spec\.ts/);
-  assert.match(config, /phase\(5-sales\|7-purchasing\|8-reports\)-acceptance/);
+  assert.match(config, /phase\(5-sales\|6-inventory\|7-purchasing\|7-authorization\|8-reports\)-acceptance/);
   assert.match(config, /LEXA_PHASE7_STORAGE_STATE/);
   assert.match(spec, /LEXA_PHASE7_ALLOW_STAGING_WRITES/);
   assert.match(spec, /disposable_scope === true/);

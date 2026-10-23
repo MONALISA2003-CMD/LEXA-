@@ -92,6 +92,7 @@ class FakeDb:
         self.pre_tenant_access = None
         self.pre_tenant_email = None
         self.workspace_lookup_context = None
+        self.info = {}
         self.commits = 0
         self.added = []
 
@@ -168,6 +169,8 @@ def test_active_account_can_resolve_workspace_and_sign_in(monkeypatch):
     assert db.workspace_lookup_context == str(db.user.id)
     assert db.user_context == str(db.user.id)
     assert db.tenant_context == str(db.tenant.id)
+    assert db.info["lexa_tenant_id"] == str(db.tenant.id)
+    assert db.info["lexa_user_id"] == str(db.user.id)
     assert db.commits == 1
 
 

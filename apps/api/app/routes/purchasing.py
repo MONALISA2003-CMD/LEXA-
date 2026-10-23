@@ -428,7 +428,7 @@ def list_suppliers(q: str | None = None, status: str = Query("ACTIVE", pattern=r
              (SELECT coalesce(sum(e.debit_amount-e.credit_amount),0) FROM public.supplier_ledger_entries e WHERE e.tenant_id=sp.tenant_id AND e.supplier_party_id=sp.supplier_party_id AND e.currency_code=sp.currency_code) AS net_balance
       FROM public.supplier_profiles sp JOIN public.parties p ON p.tenant_id=sp.tenant_id AND p.id=sp.supplier_party_id
       LEFT JOIN public.suppliers s ON s.tenant_id=sp.tenant_id AND s.supplier_party_id=sp.supplier_party_id AND s.status<>'ARCHIVED'
-      WHERE sp.tenant_id=:t AND (:status='ALL' OR sp.status=:status) AND (CAST(:q AS text) IS NULL OR p.display_name ILIKE :like OR p.email ILIKE :like OR s.code ILIKE :like)
+      WHERE sp.tenant_id=:t AND (CAST(:status AS text)='ALL' OR sp.status=CAST(:status AS text)) AND (CAST(:q AS text) IS NULL OR p.display_name ILIKE :like OR p.email ILIKE :like OR s.code ILIKE :like)
       ORDER BY p.display_name LIMIT :limit
     """
     return _many(db, query, {"t": str(tenant_id), "status": status, "q": q, "like": f"%{q.strip()}%" if q and q.strip() else None, "limit": limit})
@@ -525,7 +525,7 @@ def supplier_costs(supplier_party_id: UUID, variant_id: UUID | None = None, limi
       SELECT c.*,pv.sku,pv.name AS variant_name,pr.name AS product_name
       FROM public.supplier_variant_costs c JOIN public.product_variants pv ON pv.tenant_id=c.tenant_id AND pv.id=c.variant_id
       JOIN public.products pr ON pr.tenant_id=pv.tenant_id AND pr.id=pv.product_id
-      WHERE c.tenant_id=:t AND c.supplier_party_id=:p AND (CAST(:variant_id AS uuid) IS NULL OR c.variant_id=:variant_id)
+      WHERE c.tenant_id=:t AND c.supplier_party_id=:p AND (CAST(:variant_id AS uuid) IS NULL OR c.variant_id=CAST(:variant_id AS uuid))
       ORDER BY c.effective_from DESC LIMIT :limit
     """, {"t": str(tenant_id), "p": str(supplier_party_id), "variant_id": str(variant_id) if variant_id else None, "limit": limit})
 
@@ -558,7 +558,7 @@ def list_purchase_orders(status: str | None = None, supplier_party_id: UUID | No
       JOIN public.branches b ON b.tenant_id=po.tenant_id AND b.id=po.branch_id
       JOIN public.locations l ON l.tenant_id=po.tenant_id AND l.id=po.receiving_location_id
       JOIN public.warehouses wh ON wh.tenant_id=l.tenant_id AND wh.id=l.warehouse_id AND wh.branch_id=po.branch_id
-      WHERE po.tenant_id=:t AND __BRANCH_SCOPE__ AND (CAST(:status AS text) IS NULL OR po.status=:status) AND (CAST(:supplier AS uuid) IS NULL OR po.supplier_party_id=:supplier)
+      WHERE po.tenant_id=:t AND __BRANCH_SCOPE__ AND (CAST(:status AS text) IS NULL OR po.status=CAST(:status AS text)) AND (CAST(:supplier AS uuid) IS NULL OR po.supplier_party_id=CAST(:supplier AS uuid))
       ORDER BY po.created_at DESC LIMIT :limit
     """, {"t": str(tenant_id), "status": status, "supplier": str(supplier_party_id) if supplier_party_id else None, "limit": limit}, tenant_id=tenant_id, user_id=actor, branch_column="po.branch_id")
 
@@ -696,7 +696,7 @@ def create_receipt(order_id: UUID, body: ReceiptCreate, idempotency_key: str | N
 @router.get("/receipts")
 def list_receipts(status: str | None = None, purchase_order_id: UUID | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
-    return _many_branch_scoped(db, "SELECT r.*,po.po_number,p.display_name AS supplier_name,l.name AS location_name,po.currency_code,(SELECT count(*) FROM public.purchase_receipt_lines rl WHERE rl.tenant_id=r.tenant_id AND rl.receipt_id=r.id) AS line_count FROM public.purchase_receipts r JOIN public.purchase_orders po ON po.tenant_id=r.tenant_id AND po.id=r.purchase_order_id AND r.receiving_location_id=po.receiving_location_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id JOIN public.locations l ON l.tenant_id=r.tenant_id AND l.id=r.receiving_location_id JOIN public.warehouses wh ON wh.tenant_id=l.tenant_id AND wh.id=l.warehouse_id AND wh.branch_id=po.branch_id WHERE r.tenant_id=:t AND __BRANCH_SCOPE__ AND (CAST(:status AS text) IS NULL OR r.status=:status) AND (CAST(:po AS uuid) IS NULL OR r.purchase_order_id=:po) ORDER BY r.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "po": str(purchase_order_id) if purchase_order_id else None, "limit": limit}, tenant_id=tenant_id, user_id=actor, branch_column="po.branch_id")
+    return _many_branch_scoped(db, "SELECT r.*,po.po_number,p.display_name AS supplier_name,l.name AS location_name,po.currency_code,(SELECT count(*) FROM public.purchase_receipt_lines rl WHERE rl.tenant_id=r.tenant_id AND rl.receipt_id=r.id) AS line_count FROM public.purchase_receipts r JOIN public.purchase_orders po ON po.tenant_id=r.tenant_id AND po.id=r.purchase_order_id AND r.receiving_location_id=po.receiving_location_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id JOIN public.locations l ON l.tenant_id=r.tenant_id AND l.id=r.receiving_location_id JOIN public.warehouses wh ON wh.tenant_id=l.tenant_id AND wh.id=l.warehouse_id AND wh.branch_id=po.branch_id WHERE r.tenant_id=:t AND __BRANCH_SCOPE__ AND (CAST(:status AS text) IS NULL OR r.status=CAST(:status AS text)) AND (CAST(:po AS uuid) IS NULL OR r.purchase_order_id=CAST(:po AS uuid)) ORDER BY r.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "po": str(purchase_order_id) if purchase_order_id else None, "limit": limit}, tenant_id=tenant_id, user_id=actor, branch_column="po.branch_id")
 
 
 @router.get("/receipts/{receipt_id}")
@@ -772,7 +772,7 @@ def cancel_receipt(receipt_id: UUID, body: dict[str, Any] | None = None, idempot
 @router.get("/returns")
 def list_returns(status: str | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
-    return _many_branch_scoped(db, "SELECT r.*,pr.receipt_number,po.po_number,p.display_name AS supplier_name,po.currency_code,(SELECT coalesce(sum(rl.quantity*rl.supplier_credit_unit_cost),0) FROM public.purchase_return_lines rl WHERE rl.tenant_id=r.tenant_id AND rl.purchase_return_id=r.id) AS return_value FROM public.purchase_returns r JOIN public.purchase_receipts pr ON pr.tenant_id=r.tenant_id AND pr.id=r.purchase_receipt_id AND r.receiving_location_id=pr.receiving_location_id JOIN public.purchase_orders po ON po.tenant_id=pr.tenant_id AND po.id=pr.purchase_order_id AND pr.receiving_location_id=po.receiving_location_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id JOIN public.locations l ON l.tenant_id=r.tenant_id AND l.id=r.receiving_location_id JOIN public.warehouses wh ON wh.tenant_id=l.tenant_id AND wh.id=l.warehouse_id AND wh.branch_id=po.branch_id WHERE r.tenant_id=:t AND __BRANCH_SCOPE__ AND (CAST(:status AS text) IS NULL OR r.status=:status) ORDER BY r.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "limit": limit}, tenant_id=tenant_id, user_id=actor, branch_column="po.branch_id")
+    return _many_branch_scoped(db, "SELECT r.*,pr.receipt_number,po.po_number,p.display_name AS supplier_name,po.currency_code,(SELECT coalesce(sum(rl.quantity*rl.supplier_credit_unit_cost),0) FROM public.purchase_return_lines rl WHERE rl.tenant_id=r.tenant_id AND rl.purchase_return_id=r.id) AS return_value FROM public.purchase_returns r JOIN public.purchase_receipts pr ON pr.tenant_id=r.tenant_id AND pr.id=r.purchase_receipt_id AND r.receiving_location_id=pr.receiving_location_id JOIN public.purchase_orders po ON po.tenant_id=pr.tenant_id AND po.id=pr.purchase_order_id AND pr.receiving_location_id=po.receiving_location_id JOIN public.parties p ON p.tenant_id=po.tenant_id AND p.id=po.supplier_party_id JOIN public.locations l ON l.tenant_id=r.tenant_id AND l.id=r.receiving_location_id JOIN public.warehouses wh ON wh.tenant_id=l.tenant_id AND wh.id=l.warehouse_id AND wh.branch_id=po.branch_id WHERE r.tenant_id=:t AND __BRANCH_SCOPE__ AND (CAST(:status AS text) IS NULL OR r.status=CAST(:status AS text)) ORDER BY r.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "limit": limit}, tenant_id=tenant_id, user_id=actor, branch_column="po.branch_id")
 
 
 @router.post("/returns")
@@ -888,7 +888,7 @@ def post_return(return_id: UUID, idempotency_key: str | None = Header(None, alia
 def list_supplier_bills(status: str | None = None, supplier_party_id: UUID | None = None, due_before: date | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
     _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
-    return _many(db, "SELECT b.*,p.display_name AS supplier_name,coalesce((SELECT sum(a.amount) FROM public.supplier_payment_allocations a JOIN public.supplier_payments sp ON sp.tenant_id=a.tenant_id AND sp.id=a.payment_id WHERE a.tenant_id=b.tenant_id AND a.bill_id=b.id AND sp.status='POSTED'),0) AS paid_amount,b.total-coalesce((SELECT sum(a.amount) FROM public.supplier_payment_allocations a JOIN public.supplier_payments sp ON sp.tenant_id=a.tenant_id AND sp.id=a.payment_id WHERE a.tenant_id=b.tenant_id AND a.bill_id=b.id AND sp.status='POSTED'),0) AS allocated_outstanding FROM public.supplier_bills b JOIN public.parties p ON p.tenant_id=b.tenant_id AND p.id=b.supplier_party_id WHERE b.tenant_id=:t AND (CAST(:status AS text) IS NULL OR b.status=:status) AND (CAST(:supplier AS uuid) IS NULL OR b.supplier_party_id=:supplier) AND (CAST(:due_before AS date) IS NULL OR b.due_date<=:due_before) ORDER BY b.due_date,b.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "supplier": str(supplier_party_id) if supplier_party_id else None, "due_before": due_before, "limit": limit})
+    return _many(db, "SELECT b.*,p.display_name AS supplier_name,coalesce((SELECT sum(a.amount) FROM public.supplier_payment_allocations a JOIN public.supplier_payments sp ON sp.tenant_id=a.tenant_id AND sp.id=a.payment_id WHERE a.tenant_id=b.tenant_id AND a.bill_id=b.id AND sp.status='POSTED'),0) AS paid_amount,b.total-coalesce((SELECT sum(a.amount) FROM public.supplier_payment_allocations a JOIN public.supplier_payments sp ON sp.tenant_id=a.tenant_id AND sp.id=a.payment_id WHERE a.tenant_id=b.tenant_id AND a.bill_id=b.id AND sp.status='POSTED'),0) AS allocated_outstanding FROM public.supplier_bills b JOIN public.parties p ON p.tenant_id=b.tenant_id AND p.id=b.supplier_party_id WHERE b.tenant_id=:t AND (CAST(:status AS text) IS NULL OR b.status=CAST(:status AS text)) AND (CAST(:supplier AS uuid) IS NULL OR b.supplier_party_id=CAST(:supplier AS uuid)) AND (CAST(:due_before AS date) IS NULL OR b.due_date<=CAST(:due_before AS date)) ORDER BY b.due_date,b.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "supplier": str(supplier_party_id) if supplier_party_id else None, "due_before": due_before, "limit": limit})
 
 
 @router.post("/supplier-bills")
@@ -987,7 +987,7 @@ def void_supplier_bill(bill_id: UUID, body: dict[str, Any] | None = None, idempo
 def list_supplier_payments(status: str | None = None, supplier_party_id: UUID | None = None, limit: int = Query(100, ge=1, le=500), ctx=Depends(require_permission("purchasing.read"))):
     db, actor, tenant_id, _ = ctx
     _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
-    return _many(db, "SELECT py.*,p.display_name AS supplier_name,(SELECT coalesce(sum(a.amount),0) FROM public.supplier_payment_allocations a WHERE a.tenant_id=py.tenant_id AND a.payment_id=py.id) AS allocated_amount,py.amount-(SELECT coalesce(sum(a.amount),0) FROM public.supplier_payment_allocations a WHERE a.tenant_id=py.tenant_id AND a.payment_id=py.id) AS unallocated_amount FROM public.supplier_payments py JOIN public.parties p ON p.tenant_id=py.tenant_id AND p.id=py.supplier_party_id WHERE py.tenant_id=:t AND (CAST(:status AS text) IS NULL OR py.status=:status) AND (CAST(:supplier AS uuid) IS NULL OR py.supplier_party_id=:supplier) ORDER BY py.payment_date DESC,py.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "supplier": str(supplier_party_id) if supplier_party_id else None, "limit": limit})
+    return _many(db, "SELECT py.*,p.display_name AS supplier_name,(SELECT coalesce(sum(a.amount),0) FROM public.supplier_payment_allocations a WHERE a.tenant_id=py.tenant_id AND a.payment_id=py.id) AS allocated_amount,py.amount-(SELECT coalesce(sum(a.amount),0) FROM public.supplier_payment_allocations a WHERE a.tenant_id=py.tenant_id AND a.payment_id=py.id) AS unallocated_amount FROM public.supplier_payments py JOIN public.parties p ON p.tenant_id=py.tenant_id AND p.id=py.supplier_party_id WHERE py.tenant_id=:t AND (CAST(:status AS text) IS NULL OR py.status=CAST(:status AS text)) AND (CAST(:supplier AS uuid) IS NULL OR py.supplier_party_id=:supplier) ORDER BY py.payment_date DESC,py.created_at DESC LIMIT :limit", {"t": str(tenant_id), "status": status, "supplier": str(supplier_party_id) if supplier_party_id else None, "limit": limit})
 
 
 @router.post("/supplier-payments")
@@ -1074,7 +1074,7 @@ def supplier_balances(supplier_party_id: UUID | None = None, currency_code: str 
                AND b.total>(SELECT coalesce(sum(a.amount),0) FROM public.supplier_payment_allocations a JOIN public.supplier_payments py ON py.tenant_id=a.tenant_id AND py.id=a.payment_id WHERE a.tenant_id=b.tenant_id AND a.bill_id=b.id AND py.status='POSTED')) AS overdue_bills
       FROM ledger l JOIN public.supplier_profiles sp ON sp.tenant_id=:t AND sp.supplier_party_id=l.supplier_party_id
       JOIN public.parties p ON p.tenant_id=sp.tenant_id AND p.id=sp.supplier_party_id
-      WHERE (CAST(:supplier AS uuid) IS NULL OR l.supplier_party_id=:supplier) AND (CAST(:cc AS text) IS NULL OR upper(l.currency_code)=upper(:cc)) AND (:include_zero OR l.debits<>l.credits)
+      WHERE (CAST(:supplier AS uuid) IS NULL OR l.supplier_party_id=CAST(:supplier AS uuid)) AND (CAST(:cc AS text) IS NULL OR upper(l.currency_code)=upper(CAST(:cc AS text))) AND (CAST(:include_zero AS boolean) OR l.debits<>l.credits)
       ORDER BY abs(l.debits-l.credits) DESC,p.display_name LIMIT :limit
     """, {"t": str(tenant_id), "supplier": str(supplier_party_id) if supplier_party_id else None, "cc": currency_code.upper() if currency_code else None, "include_zero": include_zero, "limit": limit})
 
@@ -1084,7 +1084,7 @@ def supplier_ledger(supplier_party_id: UUID, currency_code: str | None = None, l
     db, actor, tenant_id, _ = ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=actor)
     _supplier(db, tenant_id, supplier_party_id, active=False)
-    rows = _many(db, "SELECT * FROM public.supplier_ledger_entries WHERE tenant_id=:t AND supplier_party_id=:p AND (CAST(:cc AS text) IS NULL OR upper(currency_code)=upper(:cc)) ORDER BY occurred_at,id LIMIT :limit", {"t": str(tenant_id), "p": str(supplier_party_id), "cc": currency_code.upper() if currency_code else None, "limit": limit})
+    rows = _many(db, "SELECT * FROM public.supplier_ledger_entries WHERE tenant_id=:t AND supplier_party_id=:p AND (CAST(:cc AS text) IS NULL OR upper(currency_code)=upper(CAST(:cc AS text))) ORDER BY occurred_at,id LIMIT :limit", {"t": str(tenant_id), "p": str(supplier_party_id), "cc": currency_code.upper() if currency_code else None, "limit": limit})
     running: dict[str, Decimal] = {}
     for row in reversed(rows):
         cc = row["currency_code"]

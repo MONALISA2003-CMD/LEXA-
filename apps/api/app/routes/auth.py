@@ -582,6 +582,8 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
         tenant_id = UUID(str(rows[0]["tenant_id"]))
 
     request_id = getattr(request.state, "request_id", None) or "untracked"
+    db.info["lexa_tenant_id"] = str(tenant_id)
+    db.info["lexa_user_id"] = str(user.id)
     db.execute(
         text("SELECT set_config('app.tenant_id', :tenant_id, true), set_config('app.user_id', :user_id, true)"),
         {"tenant_id": str(tenant_id), "user_id": str(user.id)},

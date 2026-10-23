@@ -9,12 +9,15 @@ def test_login_and_registration_set_scoped_pretenant_access_before_reads():
     source = (API / "app" / "routes" / "auth.py").read_text(encoding="utf-8")
     register = source.index("def register(")
     login = source.index("def login(")
-    registration_flag = source.index("set_config('app.pre_tenant_access', 'registration', true)", register)
+    registration_context = source.index("_set_registration_rls_context(", register)
     registration_insert = source.index("insert(RegistrationRequest)", register)
+    helper = source[source.index("def _set_registration_rls_context("):register]
+    registration_flag = helper.index("set_config('app.pre_tenant_access', 'registration', true)")
     login_flag = source.index("set_config('app.pre_tenant_access', 'login', true)", login)
     login_user_read = source.index("select(User).where(User.email == email)", login)
     login_clear = source.index("set_config('app.pre_tenant_access', '', true)", login)
-    assert registration_flag < registration_insert
+    assert registration_flag >= 0
+    assert registration_context < registration_insert
     assert login_flag < login_user_read < login_clear
 
 
