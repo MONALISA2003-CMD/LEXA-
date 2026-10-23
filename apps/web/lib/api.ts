@@ -363,6 +363,43 @@ export function getAnalyticsInventoryValueByLocation(){return getJson<AnalyticsI
 export function getAnalyticsBranches(fromDate:string,toDate:string,currency:string){return getJson<AnalyticsBranchMetric[]>(`/api/v1/analytics/branches?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}&currency_code=${encodeURIComponent(currency)}`);}
 export function refreshAnalytics(fromDate:string,toDate:string){return getJson<{run_id:string;status:string}>(`/api/v1/analytics/refresh?start_date=${encodeURIComponent(fromDate)}&end_date=${encodeURIComponent(toDate)}`,{method:'POST',headers:{'Idempotency-Key':key()}});}
 
+
+// Phase 9: bounded, deterministic insights over the canonical analytics projections.
+export type BusinessInsightFocus = "all" | "sales" | "margin" | "stock" | "balances";
+export type BusinessInsight = {
+  id: string;
+  title: string;
+  status: "available" | "partial" | "no_finding" | "unavailable" | "stale";
+  severity: "critical" | "attention" | "positive" | "informational" | "neutral" | "unknown";
+  summary: string;
+  period: { from_date: string; to_date: string };
+  metric: { label: string; value: string; unit: "money" | "percent" | "percentage_points" | "items"; currency_code?: string } | null;
+  comparison: { label: string; from_date?: string; to_date?: string; previous_value: string; change_value: string; change_percent: string | null; unit: string } | null;
+  details?: Record<string, string | number>;
+  examples?: Array<{ location_id: string; location_name: string; variant_id: string; product_name: string; variant_name: string; sku?: string | null; on_hand: string; reserved: string; available: string; units_sold_30d: string; days_cover: string | null }>;
+  methodology: string;
+  source: { tables: string[]; record_count: number; as_of_date: string | null; refreshed_at: string | null };
+  evidence: { label: string; href: string };
+  evidence_links?: Array<{ label: string; href: string }> ;
+  limitations: string[];
+};
+export type BusinessInsightsResponse = {
+  rule_version: string;
+  advisory_only: true;
+  external_ai_used: false;
+  scope: string;
+  currency_code: string;
+  period: { from_date: string; to_date: string };
+  comparison_period: { from_date: string; to_date: string };
+  last_successful_refresh_at: string | null;
+  insights: BusinessInsight[];
+  note: string;
+};
+export function getBusinessInsights(fromDate:string,toDate:string,currency:string,focus:BusinessInsightFocus="all") {
+  const params = new URLSearchParams({start_date:fromDate,end_date:toDate,currency_code:currency,focus});
+  return getJson<BusinessInsightsResponse>(`/api/v1/analytics/insights?${params.toString()}`);
+}
+
 // Phase 4A commerce contracts
 export type CommerceCustomer = { id:string; party_id:string; display_name:string; party_type:string; email?:string|null; phone?:string|null; credit_limit:string; status:string; notes?:string|null; created_at:string };
 export type PaymentChannel = { id:string; tenant_id:string; name:string; channel_type:string; provider?:string|null; currency_code:string; active:boolean; created_at:string; updated_at:string };

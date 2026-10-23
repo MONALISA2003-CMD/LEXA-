@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
+import re
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 
 from ..dependencies import require_permission
 from ..branch_access import require_full_branch_scope
+from ..business_insights import build_balance_insight, build_margin_insight, build_sales_movement_insight, build_stock_risk_insight
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -190,6 +192,222 @@ def branches(start_date: date, end_date: date, currency_code: str = Query(..., m
     db, actor_id, tenant_id, _ = ctx
     rows=db.execute(text("""SELECT a.branch_id,b.name branch_name,a.business_date,a.currency_code,a.sales_total,a.returns_total,a.net_sales,a.payments_collected,a.credit_created,a.sale_count FROM analytics_branch_daily_metrics a JOIN branches b ON b.tenant_id=a.tenant_id AND b.id=a.branch_id WHERE a.tenant_id=:t AND a.business_date BETWEEN :f AND :to AND a.currency_code=:c AND EXISTS (SELECT 1 FROM membership_branch_assignments mba JOIN tenant_memberships tm ON tm.id=mba.membership_id AND tm.tenant_id=mba.tenant_id WHERE mba.tenant_id=a.tenant_id AND mba.branch_id=a.branch_id AND mba.status='ACTIVE' AND tm.user_id=:u AND tm.status='ACTIVE' AND b.status='ACTIVE') ORDER BY a.business_date DESC,a.net_sales DESC"""),{"t":str(tenant_id),"u":str(actor_id),"f":start_date,"to":end_date,"c":currency_code.upper()}).mappings().all()
     return [out(r) for r in rows]
+
+
+@router.get("/insights")
+def business_insights(
+    start_date: date,
+    end_date: date,
+    currency_code: str = Query(..., min_length=3, max_length=3),
+    focus: Literal["all", "sales", "margin", "stock", "balances"] = Query(default="all"),
+    ctx=Depends(require_permission("analytics.read")),
+):
+    """Return bounded deterministic insights with explicit freshness and source evidence.
+
+    The endpoint is read-only. It never runs model-provided SQL, calls an external
+    AI provider, creates a purchase order, or mutates business records.
+    """
+    db, actor_id, tenant_id, _ = ctx
+    if start_date > end_date:
+        raise HTTPException(status_code=422, detail="The start date must be on or before the end date.")
+    period_days = (end_date - start_date).days + 1
+    if period_days > 93:
+        raise HTTPException(status_code=422, detail="Choose a reporting period of 93 days or less.")
+    currency = currency_code.strip().upper()
+    if not re.fullmatch(r"[A-Z]{3}", currency):
+        raise HTTPException(status_code=422, detail="Enter a valid three-letter currency code.")
+
+    # Analytics projections in this endpoint are tenant-wide. Fail closed instead
+    # of showing cross-branch rollups to someone who can only see part of a workspace.
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=actor_id)
+
+    previous_end = start_date - timedelta(days=1)
+    previous_start = previous_end - timedelta(days=period_days - 1)
+    current_params = {"tenant_id": str(tenant_id), "from_date": start_date, "to_date": end_date, "currency": currency}
+    previous_params = {"tenant_id": str(tenant_id), "from_date": previous_start, "to_date": previous_end, "currency": currency}
+
+    daily_sql = text("""
+        SELECT COUNT(*)::integer AS record_count,
+               MAX(business_date) AS latest_business_date,
+               MAX(refreshed_at) AS refreshed_at,
+               COALESCE(SUM(net_sales), 0) AS net_sales,
+               COALESCE(SUM(sales_total), 0) AS sales_total,
+               COALESCE(SUM(returns_total), 0) AS returns_total,
+               COALESCE(SUM(payments_collected), 0) AS payments_collected,
+               COALESCE(SUM(sale_count), 0)::integer AS sale_count
+        FROM public.analytics_daily_business_metrics
+        WHERE tenant_id = :tenant_id
+          AND business_date BETWEEN :from_date AND :to_date
+          AND currency_code = :currency
+    """)
+    product_sql = text("""
+        SELECT COUNT(*)::integer AS record_count,
+               MAX(business_date) AS latest_business_date,
+               MAX(refreshed_at) AS refreshed_at,
+               COALESCE(SUM(net_sales), 0) AS net_sales,
+               COALESCE(SUM(cogs), 0) AS cogs,
+               COALESCE(SUM(gross_margin), 0) AS gross_margin
+        FROM public.analytics_product_daily_metrics
+        WHERE tenant_id = :tenant_id
+          AND business_date BETWEEN :from_date AND :to_date
+          AND currency_code = :currency
+    """)
+    current_daily = dict(db.execute(daily_sql, current_params).mappings().one())
+    previous_daily = dict(db.execute(daily_sql, previous_params).mappings().one())
+    current_products = dict(db.execute(product_sql, current_params).mappings().one())
+    previous_products = dict(db.execute(product_sql, previous_params).mappings().one())
+
+    refresh = db.execute(text("""
+        SELECT MAX(completed_at) AS last_successful_refresh_at
+        FROM public.analytics_refresh_runs
+        WHERE tenant_id = :tenant_id AND status = 'SUCCEEDED'
+    """), {"tenant_id": str(tenant_id)}).mappings().one()
+    last_refresh_at = refresh["last_successful_refresh_at"]
+    now = datetime.now(timezone.utc)
+
+    def recent(value: Any, *, hours: int = 72) -> bool:
+        if not isinstance(value, datetime):
+            return False
+        normalized = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+        return normalized >= now - timedelta(hours=hours)
+
+    daily_is_fresh = recent(last_refresh_at) and recent(current_daily.get("refreshed_at"))
+    product_is_fresh = recent(last_refresh_at) and recent(current_products.get("refreshed_at"))
+
+    receivables_summary = dict(db.execute(text("""
+        SELECT COUNT(*)::integer AS record_count,
+               COUNT(*) FILTER (
+                   WHERE r.status IN ('OPEN', 'PARTIALLY_PAID') AND COALESCE(r.balance, 0) > 0
+               )::integer AS open_count,
+               COUNT(DISTINCT r.customer_party_id) FILTER (
+                   WHERE r.status IN ('OPEN', 'PARTIALLY_PAID') AND COALESCE(r.balance, 0) > 0
+               )::integer AS open_customer_count,
+               COALESCE(SUM(r.balance) FILTER (
+                   WHERE r.status IN ('OPEN', 'PARTIALLY_PAID') AND COALESCE(r.balance, 0) > 0
+               ), 0) AS open_balance,
+               COUNT(*) FILTER (
+                   WHERE r.status IN ('OPEN', 'PARTIALLY_PAID')
+                     AND COALESCE(r.balance, 0) > 0 AND r.due_at < now()
+               )::integer AS overdue_count,
+               COALESCE(SUM(r.balance) FILTER (
+                   WHERE r.status IN ('OPEN', 'PARTIALLY_PAID')
+                     AND COALESCE(r.balance, 0) > 0 AND r.due_at < now()
+               ), 0) AS overdue_balance
+        FROM public.receivables r
+        JOIN public.sales s ON s.tenant_id = r.tenant_id AND s.id = r.sale_id
+        WHERE r.tenant_id = :tenant_id AND s.currency_code = :currency
+    """), {"tenant_id": str(tenant_id), "currency": currency}).mappings().one())
+    supplier_ledger_summary = dict(db.execute(text("""
+        SELECT COUNT(*)::integer AS record_count,
+               COUNT(DISTINCT supplier_party_id)::integer AS supplier_count,
+               COALESCE(SUM(debit_amount - credit_amount), 0) AS net_balance
+        FROM public.supplier_ledger_entries
+        WHERE tenant_id = :tenant_id AND currency_code = :currency
+    """), {"tenant_id": str(tenant_id), "currency": currency}).mappings().one())
+
+    stock_latest = db.execute(text("""
+        SELECT MAX(a.snapshot_date)
+        FROM public.analytics_inventory_health_metrics a
+        JOIN public.locations l ON l.tenant_id = a.tenant_id AND l.id = a.location_id
+        JOIN public.warehouses w ON w.tenant_id = l.tenant_id AND w.id = l.warehouse_id
+        JOIN public.branches b ON b.tenant_id = w.tenant_id AND b.id = w.branch_id
+        WHERE a.tenant_id = :tenant_id
+          AND l.status = 'ACTIVE' AND w.status = 'ACTIVE' AND b.status = 'ACTIVE'
+    """), {"tenant_id": str(tenant_id)}).scalar_one_or_none()
+
+    stock_summary: dict[str, Any] | None = None
+    stock_examples: list[dict[str, Any]] = []
+    if stock_latest is not None:
+        stock_summary = dict(db.execute(text("""
+            SELECT COUNT(*)::integer AS record_count,
+                   COUNT(*) FILTER (WHERE a.available <= 0)::integer AS out_of_stock_count,
+                   COUNT(*) FILTER (WHERE a.available > 0 AND a.days_cover IS NOT NULL AND a.days_cover <= 7)::integer AS low_cover_count,
+                   COUNT(*) FILTER (WHERE a.on_hand > 0 AND COALESCE(a.units_sold_30d, 0) = 0)::integer AS slow_moving_count,
+                   COUNT(*) FILTER (
+                       WHERE a.available <= 0
+                          OR (a.days_cover IS NOT NULL AND a.days_cover <= 7)
+                          OR (a.on_hand > 0 AND COALESCE(a.units_sold_30d, 0) = 0)
+                   )::integer AS items_needing_review
+            FROM public.analytics_inventory_health_metrics a
+            JOIN public.locations l ON l.tenant_id = a.tenant_id AND l.id = a.location_id
+            JOIN public.warehouses w ON w.tenant_id = l.tenant_id AND w.id = l.warehouse_id
+            JOIN public.branches b ON b.tenant_id = w.tenant_id AND b.id = w.branch_id
+            WHERE a.tenant_id = :tenant_id AND a.snapshot_date = :snapshot_date
+              AND l.status = 'ACTIVE' AND w.status = 'ACTIVE' AND b.status = 'ACTIVE'
+        """), {"tenant_id": str(tenant_id), "snapshot_date": stock_latest}).mappings().one())
+        stock_examples = [dict(row) for row in db.execute(text("""
+            SELECT a.location_id, l.name AS location_name, a.variant_id,
+                   p.name AS product_name, pv.name AS variant_name, pv.sku,
+                   a.on_hand, a.reserved, a.available, a.units_sold_30d, a.days_cover
+            FROM public.analytics_inventory_health_metrics a
+            JOIN public.locations l ON l.tenant_id = a.tenant_id AND l.id = a.location_id
+            JOIN public.warehouses w ON w.tenant_id = l.tenant_id AND w.id = l.warehouse_id
+            JOIN public.branches b ON b.tenant_id = w.tenant_id AND b.id = w.branch_id
+            JOIN public.product_variants pv ON pv.tenant_id = a.tenant_id AND pv.id = a.variant_id
+            JOIN public.products p ON p.tenant_id = pv.tenant_id AND p.id = pv.product_id
+            WHERE a.tenant_id = :tenant_id AND a.snapshot_date = :snapshot_date
+              AND l.status = 'ACTIVE' AND w.status = 'ACTIVE' AND b.status = 'ACTIVE'
+              AND (a.available <= 0 OR (a.days_cover IS NOT NULL AND a.days_cover <= 7)
+                   OR (a.on_hand > 0 AND COALESCE(a.units_sold_30d, 0) = 0))
+            ORDER BY CASE WHEN a.available <= 0 THEN 0
+                          WHEN a.days_cover IS NOT NULL AND a.days_cover <= 7 THEN 1 ELSE 2 END,
+                     a.available ASC, p.name ASC
+            LIMIT 5
+        """), {"tenant_id": str(tenant_id), "snapshot_date": stock_latest}).mappings().all()]
+        for example in stock_examples:
+            example["on_hand"] = str(example["on_hand"])
+            example["reserved"] = str(example["reserved"])
+            example["available"] = str(example["available"])
+            example["units_sold_30d"] = str(example["units_sold_30d"])
+            example["days_cover"] = None if example["days_cover"] is None else str(example["days_cover"])
+
+    all_insights = [
+        build_sales_movement_insight(
+            current=current_daily,
+            previous=previous_daily,
+            start_date=start_date,
+            end_date=end_date,
+            previous_start_date=previous_start,
+            previous_end_date=previous_end,
+            currency_code=currency,
+            fresh=daily_is_fresh,
+        ),
+        build_margin_insight(
+            current=current_products,
+            previous=previous_products,
+            start_date=start_date,
+            end_date=end_date,
+            previous_start_date=previous_start,
+            previous_end_date=previous_end,
+            currency_code=currency,
+            fresh=product_is_fresh,
+        ),
+        build_balance_insight(
+            receivables=receivables_summary,
+            supplier_ledger=supplier_ledger_summary,
+            as_of_date=date.today(),
+            currency_code=currency,
+        ),
+        build_stock_risk_insight(
+            snapshot_date=stock_latest,
+            as_of_date=date.today(),
+            stock_summary=stock_summary,
+            examples=stock_examples,
+        ),
+    ]
+    chosen = all_insights if focus == "all" else [item for item in all_insights if item["id"] == {"sales": "sales-movement", "margin": "gross-margin-movement", "stock": "stock-risk", "balances": "working-capital-balances"}[focus]]
+    return {
+        "rule_version": "lexa-business-insights-1.0",
+        "advisory_only": True,
+        "external_ai_used": False,
+        "scope": "all active workspace branches",
+        "currency_code": currency,
+        "period": {"from_date": start_date.isoformat(), "to_date": end_date.isoformat()},
+        "comparison_period": {"from_date": previous_start.isoformat(), "to_date": previous_end.isoformat()},
+        "last_successful_refresh_at": last_refresh_at.isoformat() if last_refresh_at else None,
+        "insights": chosen,
+        "note": "These are deterministic, source-linked review prompts. They do not execute business actions or replace the underlying reports.",
+    }
 
 @router.post("/refresh")
 def refresh(start_date: date, end_date: date, ctx=Depends(require_permission("analytics.refresh"))):

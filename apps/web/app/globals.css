@@ -1348,3 +1348,10 @@ td, .data-table td { color: #2D4059; }
   .report-period-presets .button { min-height: 44px; white-space: normal; line-height: 1.25; }
   .command-form { padding: 14px; }
 }
+
+/* Phase 9: source-linked, explainable business-insight cards. */
+.insight-value{display:grid;gap:4px;margin:10px 0;padding:13px;border:1px solid #e5eaf2;border-radius:10px;background:#f8faff}.insight-value small{font-size:10px;color:#718099;font-weight:750}.insight-value strong{font-size:22px;color:#172b4d;letter-spacing:-.02em}.foundation-panel .muted{font-size:11px;line-height:1.5;color:#78859a}.foundation-panel ul{margin:6px 0 12px;padding-left:18px;color:#526078;font-size:11px;line-height:1.6}.foundation-panel .status{margin-bottom:7px}
+
+/* Phase 9: safe, local question routing to the approved insight set. */
+.insight-question{display:grid;gap:8px;margin:14px 0;padding:14px;border:1px solid #e5eaf2;border-radius:12px;background:#fbfcff}.insight-question label{font-size:12px;font-weight:800;color:#253858}.insight-question-row{display:flex;gap:8px;align-items:center}.insight-question-row input{flex:1;min-width:0;width:100%;padding:10px 12px;border:1px solid #d8e0eb;border-radius:9px;background:#fff;color:#172b4d;font:inherit;font-size:13px}.insight-question-row input:focus-visible{outline:2px solid #2463eb;outline-offset:2px}.insight-question>small{font-size:11px;line-height:1.5;color:#718099}.insight-question-message{margin:0;font-size:12px;line-height:1.55;color:#315d43}.insight-question-message.is-warning{color:#865b12}@media(max-width:560px){.insight-question-row{align-items:stretch;flex-direction:column}.insight-question-row .button{width:100%}}
+.insight-evidence-links{display:flex;flex-wrap:wrap;gap:8px}

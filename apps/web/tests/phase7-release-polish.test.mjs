@@ -38,7 +38,7 @@ test("business insights use saved sales and inventory information with clear emp
   assert.doesNotMatch(insights, /Planned depth|Next vertical|will be implemented/i);
 });
 
-test("navigation exposes core business work and keeps AI out of the pre-Phase 9 interface", () => {
+test("navigation exposes core business work without presenting insights as an action workflow", () => {
   const shell = read("components/app-shell.tsx");
   assert.match(shell, /\["\/reports", "Reports"/);
   assert.match(shell, /Business reports/);
