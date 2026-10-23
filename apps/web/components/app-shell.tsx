@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PageHeader } from "./ui";
-import { ApiError, getReadiness, getSetupProgress, logout, restoreSession, type AuthResponse, type ApiReadiness, type SetupProgress } from "../lib/api";
+import { ApiError, getCachedSession, getCachedSetupProgress, getReadiness, getSetupProgress, logout, restoreSession, type AuthResponse, type ApiReadiness, type SetupProgress } from "../lib/api";
 
 const primary = [
   ["/", "Home", "home"],
@@ -54,19 +54,31 @@ function NavGlyph({ name }: { name: string }) {
 export function AppShell({ children, title, eyebrow }: { children: React.ReactNode; title?: string; eyebrow?: string }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [session, setSession] = useState<AuthResponse | null>(null);
-  const [authState, setAuthState] = useState<"checking" | "ready" | "signed_out" | "unavailable">("checking");
+  const [session, setSession] = useState<AuthResponse | null>(() => getCachedSession());
+  const [authState, setAuthState] = useState<"checking" | "ready" | "signed_out" | "unavailable">(() => getCachedSession() ? "ready" : "checking");
   const [authAttempt, setAuthAttempt] = useState(0);
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [serviceState, setServiceState] = useState<"checking" | "ready" | "degraded" | "unavailable">("checking");
-  const [setupProgress, setSetupProgress] = useState<SetupProgress | null>(null);
-  const [setupProgressChecked, setSetupProgressChecked] = useState(false);
+  const [setupProgress, setSetupProgress] = useState<SetupProgress | null>(() => {
+    const cached = getCachedSession();
+    return cached ? getCachedSetupProgress(cached.tenant_id) : null;
+  });
+  const [setupProgressChecked, setSetupProgressChecked] = useState(() => {
+    const cached = getCachedSession();
+    return Boolean(cached && getCachedSetupProgress(cached.tenant_id));
+  });
 
   useEffect(() => {
     let active = true;
+    const cached = getCachedSession();
+    if (cached) {
+      setSession(cached);
+      setAuthState("ready");
+      return () => { active = false; };
+    }
     setAuthState("checking");
     void restoreSession().then((value) => {
       if (!active) return;
@@ -85,16 +97,23 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
   useEffect(() => {
     if (authState !== "ready") { setSetupProgress(null); setSetupProgressChecked(false); return; }
     let active = true;
-    setSetupProgressChecked(false);
+    const cached = session?.tenant_id ? getCachedSetupProgress(session.tenant_id) : null;
+    // Keep the last verified snapshot visible during route changes. It is
+    // refreshed below, but shouldn't hide a page while the request is pending.
+    if (cached) { setSetupProgress(cached); setSetupProgressChecked(true); }
+    else setSetupProgressChecked(false);
     void getSetupProgress().then((progress) => {
       if (active) { setSetupProgress(progress); setSetupProgressChecked(true); }
     }).catch(() => {
-      // Keep the shell usable if setup status cannot be checked; the page will
-      // show a plain connection message rather than inventing business totals.
-      if (active) { setSetupProgress(null); setSetupProgressChecked(true); }
+      // A prior verified snapshot is still useful when a background refresh
+      // fails; without one, render the page and let its own loader explain data state.
+      if (active) {
+        if (!cached) setSetupProgress(null);
+        setSetupProgressChecked(true);
+      }
     });
     return () => { active = false; };
-  }, [authState, pathname]);
+  }, [authState, pathname, session?.tenant_id]);
 
   useEffect(() => {
     let active = true;
@@ -215,14 +234,14 @@ export function AppShell({ children, title, eyebrow }: { children: React.ReactNo
             {setupProgress && !setupProgress.complete && !["/onboarding", "/administration", "/settings", "/workspace", "/administration/members", "/accounting", "/commerce"].some(route => pathname === route || pathname.startsWith(`${route}/`)) ? (
               <section className="setup-welcome-card" role="status" aria-live="polite">
                 <div className="setup-welcome-art"><span className="setup-welcome-orb orb-one"/><span className="setup-welcome-orb orb-two"/><span className="setup-welcome-mark"><NavGlyph name="check"/></span></div>
-                <div className="setup-welcome-copy"><span className="section-label">ONE QUICK STEP</span><h2>Let's get your business ready</h2><p>Before we show sales, stock and money figures, let's make sure your main branch and the place where you keep stock are in place. This keeps all your business records connected.</p>
-                  <div className="setup-step-pills">{setupProgress.steps.map(step => <span key={step.key} className={step.complete ? "done" : "todo"}><i aria-hidden="true">{step.complete ? "✓" : "○"}</i>{step.label}</span>)}</div>
+                <div className="setup-welcome-copy"><span className="section-label">ONE QUICK STEP</span><h2>Let's get your business ready</h2><p>Before we show sales, stock and money figures, let's verify your business details and currency, main branch and stock room, a payment method in that currency, and basic money-tracking accounts. This keeps all your business records connected.</p>
+                  <div className="setup-step-pills">{setupProgress.steps.filter(step => step.required).map(step => <span key={step.key} className={step.complete ? "done" : "todo"}><i aria-hidden="true">{step.complete ? "✓" : "○"}</i>{step.label}</span>)}</div>
                   <div className="header-actions"><Link href="/onboarding" className="button button-dark">Finish business setup</Link><Link href="/administration" className="button button-soft">Review business details</Link></div>
                 </div>
               </section>
             ) : (
               <>
-                {setupProgress && !setupProgress.complete && pathname !== "/onboarding" && <section className="business-setup-alert" role="status" aria-live="polite"><div className="business-setup-icon" aria-hidden="true"><NavGlyph name="check"/></div><div className="business-setup-copy"><strong>A few business details still need attention</strong><p>Finish your branch and stock room setup so your day-to-day work and reports stay connected.</p></div><Link href="/onboarding" className="button button-dark button-small">Finish setup</Link></section>}
+                {setupProgress && !setupProgress.complete && pathname !== "/onboarding" && <section className="business-setup-alert" role="status" aria-live="polite"><div className="business-setup-icon" aria-hidden="true"><NavGlyph name="check"/></div><div className="business-setup-copy"><strong>A few business details still need attention</strong><p>Finish the business details that still need attention so sales, stock and money records stay connected.</p></div><Link href="/onboarding" className="button button-dark button-small">Finish setup</Link></section>}
                 {children}
               </>
             )}

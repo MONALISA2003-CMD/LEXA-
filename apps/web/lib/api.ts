@@ -71,7 +71,28 @@ function friendlyMessage(status: number, payload: unknown, path = ""): string {
 
 let accessToken: string | null = null;
 let refreshInFlight: Promise<AuthResponse> | null = null;
-export function setAccessToken(token: string | null) { accessToken = token; }
+let restoredSession: AuthResponse | null = null;
+let restoredSessionToken: string | null = null;
+let restoreSessionInFlight: Promise<AuthResponse | null> | null = null;
+
+/** Keep a verified identity snapshot across client-side route changes. The
+ * opaque refresh cookie is rotated only when restoration is actually needed,
+ * not every time a page-level AppShell mounts. */
+export function setAccessToken(token: string | null) {
+  if (token !== accessToken) {
+    accessToken = token;
+    if (!token || token !== restoredSessionToken) {
+      restoredSession = null;
+      restoredSessionToken = null;
+    }
+  }
+}
+
+export function getCachedSession(): AuthResponse | null {
+  return accessToken && restoredSession && restoredSessionToken === accessToken
+    ? restoredSession
+    : null;
+}
 
 function requiresSession(path: string): boolean {
   if (/^\/(health|ready)$/.test(path)) return false;
@@ -273,16 +294,30 @@ export type CurrentIdentity = {
 };
 export function getCurrentIdentity() { return getJson<CurrentIdentity>("/api/v1/auth/me"); }
 
-export async function restoreSession() {
+export async function restoreSession(): Promise<AuthResponse | null> {
+  const cached = getCachedSession();
+  if (cached) return cached;
+  if (restoreSessionInFlight) return restoreSessionInFlight;
+
+  const pending = (async () => {
+    try {
+      const session = await refreshSession();
+      // Do not unlock the workspace until the API confirms user + tenant membership.
+      await getCurrentIdentity();
+      restoredSession = session;
+      restoredSessionToken = session.access_token;
+      return session;
+    } catch (error) {
+      setAccessToken(null);
+      if (error instanceof ApiError && error.status === 401) return null;
+      throw error;
+    }
+  })();
+  restoreSessionInFlight = pending;
   try {
-    const session = await refreshSession();
-    // Do not unlock the workspace until the API confirms user + tenant membership.
-    await getCurrentIdentity();
-    return session;
-  } catch (error) {
-    setAccessToken(null);
-    if (error instanceof ApiError && error.status === 401) return null;
-    throw error;
+    return await pending;
+  } finally {
+    if (restoreSessionInFlight === pending) restoreSessionInFlight = null;
   }
 }
 export async function logout() {
@@ -429,6 +464,14 @@ export type SetupProgress = {
   resume_path: string;
   steps: { key: string; label: string; href: string; required: boolean; complete: boolean }[];
 };
+
+// Cache only as a render continuity aid. Every page mount still revalidates the
+// progress endpoint; the most recent snapshot is shown while that request is in
+// flight so navigation never flashes a whole-page loading screen between modules.
+const setupProgressSnapshots = new Map<string, SetupProgress>();
+export function getCachedSetupProgress(tenantId: string): SetupProgress | null {
+  return setupProgressSnapshots.get(tenantId) || null;
+}
 export function getWorkspaceOptions() { return getJson<{ items: WorkspaceOption[] }>("/api/v1/workspace/options"); }
 export async function selectWorkspace(tenantId: string) {
   const session = await getJson<AuthResponse>("/api/v1/workspace/select", {
@@ -438,7 +481,13 @@ export async function selectWorkspace(tenantId: string) {
   return session;
 }
 export function getWorkspaceContext() { return getJson<WorkspaceContext>("/api/v1/workspace/context"); }
-export function getSetupProgress() { return getJson<SetupProgress>("/api/v1/workspace/setup/progress"); }
+export function getSetupProgress() {
+  return getJson<SetupProgress>("/api/v1/workspace/setup/progress").then((progress) => {
+    const session = getCachedSession();
+    if (session) setupProgressSnapshots.set(session.tenant_id, progress);
+    return progress;
+  });
+}
 export function initializeWorkspaceSetup() { return getJson<{status:string;created_defaults:string[];message:string;progress:SetupProgress}>("/api/v1/workspace/setup/initialize", {method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":key()}, body:"{}"}); }
 
 // Phase 3 Increment 03: member lifecycle, invitation lifecycle and branch scope.

@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "../../components/app-shell";
+import { BUSINESS_COUNTRIES as countries, BUSINESS_CURRENCIES as currencies } from "../../lib/business-options";
 import {
   createBusinessProfile,
   getBusinessProfile,
@@ -17,36 +18,6 @@ type ProfileDraft = {
   country_code: string;
   currency_code: string;
 };
-
-const countries = [
-  { code: "UG", name: "Uganda" },
-  { code: "KE", name: "Kenya" },
-  { code: "TZ", name: "Tanzania" },
-  { code: "RW", name: "Rwanda" },
-  { code: "SS", name: "South Sudan" },
-  { code: "US", name: "United States" },
-  { code: "GB", name: "United Kingdom" },
-  { code: "ZA", name: "South Africa" },
-  { code: "NG", name: "Nigeria" },
-  { code: "GH", name: "Ghana" },
-  { code: "IN", name: "India" },
-  { code: "AE", name: "United Arab Emirates" },
-];
-const currencies = [
-  { code: "UGX", name: "Ugandan shilling" },
-  { code: "KES", name: "Kenyan shilling" },
-  { code: "TZS", name: "Tanzanian shilling" },
-  { code: "RWF", name: "Rwandan franc" },
-  { code: "SSP", name: "South Sudanese pound" },
-  { code: "USD", name: "US dollar" },
-  { code: "GBP", name: "British pound" },
-  { code: "EUR", name: "Euro" },
-  { code: "ZAR", name: "South African rand" },
-  { code: "NGN", name: "Nigerian naira" },
-  { code: "GHS", name: "Ghanaian cedi" },
-  { code: "INR", name: "Indian rupee" },
-  { code: "AED", name: "UAE dirham" },
-];
 
 const emptyDraft: ProfileDraft = {
   legal_name: "",

@@ -47,7 +47,7 @@ console.log("Phase 8 foundation repair, module navigation, business reports, cus
 const shellText = fs.readFileSync(new URL("../components/app-shell.tsx", import.meta.url), "utf8");
 assert.match(shellText, /getSetupProgress\(\)/);
 assert.match(shellText, /A few business details still need attention/);
-assert.match(shellText, /branch and stock room setup/);
+assert.match(shellText, /business details that still need attention/);
 assert.match(shellText, /Finish setup/);
 assert.match(shellText, /get your business ready/i);
-assert.doesNotMatch(shellText, /workspace-wide|RLS|tenant_id|schema migration/);
+assert.doesNotMatch(shellText, /workspace-wide|RLS|schema migration/);

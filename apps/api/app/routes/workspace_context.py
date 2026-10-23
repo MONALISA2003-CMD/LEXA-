@@ -146,7 +146,17 @@ def workspace_context(ctx=Depends(require_active_workspace)):
 
 def _setup_progress_for_tenant(db: Session, tenant_id: UUID) -> dict:
     """Derive progress from active, tenant-consistent persisted setup records."""
-    profile = db.scalar(select(BusinessProfile.id).where(BusinessProfile.tenant_id == tenant_id))
+    profile = db.scalar(select(BusinessProfile).where(BusinessProfile.tenant_id == tenant_id))
+    profile_details_complete = bool(
+        profile
+        and (profile.legal_name or "").strip()
+        and (profile.display_name or "").strip()
+        and len((profile.country_code or "").strip()) == 2
+        and (profile.country_code or "").strip().isascii()
+        and (profile.country_code or "").strip().isalpha()
+    )
+    currency_code = (profile.currency_code or "").strip().upper() if profile else ""
+    currency_configured = bool(len(currency_code) == 3 and currency_code.isascii() and currency_code.isalpha())
     active_branch_ids = list(db.scalars(select(Branch.id).where(
         Branch.tenant_id == tenant_id, Branch.status == "ACTIVE"
     )).all())
@@ -166,23 +176,54 @@ def _setup_progress_for_tenant(db: Session, tenant_id: UUID) -> dict:
                 Warehouse.id.in_(active_warehouse_ids),
             )
         ) or 0
-    payment_method_count = db.scalar(text(
-        "SELECT count(*) FROM public.payment_channels WHERE tenant_id=:tenant_id AND active=true"
-    ), {"tenant_id": str(tenant_id)}) or 0
+    # Payment setup is only ready when at least one active channel can be used
+    # in this business's configured currency. A foreign-currency channel is not
+    # an acceptable substitute for a local cash/payment option.
+    payment_method_count = 0
+    if currency_configured:
+        payment_method_count = db.scalar(text(
+            "SELECT count(*) FROM public.payment_channels WHERE tenant_id=:tenant_id AND active=true AND upper(currency_code)=:currency"
+        ), {"tenant_id": str(tenant_id), "currency": currency_code}) or 0
     accounting_account_count = db.scalar(text(
         "SELECT count(*) FROM public.accounting_accounts WHERE tenant_id=:tenant_id AND status='ACTIVE'"
     ), {"tenant_id": str(tenant_id)}) or 0
     accounting_mapping_count = db.scalar(text(
         "SELECT count(*) FROM public.accounting_mappings WHERE tenant_id=:tenant_id"
     ), {"tenant_id": str(tenant_id)}) or 0
+    tax_configuration_ready = bool(db.scalar(text("""
+        SELECT EXISTS (
+          SELECT 1
+          FROM public.tax_configurations tc
+          JOIN public.tax_rates tr
+            ON tr.tenant_id=tc.tenant_id AND tr.id=tc.tax_rate_id
+          WHERE tc.tenant_id=:tenant_id
+            AND tc.status='ACTIVE' AND tr.status='ACTIVE'
+            AND tc.scope_type='DEFAULT'
+            AND CURRENT_DATE BETWEEN tc.effective_from AND COALESCE(tc.effective_to, DATE '9999-12-31')
+            AND CURRENT_DATE BETWEEN tr.effective_from AND COALESCE(tr.effective_to, DATE '9999-12-31')
+        )
+    """), {"tenant_id": str(tenant_id)}))
+    team_access_ready = bool(db.scalar(text("""
+        SELECT EXISTS (
+          SELECT 1
+          FROM public.tenant_memberships tm
+          JOIN public.users u ON u.id=tm.user_id AND u.is_active=true
+          JOIN public.membership_roles mr ON mr.membership_id=tm.id
+          JOIN public.roles r ON r.id=mr.role_id AND r.tenant_id=tm.tenant_id
+          WHERE tm.tenant_id=:tenant_id AND tm.status='ACTIVE'
+        )
+    """), {"tenant_id": str(tenant_id)}))
     return setup_progress(
-        profile_exists=profile is not None,
+        profile_exists=profile_details_complete,
+        currency_configured=currency_configured,
         branch_count=len(active_branch_ids),
         warehouse_count=len(active_warehouse_ids),
         location_count=int(location_count),
         payment_method_count=int(payment_method_count),
         accounting_account_count=int(accounting_account_count),
         accounting_mapping_count=int(accounting_mapping_count),
+        tax_configuration_ready=tax_configuration_ready,
+        team_access_ready=team_access_ready,
     )
 
 
@@ -220,7 +261,12 @@ def initialize_workspace_setup(request: Request, ctx=Depends(require_permission(
             "code": "BUSINESS_PROFILE_REQUIRED",
             "message": "Save your business name and currency before completing setup.",
         })
-    currency = (profile.currency_code or "UGX").upper()
+    currency = (profile.currency_code or "").strip().upper()
+    if len(currency) != 3 or not currency.isascii() or not currency.isalpha():
+        raise HTTPException(status_code=409, detail={
+            "code": "BUSINESS_CURRENCY_REQUIRED",
+            "message": "Save a valid three-letter business currency before completing setup. LEXA will not guess a currency for your financial records.",
+        })
 
     created: list[str] = []
 
@@ -324,16 +370,25 @@ def initialize_workspace_setup(request: Request, ctx=Depends(require_permission(
     if seed_function_exists:
         db.execute(text("SELECT public.seed_accounting_foundation(:tenant_id)"), {"tenant_id": str(tenant_id)})
 
-    # Cash is the sole automatic payment method. Owners can add their own names
-    # (for example, MTN Line 1 or Stanbic); no credentials or account details are used.
-    cash_exists = db.execute(text(
-        "SELECT 1 FROM public.payment_channels WHERE tenant_id=:tenant_id AND lower(name)='cash' LIMIT 1"
-    ), {"tenant_id": str(tenant_id)}).first()
-    if not cash_exists:
+    # Cash is the default method for this business currency. A legacy cash row
+    # in another currency (or an inactive row) must not make checkout appear ready.
+    # Existing rows and payment history are retained; a distinct label avoids a
+    # confusing duplicate name when a business changes currency.
+    cash_ready = db.execute(text("""
+        SELECT 1 FROM public.payment_channels
+        WHERE tenant_id=:tenant_id AND active=true AND upper(currency_code)=:currency
+          AND channel_type='CASH'
+        LIMIT 1
+    """), {"tenant_id": str(tenant_id), "currency": currency}).first()
+    if not cash_ready:
+        prior_cash = db.execute(text(
+            "SELECT 1 FROM public.payment_channels WHERE tenant_id=:tenant_id AND lower(name) LIKE 'cash%' LIMIT 1"
+        ), {"tenant_id": str(tenant_id)}).first()
+        cash_name = f"Cash ({currency})" if prior_cash else "Cash"
         db.execute(text("""
             INSERT INTO public.payment_channels(tenant_id,name,channel_type,provider,currency_code,active)
-            VALUES(:tenant_id,'Cash','CASH',NULL,:currency,true)
-        """), {"tenant_id": str(tenant_id), "currency": currency})
+            VALUES(:tenant_id,:name,'CASH',NULL,:currency,true)
+        """), {"tenant_id": str(tenant_id), "name": cash_name, "currency": currency})
         created.append("cash_payment_method")
 
     request_id = getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID")

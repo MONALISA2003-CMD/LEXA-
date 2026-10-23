@@ -33,7 +33,9 @@ def test_first_run_repair_is_owner_gated_idempotent_and_preserves_existing_recor
     assert "if not branches" in handler
     assert "if not warehouses" in handler
     assert "if not locations" in handler
-    assert "if not cash_exists" in handler
+    assert "if not cash_ready" in handler
+    assert "BUSINESS_CURRENCY_REQUIRED" in handler
+    assert "LEXA will not guess a currency" in handler
     assert "write_audit(" in handler and "emit_event(" in handler
     assert "db.commit()" in handler
     assert "progress = _setup_progress_for_tenant(db, tenant_id)" in handler

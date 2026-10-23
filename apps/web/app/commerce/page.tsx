@@ -170,8 +170,10 @@ export default function CommercePage() {
         getBusinessProfile().catch(() => null),
         getCommerceCapabilities().catch(() => ({ can_manage_price:false, can_manage_sales:false })),
       ]);
-      const profileCurrency = profile?.currency_code && /^[A-Z]{3}$/i.test(profile.currency_code) ? profile.currency_code.toUpperCase() : (d.currency_code && /^[A-Z]{3}$/i.test(d.currency_code) ? d.currency_code.toUpperCase() : null);
-      setBusinessCurrency(profileCurrency);
+      const dashboardCurrency = d.currency_code && /^[A-Z]{3}$/i.test(d.currency_code) ? d.currency_code.toUpperCase() : null;
+      const profileCurrency = profile?.currency_code && /^[A-Z]{3}$/i.test(profile.currency_code) ? profile.currency_code.toUpperCase() : null;
+      const resolvedCurrency = dashboardCurrency || profileCurrency;
+      setBusinessCurrency(resolvedCurrency);
       setCapabilities(userCapabilities);
       setDashboard(d);
       setCustomers(c);
@@ -187,8 +189,9 @@ export default function CommercePage() {
       // have organization.read; the server still enforces assigned-branch scope.
       void getBranches().then(setBranches).catch(() => setBranches([]));
       if (!locationId && l[0]) setLocationId(l[0].id);
-      const usableChannels = profileCurrency ? ch.filter((x) => x.active && x.currency_code === profileCurrency) : [];
-      if (!profileCurrency) setMessage("Set your business currency in Business details before recording payments.");
+      const usableChannels = resolvedCurrency ? ch.filter((x) => x.active && x.currency_code.toUpperCase() === resolvedCurrency) : [];
+      if (!resolvedCurrency) setMessage("Business currency could not be confirmed. Open Business details to check the saved currency, then refresh this page.");
+      else if (!usableChannels.length) setMessage(`No active payment method is configured in ${resolvedCurrency}. Open Payment methods to add one before recording a sale.`);
       if (!paymentRows[0]?.channelId && usableChannels[0]) setPaymentRows([{ channelId: usableChannels[0].id, amount: "0" }]);
       if (!refundChannelId && usableChannels[0]) setRefundChannelId(usableChannels[0].id);
       if (!variantId && p[0]) {
@@ -216,6 +219,9 @@ export default function CommercePage() {
   }, []);
 
   useEffect(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    const allowedTabs = ["New sale", "Customers", "Payment methods", "Customer balances", "End-of-day check", "Returns", "Past sales"];
+    if (requestedTab && allowedTabs.includes(requestedTab)) setTab(requestedTab);
     if (pathname === "/customers") {
       setTab("Customers");
       return;
@@ -227,7 +233,8 @@ export default function CommercePage() {
       const branchId = query.get("branch_id") || "";
       const paymentChannelId = query.get("payment_channel_id") || "";
       const historyRequested = query.get("view") === "history" || Boolean(startDate || endDate || branchId || paymentChannelId);
-      setTab(historyRequested ? "Past sales" : "New sale");
+      if (historyRequested) setTab("Past sales");
+      else if (!requestedTab || !allowedTabs.includes(requestedTab)) setTab("New sale");
       if (historyRequested) {
         setSalesStartDate(startDate); setSalesEndDate(endDate); setSalesBranchId(branchId); setSalesPaymentChannelId(paymentChannelId);
         setHistoryLoading(true);

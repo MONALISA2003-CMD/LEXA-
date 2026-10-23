@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { AppShell } from "../../components/app-shell";
+import { BUSINESS_COUNTRIES, BUSINESS_CURRENCIES } from "../../lib/business-options";
 import {
   createBranch,
   createBusinessProfile,
@@ -189,11 +190,17 @@ export default function AdministrationPage() {
           <Field id="profile-display-name" label="Trading / display name">
             <input id="profile-display-name" name="display_name" value={profileForm.display_name} onChange={event => setProfileForm(previous => ({ ...previous, display_name: event.target.value }))} minLength={2} maxLength={250} required />
           </Field>
-          <Field id="profile-country-code" label="Country code" hint="Two-letter ISO code, for example UG.">
-            <input id="profile-country-code" name="country_code" value={profileForm.country_code} onChange={event => setProfileForm(previous => ({ ...previous, country_code: event.target.value.toUpperCase() }))} pattern="[A-Z]{2}" minLength={2} maxLength={2} required />
+          <Field id="profile-country-code" label="Country">
+            <select id="profile-country-code" name="country_code" autoComplete="country" value={profileForm.country_code} onChange={event => setProfileForm(previous => ({ ...previous, country_code: event.target.value }))} required>
+              {!BUSINESS_COUNTRIES.some(country => country.code === profileForm.country_code) && profileForm.country_code && <option value={profileForm.country_code}>{profileForm.country_code} · saved country</option>}
+              {BUSINESS_COUNTRIES.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}
+            </select>
           </Field>
-          <Field id="profile-currency-code" label="Currency code" hint="Three-letter currency code, for example UGX.">
-            <input id="profile-currency-code" name="currency_code" value={profileForm.currency_code} onChange={event => setProfileForm(previous => ({ ...previous, currency_code: event.target.value.toUpperCase() }))} pattern="[A-Z]{3}" minLength={3} maxLength={3} required />
+          <Field id="profile-currency-code" label="Business currency" hint="Used for sales, payments and reports. Review it carefully before recording financial activity.">
+            <select id="profile-currency-code" name="currency_code" value={profileForm.currency_code} onChange={event => setProfileForm(previous => ({ ...previous, currency_code: event.target.value }))} required>
+              {!BUSINESS_CURRENCIES.some(currency => currency.code === profileForm.currency_code) && profileForm.currency_code && <option value={profileForm.currency_code}>{profileForm.currency_code} · saved currency</option>}
+              {BUSINESS_CURRENCIES.map(currency => <option key={currency.code} value={currency.code}>{currency.name} ({currency.code})</option>)}
+            </select>
           </Field>
         </div>
         <div className="top-actions"><button className="primary" type="submit" disabled={Boolean(busy) || loadState !== "ready"}>{busy === "profile" ? "Saving…" : profile ? "Save profile changes" : "Create business profile"}</button></div>

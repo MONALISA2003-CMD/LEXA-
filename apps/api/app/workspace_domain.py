@@ -17,9 +17,12 @@ def setup_progress(
     branch_count: int,
     warehouse_count: int,
     location_count: int,
+    currency_configured: bool = False,
     payment_method_count: int = 0,
     accounting_account_count: int = 0,
     accounting_mapping_count: int = 0,
+    tax_configuration_ready: bool = False,
+    team_access_ready: bool = False,
 ) -> dict[str, Any]:
     """Derive resumable setup from persisted records, never a shadow flag.
 
@@ -29,19 +32,23 @@ def setup_progress(
     """
     steps = [
         {"key": "business_profile", "label": "Business details", "href": "/administration", "required": True, "complete": profile_exists},
+        {"key": "business_currency", "label": "Business currency", "href": "/administration", "required": True, "complete": profile_exists and currency_configured},
         {"key": "branch", "label": "Main branch", "href": "/administration", "required": True, "complete": branch_count > 0},
         {"key": "warehouse", "label": "Stock room", "href": "/administration", "required": True, "complete": warehouse_count > 0},
         {"key": "location", "label": "Where stock is kept", "href": "/administration", "required": True, "complete": location_count > 0},
-        {"key": "payment_method", "label": "Payment method", "href": "/commerce", "required": True, "complete": payment_method_count > 0},
+        {"key": "payment_method", "label": "Payment method in your currency", "href": "/sales?tab=Payment%20methods", "required": True, "complete": payment_method_count > 0},
         {"key": "money_tracking", "label": "Money tracking", "href": "/accounting", "required": True, "complete": accounting_account_count > 0 and accounting_mapping_count > 0},
+        {"key": "tax_configuration", "label": "Review tax rules", "href": "/compliance", "required": False, "complete": tax_configuration_ready},
+        {"key": "team_access", "label": "Review team access", "href": "/administration/members", "required": False, "complete": team_access_ready},
     ]
-    first_incomplete = next((step for step in steps if step["required"] and not step["complete"]), None)
-    completed = sum(1 for step in steps if step["complete"])
+    required_steps = [step for step in steps if step["required"]]
+    first_incomplete = next((step for step in required_steps if not step["complete"]), None)
+    completed = sum(1 for step in required_steps if step["complete"])
     return {
         "status": "COMPLETE" if first_incomplete is None else "IN_PROGRESS",
         "complete": first_incomplete is None,
         "completed_required_steps": completed,
-        "required_steps": sum(1 for step in steps if step["required"]),
+        "required_steps": len(required_steps),
         "resume_path": first_incomplete["href"] if first_incomplete else "/",
         "steps": steps,
     }

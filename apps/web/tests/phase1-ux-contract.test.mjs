@@ -12,17 +12,23 @@ const products = read("app/products/page.tsx");
 const inventory = read("app/inventory/page.tsx");
 const api = read("lib/api.ts");
 const auth = read("../api/app/routes/auth.py");
+const compliance = read("app/compliance/page.tsx");
 
 // Responsive foundation and keyboard-accessible navigation.
 for (const token of ["--type-body", "--space-4", "--focus-ring"]) assert.match(css, new RegExp(token));
 assert.match(css, /env\(safe-area-inset-bottom\)/);
 assert.match(css, /prefers-reduced-motion/);
+assert.match(css, /\.workspace \.table-wrap \{ width: 100%/);
+assert.match(css, /\.workspace-header \.header-actions > \* \{ flex: 1 1 140px/);
 assert.match(shell, /\["\/sales", "Sales"/);
 assert.match(shell, /Business settings/);
 assert.match(shell, /aria-label="Quick navigation"/);
 assert.match(shell, /getReadiness\(\)/);
 assert.match(shell, /Checking that everything is ready/);
 assert.match(shell, /PageHeader/);
+assert.match(compliance, /No tax rates are saved yet/);
+assert.match(compliance, /No official fiscal documents have been recorded yet/);
+assert.match(compliance, /<Link className="button button-soft" href="\/">Back<\/Link>/);
 
 // Shared components and list states are actually consumed by the primary lists.
 for (const name of ["DataState", "StatusBanner", "PageHeader", "FormField", "ConfirmDialog", "ResponsiveDataTable", "MobileRecordCard"]) assert.match(ui, new RegExp(`export function ${name}`));
