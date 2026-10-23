@@ -5,6 +5,8 @@ const root = new URL("../", import.meta.url);
 const commerce = fs.readFileSync(new URL("app/commerce/page.tsx", root), "utf8");
 const api = fs.readFileSync(new URL("lib/api.ts", root), "utf8");
 const styles = fs.readFileSync(new URL("app/globals.css", root), "utf8");
+const acceptance = fs.readFileSync(new URL("e2e/phase5-sales-acceptance.spec.ts", root), "utf8");
+const workflow = fs.readFileSync(new URL("../../.github/workflows/lexa-ci.yml", root), "utf8");
 
 assert.match(commerce, /type CartLine = \{ id:string; variantId:string; quantity:string; unitPrice:string; discountAmount:string \}/);
 assert.match(commerce, /setCart\(\(current\) =>/);
@@ -32,5 +34,16 @@ assert.match(api, /Idempotency-Key':idempotencyKey \|\| key\(\)/);
 assert.match(styles, /\.sales-history-filters/);
 assert.match(styles, /@media print/);
 assert.doesNotMatch(commerce, /await setReconciliationActual\(line\.line_id, \{ actual_amount: value \}\);\s*await setReconciliationActual/);
+assert.match(acceptance, /disposable_scope === true/);
+assert.match(acceptance, /reset_strategy === 'dispose_test_tenant'/);
+assert.match(acceptance, /knownProductionHosts\.has\(baseHost\)/);
+assert.match(acceptance, /\/api\/lexa\/ready/);
+assert.match(acceptance, /entry_role === 'SALE_RECOGNITION'/);
+assert.match(acceptance, /journal\.lines\.every\(line => line\.currency_code === data\.currency_code\)/);
+assert.match(acceptance, /expect\(debit\)\.toBeCloseTo\(credit, 4\)/);
+assert.match(workflow, /run_phase345_staging_e2e/);
+assert.match(workflow, /LEXA_PHASE345_STAGING_URL/);
+assert.match(workflow, /clean-database-replay/);
+assert.match(workflow, /journal lines/);
 
 console.log("Phase 5 sales cockpit, multi-line checkout, filtered history, idempotent retry and receipt contracts: PASS");

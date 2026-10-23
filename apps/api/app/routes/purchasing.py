@@ -7,6 +7,7 @@ Supplier bills/payments create immutable supplier-ledger entries only on posting
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+import re
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -43,16 +44,16 @@ class SupplierCreate(Strict):
     legal_name: str | None = Field(default=None, max_length=250)
     email: str | None = Field(default=None, max_length=320)
     phone: str | None = Field(default=None, max_length=50)
-    currency_code: str = Field(default="UGX", pattern=r"^[A-Za-z]{3}$")
+    currency_code: str = Field(pattern=r"^[A-Za-z]{3}$")
     payment_terms_days: int = Field(default=0, ge=0, le=3650)
     default_receiving_location_id: UUID | None = None
     tax_number: str | None = Field(default=None, max_length=80)
     notes: str | None = Field(default=None, max_length=4000)
 
-    @field_validator("currency_code")
+    @field_validator("currency_code", mode="before")
     @classmethod
     def normalize_currency(cls, value: str) -> str:
-        return value.upper()
+        return str(value or "").strip().upper()
 
 
 class SupplierUpdate(Strict):
@@ -67,23 +68,23 @@ class SupplierUpdate(Strict):
     notes: str | None = Field(default=None, max_length=4000)
     status: str | None = Field(default=None, pattern=r"^(ACTIVE|INACTIVE|ARCHIVED)$")
 
-    @field_validator("currency_code")
+    @field_validator("currency_code", mode="before")
     @classmethod
     def normalize_currency(cls, value: str | None) -> str | None:
-        return value.upper() if value else value
+        return str(value).strip().upper() if value else value
 
 
 class SupplierCostCreate(Strict):
     variant_id: UUID
     unit_cost: Decimal = Field(gt=0, max_digits=20, decimal_places=6)
     minimum_quantity: Decimal = Field(default=Decimal("1"), gt=0, max_digits=20, decimal_places=6)
-    currency_code: str = Field(default="UGX", pattern=r"^[A-Za-z]{3}$")
+    currency_code: str = Field(pattern=r"^[A-Za-z]{3}$")
     lead_time_days: int | None = Field(default=None, ge=0, le=3650)
 
-    @field_validator("currency_code")
+    @field_validator("currency_code", mode="before")
     @classmethod
     def normalize_currency(cls, value: str) -> str:
-        return value.upper()
+        return str(value or "").strip().upper()
 
 
 class PurchaseOrderLineIn(Strict):
@@ -104,10 +105,10 @@ class PurchaseOrderCreate(Strict):
     notes: str | None = Field(default=None, max_length=4000)
     lines: list[PurchaseOrderLineIn] = Field(min_length=1, max_length=200)
 
-    @field_validator("currency_code")
+    @field_validator("currency_code", mode="before")
     @classmethod
     def normalize_currency(cls, value: str | None) -> str | None:
-        return value.upper() if value else value
+        return str(value).strip().upper() if value else value
 
     @model_validator(mode="after")
     def validate_lines(self):
@@ -135,10 +136,10 @@ class LandedCostIn(Strict):
     allocation_method: str = Field(default="BY_VALUE", pattern=r"^(BY_VALUE|BY_QUANTITY|EQUALLY)$")
     reference: str | None = Field(default=None, max_length=120)
 
-    @field_validator("currency_code")
+    @field_validator("currency_code", mode="before")
     @classmethod
     def normalize_currency(cls, value: str) -> str:
-        return value.upper()
+        return str(value or "").strip().upper()
 
 
 class ReceiptCreate(Strict):
@@ -180,7 +181,7 @@ class SupplierBillCreate(Strict):
     bill_number: str = Field(min_length=1, max_length=100)
     bill_date: date
     due_date: date | None = None
-    currency_code: str = Field(default="UGX", pattern=r"^[A-Za-z]{3}$")
+    currency_code: str = Field(pattern=r"^[A-Za-z]{3}$")
     subtotal: Decimal = Field(ge=0, max_digits=20, decimal_places=2)
     tax_amount: Decimal = Field(default=ZERO, ge=0, max_digits=20, decimal_places=2)
     other_charges: Decimal = Field(default=ZERO, ge=0, max_digits=20, decimal_places=2)
@@ -189,10 +190,10 @@ class SupplierBillCreate(Strict):
     supplier_reference: str | None = Field(default=None, max_length=120)
     notes: str | None = Field(default=None, max_length=4000)
 
-    @field_validator("currency_code")
+    @field_validator("currency_code", mode="before")
     @classmethod
     def normalize_currency(cls, value: str) -> str:
-        return value.upper()
+        return str(value or "").strip().upper()
 
     @model_validator(mode="after")
     def validate_total(self):
@@ -216,17 +217,17 @@ class SupplierPaymentCreate(Strict):
     supplier_party_id: UUID
     payment_number: str = Field(min_length=1, max_length=100)
     payment_date: date = Field(default_factory=date.today)
-    currency_code: str = Field(default="UGX", pattern=r"^[A-Za-z]{3}$")
+    currency_code: str = Field(pattern=r"^[A-Za-z]{3}$")
     amount: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
     payment_method: str = Field(pattern=r"^(CASH|BANK_TRANSFER|MOBILE_MONEY|CHEQUE|CARD|OTHER)$")
     reference: str | None = Field(default=None, max_length=120)
     notes: str | None = Field(default=None, max_length=4000)
     allocations: list[PaymentAllocationIn] = Field(default_factory=list, max_length=200)
 
-    @field_validator("currency_code")
+    @field_validator("currency_code", mode="before")
     @classmethod
     def normalize_currency(cls, value: str) -> str:
-        return value.upper()
+        return str(value or "").strip().upper()
 
     @model_validator(mode="after")
     def validate_allocations(self):
@@ -237,6 +238,23 @@ class SupplierPaymentCreate(Strict):
             [{"bill_id": row.bill_id, "amount": row.amount} for row in self.allocations],
         )
         return self
+
+
+def _business_currency(db: Session, tenant_id: UUID) -> str:
+    value = db.execute(text(
+        "SELECT currency_code FROM public.business_profiles WHERE tenant_id=:t"
+    ), {"t": str(tenant_id)}).scalar_one_or_none()
+    currency = str(value or "").strip().upper()
+    if not re.fullmatch(r"[A-Z]{3}", currency):
+        raise HTTPException(409, "Save a valid business currency in Settings before recording stock or supplier transactions.")
+    return currency
+
+
+def _require_business_currency(db: Session, tenant_id: UUID, currency_code: str) -> str:
+    business_currency = _business_currency(db, tenant_id)
+    if str(currency_code or "").strip().upper() != business_currency:
+        raise HTTPException(409, f"Foreign-exchange purchasing is not enabled. Use the saved business currency ({business_currency}) or configure an approved FX workflow first.")
+    return business_currency
 
 
 def _mapping(row) -> dict[str, Any] | None:
@@ -520,6 +538,7 @@ def set_supplier_cost(supplier_party_id: UUID, body: SupplierCostCreate, idempot
     if replay: return replay[1]
     supplier = _supplier(db, tenant_id, supplier_party_id)
     tenant_variant(db, tenant_id, body.variant_id)
+    _require_business_currency(db, tenant_id, body.currency_code)
     if body.currency_code != supplier["currency_code"]: raise HTTPException(422, "Supplier price currency must match the supplier currency; foreign-exchange purchasing is not enabled")
     now = datetime.now(timezone.utc)
     db.execute(text("UPDATE public.supplier_variant_costs SET effective_to=:now WHERE tenant_id=:t AND supplier_party_id=:p AND variant_id=:v AND effective_to IS NULL AND minimum_quantity=:min_qty AND currency_code=:cc"), {"now": now, "t": str(tenant_id), "p": str(supplier_party_id), "v": str(body.variant_id), "min_qty": body.minimum_quantity, "cc": body.currency_code})
@@ -552,6 +571,7 @@ def create_purchase_order(body: PurchaseOrderCreate, idempotency_key: str | None
     if replay: return replay[1]
     supplier = _supplier(db, tenant_id, body.supplier_party_id)
     currency = body.currency_code or supplier["currency_code"]
+    _require_business_currency(db, tenant_id, currency)
     if currency != supplier["currency_code"]: raise HTTPException(422, "Purchase order currency must match the supplier currency; FX is not enabled")
     location_branch = ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=body.receiving_location_id)
     if location_branch != body.branch_id: raise HTTPException(422, "Receiving location must belong to the selected branch")
@@ -701,6 +721,7 @@ def post_receipt(receipt_id: UUID, idempotency_key: str | None = Header(None, al
     if not receipt: raise HTTPException(404, "Purchase receipt not found")
     if receipt["status"] != "DRAFT": raise HTTPException(409, "Only a draft receipt can be posted")
     order = _ensure_order_access(db, tenant_id=tenant_id, user_id=actor, order_id=receipt["purchase_order_id"], lock=True)
+    _require_business_currency(db, tenant_id, order["currency_code"])
     _ensure_receipt_location_matches_order(receipt, order)
     if order["status"] not in {"OPEN", "PARTIALLY_RECEIVED"}: raise HTTPException(409, "Purchase order is no longer open for receiving")
     ensure_location_access(db, tenant_id=tenant_id, user_id=actor, location_id=receipt["receiving_location_id"])
@@ -876,6 +897,7 @@ def create_supplier_bill(body: SupplierBillCreate, idempotency_key: str | None =
     _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier_bill.create", idempotency_key, body.model_dump(mode="json"))
     if replay: return replay[1]
+    _require_business_currency(db, tenant_id, body.currency_code)
     supplier = _supplier(db, tenant_id, body.supplier_party_id)
     if supplier["currency_code"] != body.currency_code: raise HTTPException(422, "Supplier bill currency must match supplier currency; FX is not enabled")
     order = None
@@ -916,6 +938,7 @@ def post_supplier_bill(bill_id: UUID, idempotency_key: str | None = Header(None,
     bill = _one(db, "SELECT * FROM public.supplier_bills WHERE tenant_id=:t AND id=:id FOR UPDATE", {"t": str(tenant_id), "id": str(bill_id)})
     if not bill: raise HTTPException(404, "Supplier bill not found")
     if bill["status"] != "DRAFT": raise HTTPException(409, "Only a draft supplier bill can be posted")
+    _require_business_currency(db, tenant_id, bill["currency_code"])
     if bill["match_status"] in {"VARIANCE", "WAITING_RECEIPT"}:
         raise HTTPException(409, "Supplier invoice cannot post until goods receipt is available and reconciled, or an authorised reviewer records an explicit exception.")
     _supplier(db, tenant_id, bill["supplier_party_id"], active=False)
@@ -973,6 +996,7 @@ def create_supplier_payment(body: SupplierPaymentCreate, idempotency_key: str | 
     _require_workspace_finance_scope(db, tenant_id=tenant_id, user_id=actor)
     idem, replay = _idempotency(db, tenant_id, "purchasing.supplier_payment.create", idempotency_key, body.model_dump(mode="json"))
     if replay: return replay[1]
+    _require_business_currency(db, tenant_id, body.currency_code)
     supplier = _supplier(db, tenant_id, body.supplier_party_id, active=False)
     if supplier["currency_code"] != body.currency_code: raise HTTPException(422, "Payment currency must match the supplier currency; FX is not enabled")
     allocations = sum((a.amount for a in body.allocations), ZERO)
@@ -998,6 +1022,7 @@ def post_supplier_payment(payment_id: UUID, idempotency_key: str | None = Header
     payment = _one(db, "SELECT * FROM public.supplier_payments WHERE tenant_id=:t AND id=:id FOR UPDATE", {"t": str(tenant_id), "id": str(payment_id)})
     if not payment: raise HTTPException(404, "Supplier payment not found")
     if payment["status"] != "DRAFT": raise HTTPException(409, "Only a draft supplier payment can be posted")
+    _require_business_currency(db, tenant_id, payment["currency_code"])
     allocations = _many(db, "SELECT a.*,b.status AS bill_status,b.supplier_party_id AS bill_supplier,b.currency_code AS bill_currency,b.total FROM public.supplier_payment_allocations a JOIN public.supplier_bills b ON b.tenant_id=a.tenant_id AND b.id=a.bill_id WHERE a.tenant_id=:t AND a.payment_id=:id ORDER BY a.bill_id FOR UPDATE OF b", {"t": str(tenant_id), "id": str(payment_id)})
     total_allocated = sum((Decimal(str(a["amount"])) for a in allocations), ZERO)
     if total_allocated > Decimal(str(payment["amount"])): raise HTTPException(409, "Payment allocations exceed the payment amount")

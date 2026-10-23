@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -274,6 +274,39 @@ def _commit_created(
     return response_body
 
 
+_CURRENCY_LOCK_ACTIVITY_TABLES = (
+    "sales", "payments", "payment_allocations", "receivables", "refund_records",
+    "customer_credits", "sale_returns", "inventory_transactions",
+    "purchase_orders", "purchase_receipts", "purchase_returns",
+    "purchase_landed_costs", "purchase_landed_cost_allocations",
+    "supplier_variant_costs", "supplier_bills", "supplier_payments",
+    "supplier_payment_allocations", "supplier_ledger_entries",
+    "journal_entries", "journal_lines", "expense_records",
+)
+
+
+def _has_financial_activity(db: Session, tenant_id: UUID) -> bool:
+    """Check available tenant-scoped money/stock ledgers before currency changes.
+
+    Some deployments may be behind later purchasing migrations; discover only
+    tables and tenant_id columns that actually exist, then build SQL from this
+    fixed allow-list. This avoids references to not-yet-installed tables.
+    """
+    names = ",".join("'" + name + "'" for name in _CURRENCY_LOCK_ACTIVITY_TABLES)
+    available = db.execute(text(
+        "SELECT DISTINCT table_name FROM information_schema.columns "
+        "WHERE table_schema='public' AND column_name='tenant_id' "
+        f"AND table_name IN ({names})"
+    )).scalars().all()
+    if not available:
+        return False
+    predicates = " OR ".join(
+        f"EXISTS (SELECT 1 FROM public.{name} WHERE tenant_id=:tenant_id LIMIT 1)"
+        for name in sorted(set(available))
+    )
+    return bool(db.execute(text(f"SELECT {predicates}"), {"tenant_id": str(tenant_id)}).scalar())
+
+
 def _require_replay(replay, response_model, *, resource_label: str):
     if not replay:
         return None
@@ -383,6 +416,10 @@ def update_profile(
     if not profile:
         db.rollback()
         raise HTTPException(404, "Create the business profile before updating it")
+    if "currency_code" in updates and str(updates["currency_code"]).upper() != str(profile.currency_code or "").upper():
+        if _has_financial_activity(db, tenant_id):
+            db.rollback()
+            raise HTTPException(409, "Business currency is locked after sales, stock movements, purchases, expenses or journal activity. Correcting it requires an accountant-approved migration; ordinary settings cannot rewrite recorded money.")
     for field, value in updates.items():
         setattr(profile, field, value)
     profile.updated_at = datetime.now(timezone.utc)

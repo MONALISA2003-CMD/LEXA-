@@ -163,7 +163,7 @@ def main() -> int:
                        '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                        '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
                        '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs',
-                       '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation')
+                       '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation','043_phase5_journal_currency_guard')
                 """)
                 migration_rows = sorted(row[0] for row in cur.fetchall())
                 expected_migrations = sorted([
@@ -172,7 +172,7 @@ def main() -> int:
                     '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                     '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
                     '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs',
-                    '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation',
+                    '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation','043_phase5_journal_currency_guard',
                 ])
                 cur.execute("""
                     SELECT to_regclass('public.inventory_replenishment_policies') IS NOT NULL,
@@ -250,12 +250,16 @@ def main() -> int:
                       EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='sales' AND column_name='business_date'),
                       EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_sales_tenant_business_date_status'),
                       (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.analytics_refresh_queue'::regclass),
-                      to_regprocedure('public.process_analytics_refresh_queue(integer)') IS NOT NULL
+                      to_regprocedure('public.process_analytics_refresh_queue(integer)') IS NOT NULL,
+                      position('Journal lines and any account denomination must use the journal entry currency' in
+                        pg_get_functiondef(to_regprocedure('public.post_journal_entry(uuid,uuid)'))) > 0,
+                      has_function_privilege('lexa_app','public.post_journal_entry(uuid,uuid)','EXECUTE')
                     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                     WHERE n.nspname='public' AND c.relkind='r'
                 """)
                 (team_chat_tables, team_chat_rls_forced, team_chat_policy_tables, sales_business_date_column,
-                 sales_business_date_index, analytics_queue_rls_forced, analytics_queue_worker) = cur.fetchone()
+                 sales_business_date_index, analytics_queue_rls_forced, analytics_queue_worker,
+                 journal_entry_currency_guard, journal_posting_grant) = cur.fetchone()
                 cur.execute("""
                     SELECT count(*) FROM information_schema.tables
                      WHERE table_schema='public' AND table_type='BASE TABLE'
@@ -326,6 +330,10 @@ def main() -> int:
             failures.append("Commerce business-date ledger column or query index is missing")
         if not analytics_queue_rls_forced or not analytics_queue_worker:
             failures.append("Durable analytics queue forced-RLS or worker function is missing")
+        if not journal_entry_currency_guard:
+            failures.append("Journal posting routine lacks the single-currency guard")
+        if not journal_posting_grant:
+            failures.append("Runtime role lacks the approved execute grant for journal posting")
 
         evidence = {
             "schema_version": 1,
@@ -370,6 +378,8 @@ def main() -> int:
             "sales_business_date_index": bool(sales_business_date_index),
             "analytics_refresh_queue_rls_forced": bool(analytics_queue_rls_forced),
             "analytics_refresh_queue_worker": bool(analytics_queue_worker),
+            "journal_entry_currency_guard": bool(journal_entry_currency_guard),
+            "journal_posting_grant": bool(journal_posting_grant),
             "lexa_app_can_write_permissions_reference": bool(can_write_permissions),
             "lexa_app_can_write_schema_migrations": bool(can_write_migrations),
             "required_phase5_return_routines_found": routine_count,

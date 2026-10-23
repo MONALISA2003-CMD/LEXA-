@@ -70,4 +70,4 @@ else
   if [[ "${LEXA_REQUIRE_FULL_ACCEPTANCE:-0}" == "1" ]]; then exit 2; fi
 fi
 
-printf '\nCandidate checks completed. See the Phase 4/5 report for every check marked blocked or not run.\n'
+printf '\nCandidate checks completed. Currency safety and journal posting contracts are included; see the Phase 3–5 report for every check marked blocked or not run.\n'

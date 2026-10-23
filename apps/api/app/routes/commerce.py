@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import date, datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
+import re
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -38,9 +39,17 @@ def out(row: Any) -> dict[str, Any]:
     return {k: (str(v) if isinstance(v, Decimal) else v) for k, v in values.items()}
 
 
-def default_currency(db: Session, tenant_id: UUID) -> str:
+def require_business_currency(db: Session, tenant_id: UUID) -> str:
+    """Return the explicitly saved business currency or stop money workflows.
+
+    A fallback such as UGX silently changes the meaning of every total, balance,
+    payment channel, receivable and journal. Setup must be completed explicitly.
+    """
     profile = db.scalar(select(BusinessProfile).where(BusinessProfile.tenant_id == tenant_id))
-    return (profile.currency_code if profile else "UGX").upper()
+    currency = str(profile.currency_code or "").strip().upper() if profile else ""
+    if not re.fullmatch(r"[A-Z]{3}", currency):
+        raise HTTPException(409, "Set a valid business currency in Settings before recording sales or viewing currency-based totals.")
+    return currency
 
 
 class Strict(BaseModel):
@@ -61,13 +70,17 @@ class ChannelCreate(Strict):
     name: str = Field(min_length=1, max_length=160, description="A friendly label such as MTN Line 1 or Stanbic")
     channel_type: str = Field(min_length=2, max_length=30)
     provider: str | None = Field(default=None, max_length=100, description="Optional institution or service name; never enter account details or credentials")
-    currency_code: str = Field(min_length=3, max_length=3)
+    currency_code: str = Field(pattern=r"^[A-Za-z]{3}$")
+
+    @field_validator("currency_code", mode="before")
+    @classmethod
+    def normalize_currency(cls, value: str) -> str:
+        return str(value or "").strip().upper()
 
     @model_validator(mode="after")
     def validate_type(self):
         self.name, self.provider = safe_payment_channel_label(self.name, self.provider)
         self.channel_type = self.channel_type.upper().strip()
-        self.currency_code = self.currency_code.upper().strip()
         if self.channel_type not in CHANNEL_TYPES:
             raise ValueError("Choose a supported payment method category")
         if not self.name:
@@ -102,16 +115,16 @@ class SaleCreate(Strict):
     customer_party_id: UUID | None = None
     branch_id: UUID | None = None
     location_id: UUID | None = None
-    currency_code: str = Field(min_length=3, max_length=3)
+    currency_code: str = Field(pattern=r"^[A-Za-z]{3}$")
     business_date: date = Field(default_factory=date.today)
     lines: list[SaleLineIn] = Field(min_length=1)
     payments: list[PaymentAllocationIn] = Field(default_factory=list)
     notes: str | None = None
 
-    @model_validator(mode="after")
-    def normalize(self):
-        self.currency_code = self.currency_code.upper().strip()
-        return self
+    @field_validator("currency_code", mode="before")
+    @classmethod
+    def normalize_currency(cls, value: str) -> str:
+        return str(value or "").strip().upper()
 
 
 class PaymentCreate(Strict):
@@ -204,10 +217,7 @@ def dashboard(business_date: date | None = None, ctx=Depends(require_permission(
     ).scalar_one()
     # A tenant's profile currency is the reporting currency shown on the
     # Command Centre. Do not add values from different currencies together.
-    currency_code = db.execute(
-        text("SELECT currency_code FROM public.business_profiles WHERE tenant_id=:tenant_id"),
-        {"tenant_id": str(tenant_id)},
-    ).scalar_one_or_none() or "UGX"
+    currency_code = require_business_currency(db, tenant_id)
     # Revenue follows the date the sale was completed, using the tenant's
     # business calendar. Collection is a separate measure: payments recorded
     # on the business date, including later receivable payments, are summed
@@ -496,7 +506,9 @@ def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=N
     idem,cached,_,cached_body=_idempotency(db,tenant_id,idempotency_key,"commerce.sale.create",body.model_dump(mode="json"))
     if cached: return cached_body
     try:
-        currency=body.currency_code
+        currency = require_business_currency(db, tenant_id)
+        if body.currency_code != currency:
+            raise HTTPException(409, "Sale currency must match the saved business currency; foreign-currency checkout is not enabled.")
         _tenant_party(db,tenant_id,body.customer_party_id); _tenant_branch(db,tenant_id,body.branch_id)
         if body.location_id is None: raise HTTPException(400,"A sale location is required for inventory-safe checkout")
         tenant_location(db,tenant_id,body.location_id)

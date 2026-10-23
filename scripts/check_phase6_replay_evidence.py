@@ -76,6 +76,10 @@ def main() -> int:
         errors.append("evidence lacks the commerce business-date column or performance index")
     if evidence.get("analytics_refresh_queue_rls_forced") is not True or evidence.get("analytics_refresh_queue_worker") is not True:
         errors.append("evidence lacks the forced-RLS durable analytics queue and bounded worker routine")
+    if evidence.get("journal_entry_currency_guard") is not True:
+        errors.append("evidence lacks the single-currency journal posting guard")
+    if evidence.get("journal_posting_grant") is not True:
+        errors.append("evidence lacks the runtime journal posting execute grant")
     if evidence.get("required_phase5_return_routines_found") != 4:
         errors.append("evidence is missing one or more required Phase 5 return/accounting routines")
     if evidence.get("migration_bundle_sha256") != expected_bundle:
@@ -100,7 +104,7 @@ def main() -> int:
         for error in errors:
             print("ERROR: " + error, file=sys.stderr)
         return 1
-    print("PASS: clean-replay evidence through commerce integrity, analytics queue and team chat is tied to the current migration bundle and expected source SHA.")
+    print("PASS: clean-replay evidence through commerce integrity, analytics queue, team chat and journal currency guard is tied to the current migration bundle and expected source SHA.")
     return 0
 
 

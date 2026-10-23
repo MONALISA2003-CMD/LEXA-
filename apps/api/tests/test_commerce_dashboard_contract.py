@@ -10,7 +10,8 @@ def test_collected_today_comes_from_recorded_payments_for_business_date():
     function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "dashboard")
     body = ast.get_source_segment(source, function) or ""
 
-    assert "SELECT currency_code FROM public.business_profiles WHERE tenant_id=:tenant_id" in body
+    assert "currency_code = require_business_currency(db, tenant_id)" in body
+    assert "def require_business_currency" in source
     assert "FROM public.payments AS p" in body
     assert "p.status='RECORDED'" in body
     assert "p.business_date=:business_date" in body

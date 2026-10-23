@@ -5,6 +5,8 @@ type FixtureLine = { variant_id: string; quantity: string; unit_price: string };
 type FixturePayment = { payment_channel_id: string; amount: string };
 type Fixture = {
   environment: 'staging';
+  disposable_scope: true;
+  reset_strategy: 'dispose_test_tenant';
   actor_role: 'cashier';
   location_id: string;
   branch_id?: string;
@@ -27,14 +29,32 @@ try { fixture = rawFixture ? JSON.parse(rawFixture) as Fixture : null; } catch {
 let baseHost = '';
 try { baseHost = baseUrl ? new URL(baseUrl).hostname.toLowerCase() : ''; } catch { baseHost = ''; }
 const stagingHosts = (process.env.LEXA_PHASE5_STAGING_HOSTS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+const knownProductionHosts = new Set(['lexa-green.vercel.app', 'lexa-n10e.onrender.com']);
 const explicitlySafe = process.env.LEXA_PHASE5_ALLOW_STAGING_WRITES === '1'
   && fixture?.environment === 'staging'
+  && fixture?.disposable_scope === true
+  && fixture?.reset_strategy === 'dispose_test_tenant'
+  && !knownProductionHosts.has(baseHost)
   && stagingHosts.includes(baseHost)
   && Boolean(process.env.LEXA_PHASE5_STORAGE_STATE || process.env.LEXA_PHASE4_STORAGE_STATE);
 const optedIn = Boolean(fixture) && explicitlySafe;
 const apiRoot = `${baseUrl.replace(/\/$/, '')}/api/lexa/api/v1`;
 let liveAuthHeader = '';
 function authHeaders() { return liveAuthHeader ? { Authorization: liveAuthHeader } : {}; }
+
+// Host allow-lists alone do not prove a preview is connected to a staging DB.
+// Before any test can issue a write, require the proxied API to identify itself
+// as staging/test and report healthy database + cache dependencies.
+test.beforeAll(async () => {
+  if (!optedIn) return;
+  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/lexa/ready`, { redirect: 'error' });
+  expect(response.status, 'staging API readiness check succeeds').toBe(200);
+  const readiness = await response.json() as { status?: string; environment?: string; dependencies?: { database?: string; cache?: string } };
+  expect(['staging', 'test']).toContain(String(readiness.environment || '').toLowerCase());
+  expect(readiness.status).toBe('ready');
+  expect(readiness.dependencies?.database).toBe('ok');
+  expect(readiness.dependencies?.cache).toBe('ok');
+});
 
 async function getJson(page: import('@playwright/test').Page, path: string) {
   const response = await page.request.get(`${apiRoot}${path}`, { headers: authHeaders() });
@@ -125,10 +145,21 @@ test.describe('Phase 5 isolated staging sales acceptance', () => {
       payments: Array<{ allocated_amount: string; status: string }>;
       returns: Array<{ id: string; total: string }>;
       refunds: Array<{ amount: string; status: string }>;
+      accounting_entries: Array<{ id: string; source_type: string; source_id: string; entry_role: string; currency_code: string; status: string }>;
     };
     expect(detail.id).toBe(firstSale.id);
     expect(detail.lines).toHaveLength(3);
     expect(detail.payments.filter(x => x.status === 'RECORDED').reduce((sum, row) => sum + Number(row.allocated_amount), 0)).toBe(Number(data.expected_paid));
+    // The commerce response exposes only the journal headers linked to this sale;
+    // cashiers cannot read the finance ledger directly. Verify the link and posting
+    // state here, then verify journal line balance in the manager acceptance below.
+    const saleJournal = detail.accounting_entries.find(x => x.source_type === 'SALE' && x.source_id === firstSale.id && x.entry_role === 'SALE_RECOGNITION');
+    expect(saleJournal, 'sale revenue recognition journal is linked to the completed sale').toBeTruthy();
+    expect(saleJournal!.status).toBe('POSTED');
+    const paymentJournals = detail.accounting_entries.filter(x => x.source_type === 'PAYMENT' && x.entry_role === 'PAYMENT_RECEIPT');
+    expect(paymentJournals.length).toBe(2);
+    expect([...detail.accounting_entries].every(x => x.currency_code === data.currency_code), 'all linked journals use the sale currency').toBe(true);
+    expect([...detail.accounting_entries].every(x => x.status === 'POSTED'), 'all linked journal entries are posted').toBe(true);
 
     for (const line of data.lines) {
       const after = await readBalance(page, data.location_id, line.variant_id);
@@ -240,10 +271,32 @@ test.describe('Phase 5 isolated staging sales acceptance', () => {
         data: payload,
       });
       expect(response.status(), 'manager with pricing and sales permissions can post approved override/discount').toBe(201);
-      const body = await response.json() as { total: string; amount_paid: string; amount_due: string };
+      const body = await response.json() as { id: string; total: string; amount_paid: string; amount_due: string };
       expect(Number(body.total)).toBe(8000);
       expect(Number(body.amount_paid)).toBe(8000);
       expect(Number(body.amount_due)).toBe(0);
+
+      const detailRead = await getJson(page, `/commerce/sales/${body.id}`);
+      expect(detailRead.response.status()).toBe(200);
+      const detail = detailRead.body as { accounting_entries: Array<{ id: string; source_type: string; source_id: string; entry_role: string; currency_code: string; status: string }> };
+      const saleEntries = detail.accounting_entries.filter(entry => entry.source_type === 'SALE' && entry.source_id === body.id && entry.entry_role === 'SALE_RECOGNITION');
+      expect(saleEntries).toHaveLength(1);
+      const eligibleEntries = detail.accounting_entries.filter(entry => entry.source_type === 'SALE' && entry.source_id === body.id);
+      expect(eligibleEntries.length).toBeGreaterThanOrEqual(1);
+      for (const header of eligibleEntries) {
+        expect(header.currency_code).toBe(data.currency_code);
+        expect(header.status).toBe('POSTED');
+        const full = await getJson(page, `/accounting/journal-entries/${header.id}`);
+        expect(full.response.status(), `journal ${header.id} is readable to the manager`).toBe(200);
+        const journal = full.body as { entry: { status: string; currency_code: string }; lines: Array<{ debit: string; credit: string; currency_code: string }> };
+        expect(journal.entry.status).toBe('POSTED');
+        expect(journal.entry.currency_code).toBe(data.currency_code);
+        expect(journal.lines.length).toBeGreaterThanOrEqual(2);
+        expect(journal.lines.every(line => line.currency_code === data.currency_code), 'every journal line uses the journal currency').toBe(true);
+        const debit = journal.lines.reduce((sum, line) => sum + Number(line.debit), 0);
+        const credit = journal.lines.reduce((sum, line) => sum + Number(line.credit), 0);
+        expect(debit).toBeCloseTo(credit, 4);
+      }
     } finally {
       await context.close();
     }

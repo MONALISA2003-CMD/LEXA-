@@ -379,6 +379,14 @@ def create_expense(body: ExpenseCreate, idempotency_key: str | None = Header(def
 
     total = body.subtotal + body.tax_amount
     try:
+        business_currency = db.execute(text(
+            "SELECT currency_code FROM public.business_profiles WHERE tenant_id=:t"
+        ), {"t": str(tenant_id)}).scalar_one_or_none()
+        business_currency = str(business_currency or "").strip().upper()
+        if not re.fullmatch(r"[A-Z]{3}", business_currency):
+            raise HTTPException(409, "Save a valid business currency in Settings before recording expenses.")
+        if body.currency_code != business_currency:
+            raise HTTPException(409, f"Foreign-currency expenses are not enabled. Use the saved business currency ({business_currency}) or configure an approved FX workflow first.")
         account = db.execute(text("""
           SELECT id FROM accounting_accounts
           WHERE tenant_id=:t AND id=:id AND account_type='EXPENSE' AND status='ACTIVE' AND allow_posting=true

@@ -76,7 +76,7 @@ export default function PurchasingPage() {
   const [supplierEmail, setSupplierEmail] = useState("");
   const [supplierPhone, setSupplierPhone] = useState("");
   const [supplierTerms, setSupplierTerms] = useState("30");
-  const [supplierCurrency, setSupplierCurrency] = useState("UGX");
+  const [supplierCurrency, setSupplierCurrency] = useState("");
   const [supplierLocation, setSupplierLocation] = useState("");
   const [supplierTaxNumber, setSupplierTaxNumber] = useState("");
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
@@ -84,7 +84,7 @@ export default function PurchasingPage() {
   const [supplierEditEmail, setSupplierEditEmail] = useState("");
   const [supplierEditPhone, setSupplierEditPhone] = useState("");
   const [supplierEditTerms, setSupplierEditTerms] = useState("30");
-  const [supplierEditCurrency, setSupplierEditCurrency] = useState("UGX");
+  const [supplierEditCurrency, setSupplierEditCurrency] = useState("");
   const [supplierEditLocation, setSupplierEditLocation] = useState("");
   const [supplierEditTaxNumber, setSupplierEditTaxNumber] = useState("");
   const [supplierEditNotes, setSupplierEditNotes] = useState("");
@@ -141,6 +141,10 @@ export default function PurchasingPage() {
 
   const variantMap = useMemo(() => new Map(variants.map((v) => [v.id, v])), [variants]);
   const supplierMap = useMemo(() => new Map(suppliers.map((s) => [s.supplier_party_id, s])), [suppliers]);
+  const supplierCurrencyFor = (id: string): string | null => {
+    const value = supplierMap.get(id)?.currency_code;
+    return value && /^[A-Z]{3}$/i.test(value) ? value.toUpperCase() : null;
+  };
   const warehousesById = useMemo(() => new Map(warehouses.map((w) => [w.id, w])), [warehouses]);
   const branchLocations = useMemo(() => locations.filter((loc) => {
     const warehouse = warehousesById.get(loc.warehouse_id);
@@ -176,8 +180,9 @@ export default function PurchasingPage() {
     if (value(10)) setWarehouses(value(10) as Warehouse[]);
     if (value(11)) setVariants(value(11) as VariantOption[]);
     const profile = value(12) as { currency_code?: string } | null;
-    setBusinessCurrency(profile?.currency_code && /^[A-Z]{3}$/i.test(profile.currency_code) ? profile.currency_code.toUpperCase() : null);
-    if (profile?.currency_code && /^[A-Z]{3}$/i.test(profile.currency_code)) setSupplierCurrency(profile.currency_code.toUpperCase());
+    const configuredCurrency = profile?.currency_code && /^[A-Z]{3}$/i.test(profile.currency_code) ? profile.currency_code.toUpperCase() : null;
+    setBusinessCurrency(configuredCurrency);
+    setSupplierCurrency(current => current && /^[A-Z]{3}$/.test(current) ? current : configuredCurrency || "");
     setPoSupplier(current => current || nextSuppliers[0]?.supplier_party_id || "");
     setBillSupplier(current => current || nextSuppliers[0]?.supplier_party_id || "");
     setPaymentSupplier(current => current || nextSuppliers[0]?.supplier_party_id || "");
@@ -258,7 +263,7 @@ export default function PurchasingPage() {
     setSupplierEditEmail(supplier.email || "");
     setSupplierEditPhone(supplier.phone || "");
     setSupplierEditTerms(String(supplier.payment_terms_days ?? 0));
-    setSupplierEditCurrency(supplier.currency_code || "UGX");
+    setSupplierEditCurrency(supplier.currency_code && /^[A-Z]{3}$/i.test(supplier.currency_code) ? supplier.currency_code.toUpperCase() : "");
     setSupplierEditLocation(supplier.default_receiving_location_id || "");
     setSupplierEditTaxNumber(supplier.tax_number || "");
     setSupplierEditNotes(supplier.notes || "");
@@ -267,6 +272,7 @@ export default function PurchasingPage() {
 
   async function onCreateSupplier(event: FormEvent) {
     event.preventDefault();
+    if (!/^[A-Z]{3}$/.test(supplierCurrency.toUpperCase())) { setError("Choose an explicit three-letter supplier currency before saving."); return; }
     await perform(async () => {
       const created = await createPurchasingSupplier({ name: supplierName, code: supplierCode || undefined, email: supplierEmail || null, phone: supplierPhone || null, currency_code: supplierCurrency.toUpperCase(), payment_terms_days: Number(supplierTerms), default_receiving_location_id: supplierLocation || null, tax_number: supplierTaxNumber || null });
       setSelectedSupplierId(created.supplier_party_id); setPoSupplier(created.supplier_party_id); setBillSupplier(created.supplier_party_id); setPaymentSupplier(created.supplier_party_id);
@@ -275,11 +281,15 @@ export default function PurchasingPage() {
   }
   async function onSetSupplierCost(event: FormEvent) {
     event.preventDefault(); if (!selectedSupplierId || !costVariant || !costAmount) { setError("Choose a supplier, product and positive supplier unit cost."); return; }
-    await perform(() => setSupplierCost(selectedSupplierId, { variant_id: costVariant, unit_cost: costAmount, minimum_quantity: costMinimum || "1", currency_code: supplierMap.get(selectedSupplierId)?.currency_code || supplierCurrency, lead_time_days: costLeadTime ? Number(costLeadTime) : null }), "Supplier product cost saved. New cost history is effective-dated.");
+    const currency = supplierCurrencyFor(selectedSupplierId);
+    if (!currency) { setError("This supplier has no valid saved currency. Correct the supplier profile before recording costs."); return; }
+    if (!businessCurrency || currency !== businessCurrency) { setError(`Foreign-exchange purchasing is not enabled. Supplier costs must use the saved business currency${businessCurrency ? ` (${businessCurrency})` : ""}.`); return; }
+    await perform(() => setSupplierCost(selectedSupplierId, { variant_id: costVariant, unit_cost: costAmount, minimum_quantity: costMinimum || "1", currency_code: currency, lead_time_days: costLeadTime ? Number(costLeadTime) : null }), "Supplier product cost saved. New cost history is effective-dated.");
   }
   async function onUpdateSupplier(event: FormEvent) {
     event.preventDefault();
     if (!selectedSupplierId || !supplierEditName.trim()) { setError("Select a supplier and provide its trading name."); return; }
+    if (!/^[A-Z]{3}$/.test(supplierEditCurrency.toUpperCase())) { setError("Choose an explicit three-letter supplier currency."); return; }
     await perform(() => updatePurchasingSupplier(selectedSupplierId, {
       name: supplierEditName.trim(), email: supplierEditEmail.trim() || null, phone: supplierEditPhone.trim() || null,
       payment_terms_days: Number(supplierEditTerms), currency_code: supplierEditCurrency,
@@ -290,10 +300,13 @@ export default function PurchasingPage() {
   async function onCreateOrder(event: FormEvent) {
     event.preventDefault();
     if (!poSupplier || !poBranch || !poLocation) { setError("Select a supplier, branch and receiving location."); return; }
+    const currency = supplierCurrencyFor(poSupplier);
+    if (!currency) { setError("This supplier has no valid saved currency. Correct the supplier profile before ordering."); return; }
+    if (!businessCurrency || currency !== businessCurrency) { setError(`Foreign-exchange purchasing is not enabled. Purchase orders must use the saved business currency${businessCurrency ? ` (${businessCurrency})` : ""}.`); return; }
     const lines = poLines.filter((line) => line.variant_id && Number(line.ordered_quantity) > 0 && Number(line.unit_cost) > 0).map((line) => ({ variant_id: line.variant_id, ordered_quantity: line.ordered_quantity, unit_cost: line.unit_cost, tax_rate: line.tax_rate || "0", description: line.description || null }));
     if (!lines.length) { setError("Add at least one product line with quantity and unit cost."); return; }
     await perform(async () => {
-      const result = await createPurchaseOrder({ supplier_party_id: poSupplier, branch_id: poBranch, receiving_location_id: poLocation, order_date: poDate, expected_date: poExpectedDate || null, currency_code: supplierMap.get(poSupplier)?.currency_code || businessCurrency || "UGX", notes: poNotes || null, lines });
+      const result = await createPurchaseOrder({ supplier_party_id: poSupplier, branch_id: poBranch, receiving_location_id: poLocation, order_date: poDate, expected_date: poExpectedDate || null, currency_code: currency, notes: poNotes || null, lines });
       setSelectedOrderId(result.id); setTab("Purchase orders"); setPoLines([{ variant_id: "", ordered_quantity: "1", unit_cost: "", tax_rate: "0", description: "" }]); setPoNotes("");
     }, "Purchase order created as a draft. Submit it for approval before receiving stock.");
   }
@@ -314,13 +327,19 @@ export default function PurchasingPage() {
   }
   async function onCreateBill(event: FormEvent) {
     event.preventDefault(); if (!billSupplier || !billNumber || !billSubtotal) { setError("Choose a supplier and enter the invoice number and subtotal."); return; }
-    await perform(() => createSupplierBill({ supplier_party_id: billSupplier, bill_number: billNumber, bill_date: billDate, due_date: billDueDate || null, currency_code: supplierMap.get(billSupplier)?.currency_code || businessCurrency || "UGX", subtotal: billSubtotal, tax_amount: billTax || "0", other_charges: billCharges || "0", purchase_order_id: billPoId || null, purchase_receipt_id: billReceiptId || null, notes: billNotes || null }), "Supplier bill saved as a draft. Record it when the invoice details have been checked.");
+    const currency = supplierCurrencyFor(billSupplier);
+    if (!currency) { setError("This supplier has no valid saved currency. Correct the supplier profile before recording a bill."); return; }
+    if (!businessCurrency || currency !== businessCurrency) { setError(`Foreign-exchange purchasing is not enabled. Supplier bills must use the saved business currency${businessCurrency ? ` (${businessCurrency})` : ""}.`); return; }
+    await perform(() => createSupplierBill({ supplier_party_id: billSupplier, bill_number: billNumber, bill_date: billDate, due_date: billDueDate || null, currency_code: currency, subtotal: billSubtotal, tax_amount: billTax || "0", other_charges: billCharges || "0", purchase_order_id: billPoId || null, purchase_receipt_id: billReceiptId || null, notes: billNotes || null }), "Supplier bill saved as a draft. Record it when the invoice details have been checked.");
     setBillNumber(""); setBillSubtotal(""); setBillTax("0"); setBillCharges("0"); setBillPoId(""); setBillReceiptId(""); setBillNotes("");
   }
   async function onCreatePayment(event: FormEvent) {
     event.preventDefault(); if (!paymentSupplier || !paymentNumber || !paymentAmount) { setError("Choose a supplier and enter the payment number and amount."); return; }
+    const currency = supplierCurrencyFor(paymentSupplier);
+    if (!currency) { setError("This supplier has no valid saved currency. Correct the supplier profile before recording a payment."); return; }
+    if (!businessCurrency || currency !== businessCurrency) { setError(`Foreign-exchange purchasing is not enabled. Supplier payments must use the saved business currency${businessCurrency ? ` (${businessCurrency})` : ""}.`); return; }
     const allocations = paymentAllocations.filter((x) => x.bill_id && Number(x.amount) > 0).map((x) => ({ bill_id: x.bill_id, amount: x.amount }));
-    await perform(() => createSupplierPayment({ supplier_party_id: paymentSupplier, payment_number: paymentNumber, payment_date: paymentDate, currency_code: supplierMap.get(paymentSupplier)?.currency_code || businessCurrency || "UGX", amount: paymentAmount, payment_method: paymentMethod, reference: paymentReference || null, allocations }), "Supplier payment saved as a draft. Check the amounts and reference before recording it.");
+    await perform(() => createSupplierPayment({ supplier_party_id: paymentSupplier, payment_number: paymentNumber, payment_date: paymentDate, currency_code: currency, amount: paymentAmount, payment_method: paymentMethod, reference: paymentReference || null, allocations }), "Supplier payment saved as a draft. Check the amounts and reference before recording it.");
     setPaymentNumber(""); setPaymentAmount(""); setPaymentReference(""); setPaymentAllocations([{ bill_id: "", amount: "" }]);
   }
 
@@ -342,10 +361,10 @@ export default function PurchasingPage() {
 
         {tab === "Suppliers" && <div className="operations-layout">
           <form className="operation-form" onSubmit={onCreateSupplier}>
-            <div><p className="eyebrow">SUPPLIERS</p><h3>Add supplier</h3><p>Supplier identity, commercial currency, payment terms and default receiving location.</p></div>
+            <div><p className="eyebrow">SUPPLIERS</p><h3>Add supplier</h3><p>Supplier identity, commercial currency, payment terms and default receiving location. Until foreign-exchange accounting is enabled, stock purchases must use your saved business currency.</p></div>
             <label>Supplier / legal trading name<input value={supplierName} onChange={e=>setSupplierName(e.target.value)} required minLength={2} maxLength={250} placeholder="Supplier business name"/></label>
             <div className="form-grid"><label>Supplier code (optional)<input value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} placeholder="SUP-001"/></label><label>Payment terms (days)<input type="number" min="0" max="3650" value={supplierTerms} onChange={e=>setSupplierTerms(e.target.value)} required/></label></div>
-            <div className="form-grid"><label>Currency<select value={supplierCurrency} onChange={e=>setSupplierCurrency(e.target.value)}><option value="UGX">UGX — Uganda shilling</option><option value="USD">USD</option><option value="KES">KES</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select></label><label>Tax / registration number<input value={supplierTaxNumber} onChange={e=>setSupplierTaxNumber(e.target.value)} placeholder="Optional"></input></label></div>
+            <div className="form-grid"><label>Currency<select value={supplierCurrency} onChange={e=>setSupplierCurrency(e.target.value)} required><option value="">Choose currency</option><option value="UGX">UGX — Uganda shilling</option><option value="USD">USD</option><option value="KES">KES</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select></label><label>Tax / registration number<input value={supplierTaxNumber} onChange={e=>setSupplierTaxNumber(e.target.value)} placeholder="Optional"></input></label></div>
             <div className="form-grid"><label>Email<input type="email" value={supplierEmail} onChange={e=>setSupplierEmail(e.target.value)} placeholder="accounts@supplier.example"/></label><label>Phone<input value={supplierPhone} onChange={e=>setSupplierPhone(e.target.value)} placeholder="Contact number"/></label></div>
             <label>Default receiving location<select value={supplierLocation} onChange={e=>setSupplierLocation(e.target.value)}><option value="">Choose at order time</option>{locations.map(loc=><option key={loc.id} value={loc.id}>{loc.name} · {loc.code}</option>)}</select></label>
             <button type="submit" className="button button-dark" disabled={busy}>Create supplier</button>
@@ -365,7 +384,7 @@ export default function PurchasingPage() {
             <div><p className="eyebrow">SUPPLIER TERMS</p><h3>Edit supplier terms</h3><p>Changes are audited. Currency is locked after purchasing activity; suppliers with open work or a non-zero balance cannot be archived.</p></div>
             <label>Supplier<select value={selectedSupplierId} onChange={e=>chooseSupplierProfile(e.target.value)} required><option value="">Choose supplier</option>{suppliers.map(s=><option key={s.supplier_party_id} value={s.supplier_party_id}>{s.name} · {s.currency_code}</option>)}</select></label>
             <label>Trading name<input value={supplierEditName} onChange={e=>setSupplierEditName(e.target.value)} minLength={2} maxLength={250} required/></label>
-            <div className="form-grid"><label>Payment terms (days)<input type="number" min="0" max="3650" value={supplierEditTerms} onChange={e=>setSupplierEditTerms(e.target.value)} required/></label><label>Currency<select value={supplierEditCurrency} onChange={e=>setSupplierEditCurrency(e.target.value)}><option value="UGX">UGX</option><option value="USD">USD</option><option value="KES">KES</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select></label></div>
+            <div className="form-grid"><label>Payment terms (days)<input type="number" min="0" max="3650" value={supplierEditTerms} onChange={e=>setSupplierEditTerms(e.target.value)} required/></label><label>Currency<select value={supplierEditCurrency} onChange={e=>setSupplierEditCurrency(e.target.value)} required><option value="">Choose currency</option><option value="UGX">UGX</option><option value="USD">USD</option><option value="KES">KES</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select></label></div>
             <div className="form-grid"><label>Email<input type="email" value={supplierEditEmail} onChange={e=>setSupplierEditEmail(e.target.value)}/></label><label>Phone<input value={supplierEditPhone} onChange={e=>setSupplierEditPhone(e.target.value)}/></label></div>
             <label>Default receiving location<select value={supplierEditLocation} onChange={e=>setSupplierEditLocation(e.target.value)}><option value="">Choose at order time</option>{locations.map(loc=><option key={loc.id} value={loc.id}>{loc.name} · {loc.code}</option>)}</select></label>
             <label>Tax / registration number<input value={supplierEditTaxNumber} onChange={e=>setSupplierEditTaxNumber(e.target.value)}/></label>

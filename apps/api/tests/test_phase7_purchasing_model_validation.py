@@ -73,6 +73,16 @@ def test_supplier_payment_model_runs_shared_validation_and_normalizes_currency()
     assert len(valid.allocations) == 2
 
 
+def test_supplier_payment_requires_explicit_currency():
+    with pytest.raises(ValidationError):
+        SupplierPaymentCreate(
+            supplier_party_id=SUPPLIER_ID,
+            payment_number="P7-NO-CURRENCY",
+            amount="10.00",
+            payment_method="BANK_TRANSFER",
+        )
+
+
 def test_supplier_payment_model_rejects_duplicate_bill_allocations():
     with pytest.raises(ValidationError, match="allocate to each bill only once"):
         payment(allocations=[{"bill_id": str(BILL_A), "amount": "20.00"}, {"bill_id": str(BILL_A), "amount": "10.00"}])

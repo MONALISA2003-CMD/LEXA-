@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "purpose": "Disposable clean-replay sequence for the maintained LEXA replacement chain through commerce integrity/scaling (041) and team chat (042). Never run against production.",
+  "purpose": "Disposable clean-replay sequence for the maintained LEXA replacement chain through commerce integrity (041), team chat (042), and journal currency guard (043). Never run against production.",
   "baseline_commit": "a6acc0eb53660ea938a314640bf28283ae2a98a8",
-  "status": "HISTORICAL_RECOVERY_GATE_CLOSED_BY_PHASE3_APPROVAL; PHASE8_PLUS_COMMERCE_CHAT_SEMANTIC_REPLAY_PENDING",
+  "status": "HISTORICAL_RECOVERY_GATE_CLOSED_BY_PHASE3_APPROVAL; PHASE8_PLUS_COMMERCE_CHAT_JOURNAL_CURRENCY_SEMANTIC_REPLAY_PENDING",
   "do_not_execute_in_production": true,
   "steps": [
     {
@@ -212,6 +212,10 @@
     {
       "path": "migrations/042_team_chat_foundation.sql",
       "mode": "tenant-and-branch-scoped-team-chat-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/043_phase5_journal_currency_guard.sql",
+      "mode": "journal-currency-consistency-and-single-currency-posting-guard-candidate"
     }
   ],
   "replay_only_notice": "Runs only on a fresh local/CI disposable PostgreSQL database after explicit environment opt-in. Never execute against production. A successful replay validates the selected replacement chain, not original historical-byte parity.",
