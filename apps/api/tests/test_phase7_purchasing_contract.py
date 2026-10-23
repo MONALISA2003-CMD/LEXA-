@@ -98,3 +98,28 @@ def test_phase7_append_only_allocation_grants_are_compatible_with_bounded_row_lo
     migration = (ROOT / "migrations/039_phase7_supplier_ledger_landed_costs.sql").read_text()
     assert "WHERE r.name IN ('Owner','Administrator','Finance / Accounting')" in migration
     assert "WHERE r.name='Inventory'" not in migration
+
+
+def test_nullable_purchasing_filters_have_explicit_postgres_types():
+    """PostgreSQL cannot infer the type of a NULL-only bind parameter.
+
+    These casts prevent psycopg.errors.AmbiguousParameter for unfiltered list
+    requests while retaining the same filtered-query semantics.
+    """
+    source = (ROOT / "apps/api/app/routes/purchasing.py").read_text()
+    expected_casts = [
+        "CAST(:q AS text) IS NULL",
+        "CAST(:variant_id AS uuid) IS NULL",
+        "CAST(:status AS text) IS NULL",
+        "CAST(:supplier AS uuid) IS NULL",
+        "CAST(:po AS uuid) IS NULL",
+        "CAST(:due_before AS date) IS NULL",
+        "CAST(:cc AS text) IS NULL",
+    ]
+    for expression in expected_casts:
+        assert expression in source, f"Missing explicit type for nullable filter: {expression}"
+
+    # Guard against reintroducing the exact ambiguous pattern into this module.
+    import re
+    untyped_null_filters = re.findall(r"(?<!CAST\():(\w+)\s+IS\s+NULL", source, re.IGNORECASE)
+    assert not untyped_null_filters, f"Untyped nullable SQL parameters remain: {untyped_null_filters}"
