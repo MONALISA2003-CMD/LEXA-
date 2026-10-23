@@ -1,0 +1,408 @@
+name: LEXA CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_phase345_staging_e2e:
+        description: Run write-enabled Phase 3–5 sales/accounting acceptance only against configured disposable staging
+        type: boolean
+        required: true
+        default: false
+      run_phase6_staging_e2e:
+        description: Run write-enabled Phase 6 acceptance only against configured disposable staging
+        type: boolean
+        required: true
+        default: false
+      run_phase7_staging_e2e:
+        description: Run write-enabled Phase 7 acceptance only against configured disposable staging
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lexa-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-contracts:
+    name: Backend contracts and migration source integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: lexa_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U test -d lexa_test"
+          --health-interval 10s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      APP_ENV: development
+      PYTHONPATH: apps/api
+      DATABASE_URL: postgresql+psycopg://test:test@127.0.0.1:5432/lexa_test
+      REDIS_URL: redis://127.0.0.1:6379/0
+      JWT_SECRET: test-only-ci-secret-that-is-long-enough-for-contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: apps/api/pyproject.toml
+      - name: Install declared API dev/test dependencies
+        working-directory: apps/api
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
+      - name: Run complete canonical Python suites (no dependency-driven skips)
+        run: python -m pytest -q tests apps/api/tests
+      - name: Compile API, tests, and scripts
+        run: python -m compileall -q apps/api/app apps/api/tests tests scripts
+      - name: Validate migration source disposition and checksums
+        run: |
+          python scripts/check_migration_recovery_manifest.py
+          python scripts/check_migration_sources.py --strict
+          python scripts/run_clean_migration_replay.py --plan-only
+
+  frontend-contracts:
+    name: Node 24 typecheck, frontend contracts and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install locked dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        working-directory: apps/web
+        run: npm run typecheck
+      - name: Frontend contract and safety tests
+        working-directory: apps/web
+        run: node --test tests/*.test.mjs
+      - name: Audit interactive controls and destinations
+        run: node scripts/audit_frontend_actions.mjs
+      - name: Production build
+        working-directory: apps/web
+        run: npm run build
+
+  clean-database-replay:
+    name: Clean migration replay and RLS/least-privilege proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lexa_replay_ci
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lexa_replay_ci"
+          --health-interval 10s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/lexa_replay_ci
+      LEXA_ALLOW_DISPOSABLE_REPLAY: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install PostgreSQL client and psycopg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+          python -m pip install --upgrade pip 'psycopg[binary]>=3.2,<4'
+      - name: Verify exact migration inputs
+        run: python scripts/run_clean_migration_replay.py --plan-only
+      - name: Apply ordered replay to empty local disposable database
+        run: python scripts/run_clean_migration_replay.py --apply
+      - name: Verify replay evidence is tied to this SHA
+        run: python scripts/check_phase6_replay_evidence.py --evidence artifacts/phase6-replay-evidence.json --expected-commit "$GITHUB_SHA"
+      - name: Require semantic replacement validation
+        run: python scripts/check_migration_sources.py --strict --require-semantic-validation --evidence artifacts/phase6-replay-evidence.json
+      - name: Preserve replay evidence and checksum
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lexa-phase6-7-clean-replay-${{ github.sha }}
+          path: |
+            artifacts/phase6-replay-evidence.json
+            artifacts/phase6-replay-evidence.json.sha256
+          if-no-files-found: warn
+          retention-days: 90
+
+  phase345-staging-e2e:
+    name: Phase 3–5 sales/accounting acceptance and journal lines (explicit disposable staging only)
+    if: github.event_name == 'workflow_dispatch' && inputs.run_phase345_staging_e2e == true && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: phase345-staging
+    needs: [backend-contracts, frontend-contracts, clean-database-replay]
+    env:
+      LEXA_BROWSER_BASE_URL: ${{ vars.LEXA_PHASE345_STAGING_URL }}
+      LEXA_PHASE5_STAGING_HOSTS: ${{ vars.LEXA_PHASE345_STAGING_HOSTS }}
+      LEXA_PHASE5_ACCEPTANCE_FIXTURE_JSON: ${{ secrets.LEXA_PHASE5_ACCEPTANCE_FIXTURE_JSON }}
+      LEXA_PHASE5_STORAGE_STATE_B64: ${{ secrets.LEXA_PHASE5_STORAGE_STATE_B64 }}
+      LEXA_PHASE5_MANAGER_STORAGE_STATE_B64: ${{ secrets.LEXA_PHASE5_MANAGER_STORAGE_STATE_B64 }}
+      LEXA_PHASE5_ALLOW_STAGING_WRITES: '1'
+      LEXA_PHASE5_STORAGE_STATE: .phase5-storage-state.json
+      LEXA_PHASE5_MANAGER_STORAGE_STATE: .phase5-manager-storage-state.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --no-fund
+      - name: Validate sales fixture, staging host and both QA auth states
+        env:
+          BASE_URL: ${{ vars.LEXA_PHASE345_STAGING_URL }}
+          ALLOWED_HOSTS: ${{ vars.LEXA_PHASE345_STAGING_HOSTS }}
+          FIXTURE_JSON: ${{ secrets.LEXA_PHASE5_ACCEPTANCE_FIXTURE_JSON }}
+          STORAGE_B64: ${{ secrets.LEXA_PHASE5_STORAGE_STATE_B64 }}
+          MANAGER_STORAGE_B64: ${{ secrets.LEXA_PHASE5_MANAGER_STORAGE_STATE_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$BASE_URL" || { echo 'Missing repository variable LEXA_PHASE345_STAGING_URL' >&2; exit 1; }
+          test -n "$ALLOWED_HOSTS" || { echo 'Missing repository variable LEXA_PHASE345_STAGING_HOSTS' >&2; exit 1; }
+          test -n "$FIXTURE_JSON" || { echo 'Missing secret LEXA_PHASE5_ACCEPTANCE_FIXTURE_JSON' >&2; exit 1; }
+          test -n "$STORAGE_B64" || { echo 'Missing secret LEXA_PHASE5_STORAGE_STATE_B64' >&2; exit 1; }
+          test -n "$MANAGER_STORAGE_B64" || { echo 'Missing secret LEXA_PHASE5_MANAGER_STORAGE_STATE_B64' >&2; exit 1; }
+          node - <<'NODE'
+          const base = new URL(process.env.BASE_URL);
+          const allowed = process.env.ALLOWED_HOSTS.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+          const production = new Set(['lexa-green.vercel.app', 'lexa-n10e.onrender.com']);
+          const fixture = JSON.parse(process.env.FIXTURE_JSON);
+          if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash || !['', '/'].includes(base.pathname)) throw new Error('Phase 3–5 target must be a plain HTTPS origin');
+          if (production.has(base.hostname.toLowerCase()) || !allowed.includes(base.hostname.toLowerCase())) throw new Error('Phase 3–5 target hostname is not an approved staging host');
+          if (fixture.environment !== 'staging' || fixture.disposable_scope !== true || fixture.reset_strategy !== 'dispose_test_tenant' || fixture.actor_role !== 'cashier') throw new Error('Phase 5 fixture must be a disposable staging cashier fixture');
+          for (const key of ['location_id', 'customer_party_id', 'currency_code', 'business_date', 'expected_total', 'expected_paid', 'lines', 'payments']) if (fixture[key] === undefined || fixture[key] === null || fixture[key] === '') throw new Error(`Fixture missing ${key}`);
+          if (!Array.isArray(fixture.lines) || fixture.lines.length !== 3 || !Array.isArray(fixture.payments) || fixture.payments.length !== 2) throw new Error('Phase 5 fixture must have three sales lines and two payment entries');
+          NODE
+          printf '%s' "$STORAGE_B64" | base64 --decode > apps/web/.phase5-storage-state.json
+          printf '%s' "$MANAGER_STORAGE_B64" | base64 --decode > apps/web/.phase5-manager-storage-state.json
+          node - <<'NODE'
+          const fs = require('fs');
+          for (const file of ['apps/web/.phase5-storage-state.json', 'apps/web/.phase5-manager-storage-state.json']) {
+            const state = JSON.parse(fs.readFileSync(file, 'utf8'));
+            if (!Array.isArray(state.cookies) || !Array.isArray(state.origins)) throw new Error(`Invalid Playwright storage state: ${file}`);
+          }
+          NODE
+      - name: Install Chromium
+        run: npx --yes playwright@1.64.1 install --with-deps chromium
+      - name: Run sales/accounting acceptance including journal lines
+        working-directory: apps/web
+        env:
+          CI: ''
+        run: npm run test:e2e:phase5
+      - name: Remove all QA authentication state
+        if: always()
+        run: rm -f apps/web/.phase5-storage-state.json apps/web/.phase5-manager-storage-state.json
+      - name: Retain Phase 3–5 report only (never QA auth state)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lexa-phase345-staging-e2e-${{ github.sha }}
+          path: apps/web/test-results/staging-acceptance/
+          if-no-files-found: warn
+          retention-days: 14
+
+  phase6-staging-e2e:
+    name: Phase 6 inventory intelligence E2E (explicit disposable staging only)
+    if: github.event_name == 'workflow_dispatch' && inputs.run_phase6_staging_e2e == true && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: phase6-staging
+    needs: [backend-contracts, frontend-contracts, clean-database-replay]
+    env:
+      LEXA_BROWSER_BASE_URL: ${{ vars.LEXA_PHASE6_STAGING_URL }}
+      LEXA_PHASE6_STAGING_HOSTS: ${{ vars.LEXA_PHASE6_STAGING_HOSTS }}
+      LEXA_PHASE6_ACCEPTANCE_FIXTURE_JSON: ${{ secrets.LEXA_PHASE6_ACCEPTANCE_FIXTURE_JSON }}
+      LEXA_PHASE6_STORAGE_STATE_B64: ${{ secrets.LEXA_PHASE6_STORAGE_STATE_B64 }}
+      LEXA_PHASE6_ALLOW_STAGING_WRITES: '1'
+      LEXA_PHASE6_STORAGE_STATE: .phase6-storage-state.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --no-fund
+      - name: Validate staging input before creating auth state
+        env:
+          BASE_URL: ${{ vars.LEXA_PHASE6_STAGING_URL }}
+          ALLOWED_HOSTS: ${{ vars.LEXA_PHASE6_STAGING_HOSTS }}
+          FIXTURE_JSON: ${{ secrets.LEXA_PHASE6_ACCEPTANCE_FIXTURE_JSON }}
+          STORAGE_B64: ${{ secrets.LEXA_PHASE6_STORAGE_STATE_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$BASE_URL" && test -n "$ALLOWED_HOSTS" && test -n "$FIXTURE_JSON" && test -n "$STORAGE_B64"
+          node - <<'NODE'
+          const base = new URL(process.env.BASE_URL);
+          const allowed = process.env.ALLOWED_HOSTS.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+          const production = new Set(['lexa-green.vercel.app', 'lexa-n10e.onrender.com']);
+          const fixture = JSON.parse(process.env.FIXTURE_JSON);
+          if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash || !['', '/'].includes(base.pathname)) throw new Error('Phase 6 target must be a plain HTTPS origin');
+          if (production.has(base.hostname.toLowerCase()) || !allowed.includes(base.hostname.toLowerCase())) throw new Error('Phase 6 target hostname is not an approved staging host');
+          if (fixture.environment !== 'staging' || fixture.disposable_scope !== true || fixture.reset_strategy !== 'dispose_test_tenant' || fixture.actor_role !== 'manager') throw new Error('Phase 6 fixture is not a disposable manager staging fixture');
+          for (const key of ['location_id', 'restricted_location_id', 'variant_id']) if (!fixture[key]) throw new Error(`Fixture missing ${key}`);
+          NODE
+          printf '%s' "$STORAGE_B64" | base64 --decode > apps/web/.phase6-storage-state.json
+          node -e "const s=JSON.parse(require('fs').readFileSync('apps/web/.phase6-storage-state.json','utf8')); if(!Array.isArray(s.cookies)||!Array.isArray(s.origins)) process.exit(2)"
+      - name: Install Chromium
+        run: npx --yes playwright@1.64.1 install --with-deps chromium
+      - name: Run guarded Phase 6 staging acceptance without auto-retries
+        working-directory: apps/web
+        env:
+          CI: ''
+        run: npm run test:e2e:phase6
+      - name: Remove QA auth state
+        if: always()
+        run: rm -f apps/web/.phase6-storage-state.json
+      - name: Retain Phase 6 report only (never auth state)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lexa-phase6-staging-e2e-${{ github.sha }}
+          path: apps/web/test-results/staging-acceptance/
+          if-no-files-found: warn
+          retention-days: 14
+
+  phase7-staging-e2e:
+    name: Phase 7 purchasing lifecycle and branch-scope E2E (explicit staging only)
+    if: github.event_name == 'workflow_dispatch' && inputs.run_phase7_staging_e2e == true && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: phase7-staging
+    needs: [backend-contracts, frontend-contracts, clean-database-replay]
+    env:
+      LEXA_BROWSER_BASE_URL: ${{ vars.LEXA_PHASE7_STAGING_URL }}
+      LEXA_PHASE7_STAGING_HOSTS: ${{ vars.LEXA_PHASE7_STAGING_HOSTS }}
+      LEXA_PHASE7_ACCEPTANCE_FIXTURE_JSON: ${{ secrets.LEXA_PHASE7_ACCEPTANCE_FIXTURE_JSON }}
+      LEXA_PHASE7_STORAGE_STATE_B64: ${{ secrets.LEXA_PHASE7_STORAGE_STATE_B64 }}
+      LEXA_PHASE7_ALLOW_STAGING_WRITES: '1'
+      LEXA_PHASE7_STORAGE_STATE: .phase7-storage-state.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --no-fund
+      - name: Validate staging input before creating auth state
+        env:
+          BASE_URL: ${{ vars.LEXA_PHASE7_STAGING_URL }}
+          ALLOWED_HOSTS: ${{ vars.LEXA_PHASE7_STAGING_HOSTS }}
+          FIXTURE_JSON: ${{ secrets.LEXA_PHASE7_ACCEPTANCE_FIXTURE_JSON }}
+          STORAGE_B64: ${{ secrets.LEXA_PHASE7_STORAGE_STATE_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$BASE_URL" && test -n "$ALLOWED_HOSTS" && test -n "$FIXTURE_JSON" && test -n "$STORAGE_B64"
+          node - <<'NODE'
+          const base = new URL(process.env.BASE_URL);
+          const allowed = process.env.ALLOWED_HOSTS.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+          const production = new Set(['lexa-green.vercel.app', 'lexa-n10e.onrender.com']);
+          const fixture = JSON.parse(process.env.FIXTURE_JSON);
+          if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash || !['', '/'].includes(base.pathname)) throw new Error('Phase 7 target must be a plain HTTPS origin');
+          if (production.has(base.hostname.toLowerCase())) throw new Error('Known production hostname is forbidden for write-enabled E2E');
+          if (!allowed.includes(base.hostname.toLowerCase())) throw new Error('Phase 7 target hostname is not in the explicit staging host allow-list');
+          if (fixture.environment !== 'staging' || fixture.disposable_scope !== true || fixture.reset_strategy !== 'dispose_test_tenant') throw new Error('Phase 7 fixture is not disposable staging');
+          if (!['owner','administrator','manager','finance'].includes(fixture.actor_role)) throw new Error('Phase 7 fixture role is not eligible');
+          for (const key of ['branch_id','location_id','variant_id','currency_code','unit_cost','order_quantity','receipt_quantity','landed_cost_amount','restricted_purchase_order_id']) if (!fixture[key]) throw new Error(`Fixture missing ${key}`);
+          NODE
+          printf '%s' "$STORAGE_B64" | base64 --decode > apps/web/.phase7-storage-state.json
+          node -e "const s=JSON.parse(require('fs').readFileSync('apps/web/.phase7-storage-state.json','utf8')); if(!Array.isArray(s.cookies)||!Array.isArray(s.origins)) process.exit(2)"
+      - name: Install Chromium
+        run: npx --yes playwright@1.64.1 install --with-deps chromium
+      - name: Run purchasing lifecycle acceptance
+        working-directory: apps/web
+        env:
+          CI: ''
+        run: npm run test:e2e:phase7
+      - name: Run branch-boundary authorization acceptance
+        working-directory: apps/web
+        env:
+          CI: ''
+        run: npm run test:e2e:phase7:security
+      - name: Remove authenticated storage state
+        if: always()
+        run: rm -f apps/web/.phase7-storage-state.json
+      - name: Retain Phase 7 reports only (never auth state)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lexa-phase7-staging-e2e-${{ github.sha }}
+          path: apps/web/test-results/staging-acceptance/
+          if-no-files-found: warn
+          retention-days: 14
+
+  ci-gate-evidence:
+    name: Exact-SHA CI gate evidence (not production release acceptance)
+    if: always()
+    needs: [backend-contracts, frontend-contracts, clean-database-replay]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BACKEND_RESULT: ${{ needs.backend-contracts.result }}
+      FRONTEND_RESULT: ${{ needs.frontend-contracts.result }}
+      REPLAY_RESULT: ${{ needs.clean-database-replay.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Generate exact-SHA CI summary (fails closed)
+        run: python scripts/generate_phase6_ci_gate_evidence.py --output artifacts/phase7-ci-gate-evidence.json
+      - name: Preserve CI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lexa-phase6-7-ci-evidence-${{ github.sha }}
+          path: |
+            artifacts/phase7-ci-gate-evidence.json
+            artifacts/phase7-ci-gate-evidence.json.sha256
+          if-no-files-found: warn
+          retention-days: 90
