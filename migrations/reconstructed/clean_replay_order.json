@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "purpose": "Disposable clean-replay sequence for the maintained LEXA replacement chain through commerce integrity (041), team chat (042), journal currency guard (043), and Phase 3 password-reset security (044). Never run against production.",
+  "purpose": "Disposable clean-replay sequence for the maintained LEXA replacement chain through migration 045, including the Phase 8 closed-reconciliation snapshot guard. Never run against production.",
   "baseline_commit": "a6acc0eb53660ea938a314640bf28283ae2a98a8",
-  "status": "HISTORICAL_RECOVERY_GATE_CLOSED_BY_PHASE3_APPROVAL; SEMANTIC_REPLAY_PENDING_THROUGH_044_PASSWORD_RESET_SECURITY",
+  "status": "HISTORICAL_RECOVERY_GATE_CLOSED_BY_PHASE3_APPROVAL; SEMANTIC_REPLAY_PENDING_THROUGH_045_PHASE8_RECONCILIATION_SNAPSHOT",
   "do_not_execute_in_production": true,
   "steps": [
     {
@@ -220,6 +220,10 @@
     {
       "path": "migrations/044_phase3_password_reset_security.sql",
       "mode": "password-reset-one-time-token-and-session-revocation-forward-migration-candidate"
+    },
+    {
+      "path": "migrations/045_phase8_reconciliation_closed_snapshot.sql",
+      "mode": "phase8-forward-migration-candidate"
     }
   ],
   "replay_only_notice": "Runs only on a fresh local/CI disposable PostgreSQL database after explicit environment opt-in. Never execute against production. A successful replay validates the selected replacement chain, not original historical-byte parity.",

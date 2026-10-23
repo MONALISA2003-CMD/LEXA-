@@ -4,6 +4,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMMERCE = ROOT / "app" / "routes" / "commerce.py"
 FINANCE = ROOT / "app" / "routes" / "finance.py"
 MIGRATION = ROOT.parent.parent / "migrations" / "040_phase8_finance_workflows.sql"
+SNAPSHOT_MIGRATION = ROOT.parent.parent / "migrations" / "045_phase8_reconciliation_closed_snapshot.sql"
 
 
 def test_payment_method_deactivation_is_tenant_scoped_and_keeps_history():
@@ -120,3 +121,42 @@ def test_expense_history_is_tenant_scoped_and_returns_only_a_safe_timeline():
     assert "e.payload->>'reason' AS reason" in block
     assert "return [{\"event_type\": row[\"event_type\"]" in block
     assert "e.last_error" not in block and "e.payload" in block
+
+
+def test_closed_reconciliations_are_not_rewritten_by_later_money_changes():
+    source = SNAPSHOT_MIGRATION.read_text(encoding="utf-8")
+    assert "CREATE OR REPLACE FUNCTION refresh_reconciliation_channel_date" in source
+    assert source.count("h.status <> 'CLOSED'") == 2
+    assert "UPDATE daily_reconciliation_lines" in source
+    assert "refresh_reconciliation_header(r.reconciliation_id)" in source
+    plan = (ROOT.parent.parent / "migrations" / "reconstructed" / "clean_replay_order.json").read_text(encoding="utf-8")
+    assert "migrations/045_phase8_reconciliation_closed_snapshot.sql" in plan
+
+
+def test_financial_date_range_reports_reject_reversed_dates():
+    source = FINANCE.read_text(encoding="utf-8")
+    for route_name in ("trial_balance", "income_statement"):
+        block = source.split(f"def {route_name}(", 1)[1].split("\n\n@router.", 1)[0]
+        assert "if start_date > end_date:" in block
+        assert 'HTTPException(status_code=422, detail="start_date must be on or before end_date")' in block
+
+
+def test_closed_reconciliation_snapshot_is_a_readiness_and_replay_postcondition():
+    health = (ROOT / "app" / "health.py").read_text(encoding="utf-8")
+    replay = (ROOT.parent.parent / "scripts" / "run_clean_migration_replay.py").read_text(encoding="utf-8")
+    assert '"045_phase8_reconciliation_closed_snapshot"' in health
+    assert "closed_snapshot_filter_present_twice" in health
+    assert "phase8_reconciliation_snapshot_migration" in replay
+    assert "phase8_reconciliation_snapshot_closed_filters" in replay
+
+
+def test_customer_history_is_id_keyed_branch_scoped_and_explains_returns():
+    source = COMMERCE.read_text(encoding="utf-8")
+    block = source.split('@router.get("/customers/{party_id}/history")', 1)[1].split('@router.post("/customers", status_code=201)', 1)[0]
+    assert 'require_permission("sales.read")' in block
+    assert "cp.tenant_id=:t AND cp.party_id=:party_id" in block
+    assert "s.customer_party_id=:party_id" in block
+    assert "membership_branch_assignments" in block
+    assert "return_count" in block and "returned_total" in block and "refund_total" in block
+    assert "customer_credit_total" in block and "remaining_customer_credit" in block
+    assert "ILIKE :search" not in block

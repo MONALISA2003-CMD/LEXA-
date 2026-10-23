@@ -44,6 +44,7 @@ function friendlyMessage(status: number, payload: unknown, path = ""): string {
   const topCode = typeof payload === "object" && payload !== null && "failure_code" in payload ? String((payload as { failure_code?: unknown }).failure_code || "") : "";
   if (path === "/ready" && topCode === "FEATURES_NEED_UPDATE") return "LEXA is online, but some business features need a service update before all pages can load. Your saved records have not been changed.";
   if (path === "/ready" && topCode === "BUSINESS_RECORDS_NEED_REVIEW") return "LEXA is connected to the wrong business data source. Please contact support before making changes.";
+  if (path === "/ready" && topCode) return "LEXA is online, but a required service or database update is still missing. Full readiness has not been confirmed; saved business records have not been changed.";
   const detail = typeof payload === "object" && payload !== null && "detail" in payload ? (payload as { detail?: unknown }).detail : null;
   const code = typeof detail === "object" && detail !== null && "code" in detail ? String((detail as { code?: unknown }).code) : "";
   const raw = typeof detail === "string" ? detail : "";
@@ -411,6 +412,18 @@ export function getBusinessInsights(fromDate:string,toDate:string,currency:strin
 
 // Phase 4A commerce contracts
 export type CommerceCustomer = { id:string; party_id:string; display_name:string; party_type:string; email?:string|null; phone?:string|null; credit_limit:string; status:string; notes?:string|null; created_at:string };
+export type CustomerSaleHistory = CommerceSale & {
+  return_count: number;
+  returned_total: string;
+  refund_total: string;
+  customer_credit_total: string;
+  remaining_customer_credit: string;
+  returns: Array<{id:string;status:string;reason:string;total:number|string;created_at:string;completed_at?:string|null;refunded:number|string;credit_balance:number|string}>;
+};
+export function getCustomerSalesHistory(partyId:string, limit=200, offset=0) {
+  const params = new URLSearchParams({limit:String(limit),offset:String(offset)});
+  return getJson<CustomerSaleHistory[]>(`/api/v1/commerce/customers/${encodeURIComponent(partyId)}/history?${params.toString()}`);
+}
 export type PaymentChannel = { id:string; tenant_id:string; name:string; channel_type:string; provider?:string|null; currency_code:string; active:boolean; created_at:string; updated_at:string };
 export type CommerceProduct = { variant_id:string; sku:string; variant_name:string; product_name:string; track_inventory:boolean; selling_price:string; effective_tax_rate:string; tax_inclusive:boolean; tax_code?:string|null; tax_rule_source:string };
 export type CommerceSale = { id:string; transaction_id:string; customer_party_id?:string|null; customer_name?:string|null; currency_code:string; status:string; subtotal:string; discount_total:string; tax_total:string; total:string; amount_paid:string; amount_due:string; return_adjustment_amount?:string; created_at:string; completed_at?:string|null };

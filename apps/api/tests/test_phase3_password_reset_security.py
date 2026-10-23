@@ -62,9 +62,11 @@ def test_password_reset_migration_is_a_readiness_gate_and_in_clean_replay_chain(
         assert f'"{version}"' in health, f"Readiness gate is missing {version}"
     assert "lexa_consume_password_reset" in health
     assert "definer_owner_bypasses_rls" in health
-    assert paths[-1] == "migrations/044_phase3_password_reset_security.sql"
+    assert paths[-2] == "migrations/044_phase3_password_reset_security.sql"
+    assert paths[-1] == "migrations/045_phase8_reconciliation_closed_snapshot.sql"
     assert "password_reset_contract_count != 8" in replay_script
     assert "044_phase3_password_reset_security" in replay_script
+    assert "045_phase8_reconciliation_closed_snapshot" in replay_script
 
 
 def test_security_sessions_are_scoped_to_signed_in_user_and_workspace():

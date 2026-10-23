@@ -147,6 +147,8 @@ def close_period(period_id: UUID, ctx=Depends(require_permission("periods.manage
 
 @router.get("/trial-balance")
 def trial_balance(start_date: date, end_date: date, ctx=Depends(require_permission("accounting.read"))):
+    if start_date > end_date:
+        raise HTTPException(status_code=422, detail="start_date must be on or before end_date")
     db, _, tenant_id, _ = ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("SELECT * FROM trial_balance(:t,:f,:to)"), {"t": str(tenant_id), "f": start_date, "to": end_date}).mappings().all()
@@ -155,6 +157,8 @@ def trial_balance(start_date: date, end_date: date, ctx=Depends(require_permissi
 
 @router.get("/income-statement")
 def income_statement(start_date: date, end_date: date, ctx=Depends(require_permission("accounting.read"))):
+    if start_date > end_date:
+        raise HTTPException(status_code=422, detail="start_date must be on or before end_date")
     db, _, tenant_id, _ = ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("SELECT * FROM income_statement(:t,:f,:to)"), {"t": str(tenant_id), "f": start_date, "to": end_date}).mappings().all()

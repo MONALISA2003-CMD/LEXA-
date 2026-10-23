@@ -181,7 +181,7 @@ def main() -> int:
                        '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                        '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
                        '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs',
-                       '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation','043_phase5_journal_currency_guard','044_phase3_password_reset_security')
+                       '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation','043_phase5_journal_currency_guard','044_phase3_password_reset_security','045_phase8_reconciliation_closed_snapshot')
                 """)
                 migration_rows = sorted(row[0] for row in cur.fetchall())
                 expected_migrations = sorted([
@@ -190,7 +190,7 @@ def main() -> int:
                     '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                     '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
                     '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs',
-                    '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation','043_phase5_journal_currency_guard','044_phase3_password_reset_security',
+                    '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation','043_phase5_journal_currency_guard','044_phase3_password_reset_security','045_phase8_reconciliation_closed_snapshot',
                 ])
                 cur.execute("""
                     SELECT
@@ -302,6 +302,17 @@ def main() -> int:
                  sales_business_date_index, analytics_queue_rls_forced, analytics_queue_worker,
                  journal_entry_currency_guard, journal_posting_grant) = cur.fetchone()
                 cur.execute("""
+                    SELECT
+                      EXISTS (SELECT 1 FROM public.schema_migrations WHERE version='045_phase8_reconciliation_closed_snapshot'),
+                      to_regprocedure('public.refresh_reconciliation_channel_date(uuid,uuid,date)') IS NOT NULL,
+                      CASE WHEN to_regprocedure('public.refresh_reconciliation_channel_date(uuid,uuid,date)') IS NULL THEN false
+                           ELSE array_length(regexp_split_to_array(
+                             pg_get_functiondef(to_regprocedure('public.refresh_reconciliation_channel_date(uuid,uuid,date)')),
+                             $$h.status <> 'CLOSED'$$), 1) = 3
+                      END
+                """)
+                reconciliation_snapshot_migration, reconciliation_refresh_function, reconciliation_snapshot_filters = cur.fetchone()
+                cur.execute("""
                     SELECT count(*) FROM information_schema.tables
                      WHERE table_schema='public' AND table_type='BASE TABLE'
                 """)
@@ -367,6 +378,9 @@ def main() -> int:
         if not phase8_expense_reversal_metric: failures.append("Phase 8 expense-correction reporting column is missing")
         if not phase8_reversal_fk: failures.append("Phase 8 expense reversal journal reference is not tenant-safe")
         if not phase8_status_constraint: failures.append("Phase 8 expense lifecycle does not allow the supported correction status")
+        if not reconciliation_snapshot_migration: failures.append("Phase 8 closed reconciliation snapshot migration is missing")
+        if not reconciliation_refresh_function: failures.append("Phase 8 reconciliation refresh function is missing")
+        if not reconciliation_snapshot_filters: failures.append("Closed reconciliation snapshot guard must exclude CLOSED headers in both refresh queries")
         if team_chat_tables != 3 or team_chat_rls_forced != 3 or team_chat_policy_tables != 3:
             failures.append(f"Team chat tables must all exist with forced RLS and scoped policies: tables={team_chat_tables}/3, forced={team_chat_rls_forced}/3, policies={team_chat_policy_tables}/3")
         if not sales_business_date_column or not sales_business_date_index:
@@ -414,6 +428,9 @@ def main() -> int:
             "phase8_expense_reversal_reporting_metric": bool(phase8_expense_reversal_metric),
             "phase8_expense_reversal_tenant_safe_fk": bool(phase8_reversal_fk),
             "phase8_expense_correction_status": bool(phase8_status_constraint),
+            "phase8_reconciliation_snapshot_migration": bool(reconciliation_snapshot_migration),
+            "phase8_reconciliation_refresh_function": bool(reconciliation_refresh_function),
+            "phase8_reconciliation_snapshot_closed_filters": bool(reconciliation_snapshot_filters),
             "team_chat_tables": team_chat_tables,
             "team_chat_rls_forced": team_chat_rls_forced,
             "team_chat_policy_tables": team_chat_policy_tables,

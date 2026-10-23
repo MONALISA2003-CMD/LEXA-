@@ -1,16 +1,16 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "../../components/app-shell";
 import {
   createCommerceCustomer,
   getCommerceCustomers,
-  getCommerceSales,
+  getCustomerSalesHistory,
   getReceivables,
   getBusinessProfile,
   userFacingError,
   type CommerceCustomer,
-  type CommerceSale,
+  type CustomerSaleHistory,
   type Receivable,
 } from "../../lib/api";
 
@@ -22,12 +22,16 @@ const statusLabel = (value: string) => ({ COMPLETED: "Completed", DRAFT: "Draft"
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<CommerceCustomer[]>([]);
   const [receivables, setReceivables] = useState<Receivable[]>([]);
-  const [salesHistory, setSalesHistory] = useState<CommerceSale[]>([]);
+  const [salesHistory, setSalesHistory] = useState<CustomerSaleHistory[]>([]);
   const [currency, setCurrency] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<CustomerDraft>(emptyDraft);
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyMoreLoading, setHistoryMoreLoading] = useState(false);
+  const [historyOffset, setHistoryOffset] = useState(0);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const historyRequestRef = useRef(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [historyError, setHistoryError] = useState("");
@@ -75,18 +79,48 @@ export default function CustomersPage() {
   const totalDue = [...balances.values()].reduce((sum, value) => sum + value.balance, 0);
 
   useEffect(() => {
-    if (!activeCustomer) { setSalesHistory([]); setHistoryError(""); setHistoryLoading(false); return; }
+    const requestToken = ++historyRequestRef.current;
+    if (!activeCustomer) {
+      setSalesHistory([]); setHistoryError(""); setHistoryLoading(false);
+      setHistoryOffset(0); setHistoryHasMore(false); setHistoryMoreLoading(false);
+      return;
+    }
     let active = true;
     setHistoryLoading(true); setHistoryError(""); setSalesHistory([]);
-    // Search the existing sales records by the customer's name, then filter by ID.
-    // This keeps all paid and unpaid sales together without introducing a second ledger.
-    void getCommerceSales({ search: activeCustomer.display_name, limit: 200 }).then(rows => {
-      if (active) setSalesHistory(rows.filter(sale => sale.customer_party_id === activeCustomer.party_id).sort((a, b) => b.created_at.localeCompare(a.created_at)));
+    setHistoryOffset(0); setHistoryHasMore(false); setHistoryMoreLoading(false);
+    // Query by stable customer ID on the server. This avoids name-matching false
+    // positives and keeps return/refund/credit totals tied to the same sale history.
+    void getCustomerSalesHistory(activeCustomer.party_id, 100, 0).then(rows => {
+      if (active && requestToken === historyRequestRef.current) {
+        setSalesHistory(rows); setHistoryOffset(rows.length); setHistoryHasMore(rows.length === 100);
+      }
     }).catch(error => {
-      if (active) setHistoryError(userFacingError(error, "This customer's sales history could not be loaded."));
-    }).finally(() => { if (active) setHistoryLoading(false); });
+      if (active && requestToken === historyRequestRef.current) setHistoryError(userFacingError(error, "This customer's sales history could not be loaded."));
+    }).finally(() => { if (active && requestToken === historyRequestRef.current) setHistoryLoading(false); });
     return () => { active = false; };
   }, [activeCustomer]);
+
+  async function loadMoreHistory() {
+    const partyId = activeCustomer?.party_id;
+    if (!partyId || historyMoreLoading || !historyHasMore) return;
+    const requestToken = historyRequestRef.current;
+    const offset = historyOffset;
+    setHistoryMoreLoading(true); setHistoryError("");
+    try {
+      const rows = await getCustomerSalesHistory(partyId, 100, offset);
+      if (requestToken === historyRequestRef.current && selected === partyId) {
+        setSalesHistory(current => [...current, ...rows]);
+        setHistoryOffset(offset + rows.length);
+        setHistoryHasMore(rows.length === 100);
+      }
+    } catch (error) {
+      if (requestToken === historyRequestRef.current && selected === partyId) {
+        setHistoryError(userFacingError(error, "Older sales history could not be loaded. Please retry."));
+      }
+    } finally {
+      if (requestToken === historyRequestRef.current) setHistoryMoreLoading(false);
+    }
+  }
 
   async function addCustomer(event: FormEvent) {
     event.preventDefault(); if (saving) return;
@@ -110,7 +144,7 @@ export default function CustomersPage() {
       <section className="panel customer-list-panel"><div className="panel-head"><div><h2>Customer list</h2><p>Choose a customer to see their full recorded sales and balances.</p></div><input aria-label="Search customers" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search names or phone" className="customer-search" /></div>
         {loading ? <p className="empty-inline">Loading customer list…</p> : customers.length===0 ? <div className="customer-empty"><span aria-hidden="true">☺</span><strong>No customers yet</strong><p>Add a customer here, or record a sale for a walk-in customer.</p></div> : <div className="customer-record-list">{customers.map(c=>{const row=balances.get(c.party_id);return <button type="button" key={c.party_id} onClick={()=>setSelected(c.party_id)} className={`customer-record ${selected===c.party_id?"selected":""}`}><span className="customer-avatar">{c.display_name.trim().slice(0,1).toUpperCase()||"C"}</span><span className="customer-record-main"><strong>{c.display_name}</strong><small>{c.phone||c.email||"No contact details"}</small></span><span className="customer-record-balance"><b>{fmtMoney(row?.balance||0,currency)}</b><small>{row?.count||0} open balance record{row?.count===1?"":"s"}</small></span></button>})}</div>}
       </section>
-      <section className="panel customer-detail-panel">{activeCustomer ? <><div className="customer-detail-head"><span className="customer-avatar large">{activeCustomer.display_name.slice(0,1).toUpperCase()}</span><div><span className="detail-kicker">CUSTOMER DETAILS</span><h2>{activeCustomer.display_name}</h2><p>{activeCustomer.phone||activeCustomer.email||"Contact details not added"}</p></div></div><div className="detail-stat"><span>Balance still owed</span><strong>{fmtMoney(balances.get(activeCustomer.party_id)?.balance||0,currency)}</strong></div><div className="subsection"><strong className="subsection-head">Sales history</strong>{historyError&&<p className="notice notice-error" role="alert">{historyError}</p>}{historyLoading?<p className="empty-inline">Loading sales history…</p>:salesHistory.length===0?<p className="empty-inline">No recorded sales for this customer yet.</p>:salesHistory.map(sale=>{const receivable=balanceBySale.get(sale.id);return <div className="mini-row customer-sale-row" key={sale.id}><div><strong>{new Date(sale.created_at).toLocaleDateString("en-UG",{day:"numeric",month:"short",year:"numeric"})}</strong><small>Sale {sale.id.slice(0,8)} · {statusLabel(sale.status)}</small><small>Paid {fmtMoney(Number(sale.amount_paid)||0,currency)} of {fmtMoney(Number(sale.total)||0,currency)}</small></div><span>{Number(sale.amount_due)>0?`${fmtMoney(Number(sale.amount_due),currency)} due`:"Paid"}</span></div>})}</div><div className="subsection customer-limit"><span>Credit limit</span><strong>{fmtMoney(Number(activeCustomer.credit_limit)||0,currency)}</strong></div></>:<div className="customer-empty"><span aria-hidden="true">◎</span><strong>Select a customer</strong><p>Their contact details and recorded sales will appear here.</p></div>}
+      <section className="panel customer-detail-panel">{activeCustomer ? <><div className="customer-detail-head"><span className="customer-avatar large">{activeCustomer.display_name.slice(0,1).toUpperCase()}</span><div><span className="detail-kicker">CUSTOMER DETAILS</span><h2>{activeCustomer.display_name}</h2><p>{activeCustomer.phone||activeCustomer.email||"Contact details not added"}</p></div></div><div className="detail-stat"><span>Balance still owed</span><strong>{fmtMoney(balances.get(activeCustomer.party_id)?.balance||0,currency)}</strong></div><div className="subsection"><strong className="subsection-head">Sales history</strong>{historyError&&<p className="notice notice-error" role="alert">{historyError}</p>}{historyLoading?<p className="empty-inline">Loading sales history…</p>:salesHistory.length===0?<p className="empty-inline">No recorded sales for this customer yet.</p>:salesHistory.map(sale=>{const receivable=balanceBySale.get(sale.id);return <div className="mini-row customer-sale-row" key={sale.id}><div><strong>{new Date(sale.created_at).toLocaleDateString("en-UG",{day:"numeric",month:"short",year:"numeric"})}</strong><small>Sale {sale.id.slice(0,8)} · {statusLabel(sale.status)}</small><small>Paid {fmtMoney(Number(sale.amount_paid)||0,currency)} of original sale {fmtMoney(Number(sale.total)||0,currency)}</small>{sale.return_count>0&&<small>Returns: {sale.return_count} · value {fmtMoney(Number(sale.returned_total)||0,currency)} · refunds {fmtMoney(Number(sale.refund_total)||0,currency)}</small>}{Number(sale.customer_credit_total)>0&&<small>Customer credit issued {fmtMoney(Number(sale.customer_credit_total)||0,currency)} · remaining {fmtMoney(Number(sale.remaining_customer_credit)||0,currency)}</small>}</div><span>{Number(sale.amount_due)>0?`${fmtMoney(Number(sale.amount_due),currency)} due`:"Paid"}</span></div>})}{historyHasMore&&<button type="button" className="button button-soft" onClick={() => void loadMoreHistory()} disabled={historyMoreLoading}>{historyMoreLoading?"Loading older sales…":"Load older sales"}</button>}<p className="empty-inline">Original sale amounts, returned value, cash refunds and customer credit are shown separately.</p></div><div className="subsection customer-limit"><span>Credit limit</span><strong>{fmtMoney(Number(activeCustomer.credit_limit)||0,currency)}</strong></div></>:<div className="customer-empty"><span aria-hidden="true">◎</span><strong>Select a customer</strong><p>Their contact details and recorded sales will appear here.</p></div>}
       </section>
     </div>
     <section className="panel customer-add-panel"><div className="panel-head"><div><h2>Add a customer</h2><p>Only enter the details your business needs.</p></div></div><form onSubmit={addCustomer} className="customer-add-form"><label>Customer name<input required maxLength={200} value={draft.display_name} onChange={e=>setDraft(d=>({...d,display_name:e.target.value}))} placeholder="e.g. Sarah Namusoke" /></label><label>Phone number (optional)<input type="tel" value={draft.phone} onChange={e=>setDraft(d=>({...d,phone:e.target.value}))} placeholder="e.g. 07…" /></label><label>Email (optional)<input type="email" value={draft.email} onChange={e=>setDraft(d=>({...d,email:e.target.value}))} placeholder="name@example.com" /></label><label>Credit limit ({currency})<input type="number" min="0" step="0.01" value={draft.credit_limit} onChange={e=>setDraft(d=>({...d,credit_limit:e.target.value}))} /></label><button type="submit" className="button button-dark" disabled={saving}>{saving?"Saving customer…":"Save customer"}</button></form></section>

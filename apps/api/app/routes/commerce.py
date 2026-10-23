@@ -266,6 +266,69 @@ def list_customers(search: str | None = Query(default=None, max_length=100), ctx
     return [out(x) for x in rows]
 
 
+@router.get("/customers/{party_id}/history")
+def customer_sales_history(
+    party_id: UUID,
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=100000),
+    ctx=Depends(require_permission("sales.read")),
+):
+    """Return a customer-ID keyed, branch-scoped sales/returns/credit timeline."""
+    db, actor_id, tenant_id, _ = ctx
+    customer = db.execute(text("""
+      SELECT cp.party_id, p.display_name
+      FROM customer_profiles cp
+      JOIN parties p ON p.id=cp.party_id AND p.tenant_id=cp.tenant_id
+      WHERE cp.tenant_id=:t AND cp.party_id=:party_id
+    """), {"t": str(tenant_id), "party_id": str(party_id)}).mappings().first()
+    if not customer:
+        raise HTTPException(404, "Customer not found")
+    rows = db.execute(text("""
+      SELECT s.id,s.transaction_id,s.customer_party_id,p.display_name customer_name,
+             s.branch_id,s.location_id,s.currency_code,s.business_date,s.status,
+             s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,
+             s.return_adjustment_amount,s.created_at,s.completed_at,
+             COALESCE((SELECT count(*) FROM sale_returns sr
+                       WHERE sr.tenant_id=s.tenant_id AND sr.sale_id=s.id),0) return_count,
+             COALESCE((SELECT sum(sr.total) FROM sale_returns sr
+                       WHERE sr.tenant_id=s.tenant_id AND sr.sale_id=s.id AND sr.status='COMPLETED'),0) returned_total,
+             COALESCE((SELECT sum(rr.amount)
+                       FROM refund_records rr JOIN sale_returns sr
+                         ON sr.id=rr.return_id AND sr.tenant_id=rr.tenant_id
+                       WHERE rr.tenant_id=s.tenant_id AND sr.sale_id=s.id
+                         AND sr.status='COMPLETED' AND rr.status='RECORDED'),0) refund_total,
+             COALESCE((SELECT sum(cc.original_amount) FROM customer_credits cc
+                       JOIN sale_returns sr ON sr.id=cc.source_return_id AND sr.tenant_id=cc.tenant_id
+                       WHERE cc.tenant_id=s.tenant_id AND sr.sale_id=s.id AND sr.status='COMPLETED'),0) customer_credit_total,
+             COALESCE((SELECT sum(cc.balance) FROM customer_credits cc
+                       JOIN sale_returns sr ON sr.id=cc.source_return_id AND sr.tenant_id=cc.tenant_id
+                       WHERE cc.tenant_id=s.tenant_id AND sr.sale_id=s.id AND sr.status='COMPLETED'
+                         AND cc.status IN ('OPEN','PARTIALLY_USED')),0) remaining_customer_credit,
+             COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                         'id',sr.id::text,'status',sr.status,'reason',sr.reason,'total',sr.total,
+                         'created_at',sr.created_at,'completed_at',sr.completed_at,
+                         'refunded',COALESCE((SELECT sum(rr.amount) FROM refund_records rr
+                           WHERE rr.tenant_id=sr.tenant_id AND rr.return_id=sr.id AND rr.status='RECORDED'),0),
+                         'credit_balance',COALESCE((SELECT sum(cc.balance) FROM customer_credits cc
+                           WHERE cc.tenant_id=sr.tenant_id AND cc.source_return_id=sr.id
+                             AND cc.status IN ('OPEN','PARTIALLY_USED')),0)
+                       ) ORDER BY sr.created_at DESC)
+                       FROM sale_returns sr WHERE sr.tenant_id=s.tenant_id AND sr.sale_id=s.id), '[]'::jsonb) returns
+      FROM sales s
+      LEFT JOIN parties p ON p.id=s.customer_party_id AND p.tenant_id=s.tenant_id
+      WHERE s.tenant_id=:t AND s.customer_party_id=:party_id AND s.branch_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM tenant_memberships tm
+          JOIN membership_branch_assignments mba ON mba.membership_id=tm.id AND mba.tenant_id=tm.tenant_id
+          JOIN branches b ON b.id=mba.branch_id AND b.tenant_id=mba.tenant_id
+          WHERE tm.tenant_id=s.tenant_id AND tm.user_id=:u AND tm.status='ACTIVE'
+            AND mba.status='ACTIVE' AND b.status='ACTIVE' AND b.id=s.branch_id
+        )
+      ORDER BY s.created_at DESC,s.id DESC LIMIT :lim OFFSET :off
+    """), {"t": str(tenant_id), "u": str(actor_id), "party_id": str(party_id), "lim": limit, "off": offset}).mappings().all()
+    return [out(row) for row in rows]
+
+
 @router.post("/customers", status_code=201)
 def create_customer(body: CustomerCreate, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("customers.manage"))):
     db, actor, tenant_id, _ = ctx

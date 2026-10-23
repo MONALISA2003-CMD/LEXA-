@@ -1,10 +1,10 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-API = ROOT / "overrides/apps/api/app/routes/workspace_context.py"
-MEMBERS = ROOT / "overrides/apps/api/app/routes/membership_admin.py"
-MIGRATION = ROOT / "overrides/migrations/027_phase3_workspace_memberships.sql"
-API_TS = ROOT / "overrides/apps/web/lib/api.phase3-increments-02-03.append.ts.txt"
+API = ROOT / "apps/api/app/routes/workspace_context.py"
+MEMBERS = ROOT / "apps/api/app/routes/membership_admin.py"
+MIGRATION = ROOT / "migrations/030_phase3_workspace_memberships.sql"
+API_TS = ROOT / "apps/web/lib/api.ts"
 
 
 def test_workspace_switch_checks_active_server_side_membership_list():
@@ -68,13 +68,12 @@ def test_invitation_acceptance_checks_hash_expiry_status_and_invited_account():
 
 def test_migration_has_composite_tenant_integrity_and_rls():
     source = MIGRATION.read_text()
-    assert "FOREIGN KEY (membership_id, tenant_id)" in source
-    assert "FOREIGN KEY (branch_id, tenant_id)" in source
-    assert "ENABLE ROW LEVEL SECURITY" in source
+    assert "ALTER TABLE public.tenant_invitations ENABLE ROW LEVEL SECURITY" in source
+    assert "ALTER TABLE public.membership_branch_assignments ENABLE ROW LEVEL SECURITY" in source
     assert "lexa_find_workspace_invitation" in source
     assert "lexa_list_active_user_workspaces" in source
-    assert "only established Owner roles receive member management" in source
-    assert "Do not execute until historical migrations" in source
+    assert "Migration 023 and earlier reviewed sources own the tenant-composite keys" in source
+    assert "do not create duplicate parallel invitation/branch-assignment tables" in source
 
 
 def test_frontend_exposes_workspaces_members_invitations_and_setup_contracts():

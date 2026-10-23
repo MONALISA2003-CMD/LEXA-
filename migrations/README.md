@@ -55,3 +55,8 @@ The app role can execute only the three named functions; `PUBLIC` cannot execute
 them. A one-time link is sent through Resend when `RESEND_API_KEY`, `EMAIL_FROM`,
 and `PUBLIC_APP_URL` are configured in the backend environment. Do not place the
 Resend key in a `NEXT_PUBLIC_*` variable.
+
+
+## Phase 8 — closed reconciliation snapshot integrity (candidate 045)
+
+`045_phase8_reconciliation_closed_snapshot.sql` redefines the channel/date refresh helper so payment or refund changes only refresh reconciliation headers and lines that are not `CLOSED`. Closing a day therefore preserves its historical recorded-vs-actual snapshot; later corrections remain in their source transaction history and do not silently rewrite the prior close. This is a forward-only candidate and must be replayed on a disposable clean database and reviewed before any approved environment applies it. It has not been applied to production by packaging this source archive.

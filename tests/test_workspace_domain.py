@@ -3,7 +3,7 @@ from pathlib import Path
 import importlib.util
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("workspace_domain", ROOT / "overrides/apps/api/app/workspace_domain.py")
+SPEC = importlib.util.spec_from_file_location("workspace_domain", ROOT / "apps/api/app/workspace_domain.py")
 workspace_domain = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 SPEC.loader.exec_module(workspace_domain)
@@ -14,12 +14,18 @@ def test_setup_progress_returns_first_incomplete_step_and_resume_path():
     assert result["status"] == "IN_PROGRESS"
     assert result["resume_path"] == "/administration"
     assert result["completed_required_steps"] == 2
-    assert result["required_steps"] == 4
-    assert [s["key"] for s in result["steps"] if not s["complete"]] == ["warehouse", "location"]
+    assert result["required_steps"] == 7
+    assert [s["key"] for s in result["steps"] if s["required"] and not s["complete"]] == [
+        "business_currency", "warehouse", "location", "payment_method", "money_tracking"
+    ]
 
 
 def test_setup_progress_is_complete_only_when_every_required_resource_exists():
-    result = workspace_domain.setup_progress(profile_exists=True, branch_count=1, warehouse_count=1, location_count=1)
+    result = workspace_domain.setup_progress(
+        profile_exists=True, branch_count=1, warehouse_count=1, location_count=1,
+        currency_configured=True, payment_method_count=1,
+        accounting_account_count=1, accounting_mapping_count=1,
+    )
     assert result["complete"] is True
     assert result["status"] == "COMPLETE"
     assert result["resume_path"] == "/"
@@ -27,7 +33,11 @@ def test_setup_progress_is_complete_only_when_every_required_resource_exists():
 
 def test_setup_progress_does_not_use_a_client_supplied_completion_flag():
     # Only persisted-resource facts are inputs to the pure function.
-    result = workspace_domain.setup_progress(profile_exists=False, branch_count=20, warehouse_count=20, location_count=20)
+    result = workspace_domain.setup_progress(
+        profile_exists=False, branch_count=20, warehouse_count=20, location_count=20,
+        currency_configured=True, payment_method_count=20,
+        accounting_account_count=20, accounting_mapping_count=20,
+    )
     assert result["complete"] is False
     assert result["resume_path"] == "/administration"
 

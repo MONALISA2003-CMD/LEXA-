@@ -25,6 +25,7 @@ REQUIRED_APP_MIGRATIONS = (
     "042_team_chat_foundation",
     "043_phase5_journal_currency_guard",
     "044_phase3_password_reset_security",
+    "045_phase8_reconciliation_closed_snapshot",
 )
 REQUIRED_SCHEMA_COLUMNS = (
     ("suppliers", "supplier_party_id"),
@@ -293,6 +294,22 @@ def check_database() -> tuple[bool, str | dict[str, object] | None]:
                 if settings.app_env.strip().lower() != "production":
                     return False, {"code": "LEXA_AUTH_SCHEMA_NOT_READY", **{key: bool(value) for key, value in password_reset_contract.items()}}
                 return False, "LEXA_AUTH_SCHEMA_NOT_READY"
+
+            reconciliation_snapshot_contract = connection.execute(text("""
+                SELECT
+                  EXISTS (SELECT 1 FROM public.schema_migrations WHERE version='045_phase8_reconciliation_closed_snapshot') AS migration_present,
+                  to_regprocedure('public.refresh_reconciliation_channel_date(uuid,uuid,date)') IS NOT NULL AS function_present,
+                  CASE WHEN to_regprocedure('public.refresh_reconciliation_channel_date(uuid,uuid,date)') IS NULL THEN false
+                       ELSE array_length(regexp_split_to_array(
+                         pg_get_functiondef(to_regprocedure('public.refresh_reconciliation_channel_date(uuid,uuid,date)')),
+                         $$h.status <> 'CLOSED'$$), 1) = 3
+                  END AS closed_snapshot_filter_present_twice
+            """)).mappings().one()
+            if not all(bool(reconciliation_snapshot_contract[key]) for key in reconciliation_snapshot_contract):
+                logger.warning("closed_reconciliation_snapshot_schema_not_ready", extra={key: bool(value) for key, value in reconciliation_snapshot_contract.items()})
+                if settings.app_env.strip().lower() != "production":
+                    return False, {"code": "LEXA_FINANCE_SCHEMA_NOT_READY", **{key: bool(value) for key, value in reconciliation_snapshot_contract.items()}}
+                return False, "LEXA_FINANCE_SCHEMA_NOT_READY"
 
         return True, None
     except Exception as exc:
