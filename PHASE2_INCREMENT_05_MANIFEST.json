@@ -28,18 +28,23 @@
     },
     {
       "path": ".env.example",
-      "sha256": "ef0d8738c55d1e8d72d857ed1502ee5d86a04670924b67cf412f958e41b2c581",
-      "size_bytes": 569
+      "sha256": "20b0dfa79bcc85bce04a0b754433aa9bdc5bfbf6450c61da44d8996b6accc688",
+      "size_bytes": 578
     },
     {
       "path": ".github/workflows/lexa-ci.yml",
-      "sha256": "56fc074dd624fda5d0ac70d369eaf30d42cb361074facaf32a022ea556467641",
-      "size_bytes": 1971
+      "sha256": "6eab4308b289606d36cda1a058d6520ff2787cf043739b58122b1df071717770",
+      "size_bytes": 19919
+    },
+    {
+      "path": ".github/workflows/lexa-zip-extract.yml",
+      "sha256": "c88cfb58d120c8ca1ae2c11d89e3f3cf5330caf0c6c20c649834e1b0f6c71a97",
+      "size_bytes": 7591
     },
     {
       "path": ".gitignore",
-      "sha256": "dc6232a0c9d41af0a9c62afadf6a801212b88dc064377e7734f8400ed75898d5",
-      "size_bytes": 199
+      "sha256": "79dde6087070ff69a9ff5b1d6044c53d96233e03f415f1cc5a911112ee9b9bc0",
+      "size_bytes": 481
     },
     {
       "path": "AUDIT_REPORT_v0.6.md",
@@ -48,8 +53,8 @@
     },
     {
       "path": "DELETE.txt",
-      "sha256": "a0239e2d2c48a88ce7cfc7fd053047d9c807a7694f21e945543e4d6ec2ae2b0b",
-      "size_bytes": 345
+      "sha256": "c4db5a96a64db3d12c7e0375772bed2a02489e74700e4d999e1691b23b6cc9e8",
+      "size_bytes": 522
     },
     {
       "path": "DEPLOYMENT_FIXES_2026-10-13.md",
@@ -67,9 +72,24 @@
       "size_bytes": 1861
     },
     {
+      "path": "FRESH_NEW_PRODUCT_STRATEGY.md",
+      "sha256": "7f88da195551c6af6a0cdb8c47ed5027606b0ee6943ade688dfd8d872bb867c9",
+      "size_bytes": 16326
+    },
+    {
+      "path": "LEXA_2.14.0_IMPLEMENTATION_HANDOFF_2026-10-22.md",
+      "sha256": "d61c7cc6d795ea7f855ec3b2608b2d099115f166d49c803741736b1024a22f18",
+      "size_bytes": 7765
+    },
+    {
       "path": "LEXA_E2E_FORENSIC_AUDIT_2026-10-13.md",
       "sha256": "9929e35a4782f6b08cb07ee9a7679fe25fc2aef45516909136f50d2fa306b050",
       "size_bytes": 11787
+    },
+    {
+      "path": "LEXA_EMERALD_FUSION_BRAND_AND_UX_IMPLEMENTATION_2026-10-22.md",
+      "sha256": "cb0921ee9b5a51a7461b2b83772e5062fb2e41e41585547257ff34a4b2b267c1",
+      "size_bytes": 6072
     },
     {
       "path": "LEXA_Integration_Repair_v1.7.1_NOTES.md",
@@ -83,18 +103,48 @@
     },
     {
       "path": "LEXA_PACKAGE_MANIFEST.json",
-      "sha256": "96f6e0812536086c73877d9746a3571a5e8b390ccd3969b06f49a5127a67b918",
-      "size_bytes": 11779
+      "sha256": "dd79eda1eefea326a2877f6b5438d7dd13b923ed362b2f1a68012eec4a4ee77d",
+      "size_bytes": 42314
+    },
+    {
+      "path": "LEXA_PHASE4_6_COMPLETENESS_MANIFEST_2026-10-21.json",
+      "sha256": "5c37ffa863f28bfde04f3a0967b8dab28be0eae0a62b08e171cd2a45006230a0",
+      "size_bytes": 63425
+    },
+    {
+      "path": "LEXA_PHASE8_REVISED_ARCHITECTURE_AND_IMPLEMENTATION_PLAN_2026-10-22.md",
+      "sha256": "9fc89267a3a73a765e74c75e7bec9f14590c4965df474bd8ae25cb4c0fe146a1",
+      "size_bytes": 47013
+    },
+    {
+      "path": "LEXA_PRE_PHASE9_POLISH_IMPLEMENTATION_REPORT_2026-10-22.md",
+      "sha256": "4cfa39d6214ac6af9d6d79ed7266e12f6eba1584394884caf63a76409a7b03c3",
+      "size_bytes": 8848
+    },
+    {
+      "path": "LEXA_STAGE1_5_LIVE_DEPLOYMENT_AUDIT_2026-10-22.md",
+      "sha256": "91513c2a7c9b72c3e3b8386f21b386c0896b9f9297be489acc2823c424180fec",
+      "size_bytes": 13703
+    },
+    {
+      "path": "LEXA_STAGE2_3_IMPLEMENTATION_REPORT_2026-10-22.md",
+      "sha256": "1a1a29a7934b34ff239a44c994cd170f53ceb122daacf5d7493cafa102378fb0",
+      "size_bytes": 9829
+    },
+    {
+      "path": "LEXA_STAGE4_STAGE5_ACCEPTANCE_MANIFEST_2026-10-22.json",
+      "sha256": "d79e2d3b1056b6832f15203b3fcf792084686956a44d3b36b1fec348d87efef6",
+      "size_bytes": 2276
     },
     {
       "path": "MANUAL_PUSH_INSTRUCTIONS.md",
-      "sha256": "4e5384aed682eeb10a8ee5f52bfdd498b44445166407846b74be9e237e8c97ba",
-      "size_bytes": 4150
+      "sha256": "ef5ba7b8e6673e406cc19ce8a4f485142a5bd7e94b9a321aed171d47e7498435",
+      "size_bytes": 2813
     },
     {
       "path": "PACKAGE_FILE_SHA256SUMS.txt",
-      "sha256": "b428bd88faab94d899fcc45479ecc9766e93828dee2fef84fc7ff3e78b84e3b1",
-      "size_bytes": 20932
+      "sha256": "4c0449ae44ae5d6215405a3c160623633295c953965251e791f3ad3651d04fc8",
+      "size_bytes": 45872
     },
     {
       "path": "PHASE1_ZIP_README.md",
@@ -108,8 +158,8 @@
     },
     {
       "path": "PHASE2_FORENSIC_AUDIT_2026-10-20.md",
-      "sha256": "29d935a29190eb0d366b210716a5a0ba85731a9c2e2e337900ec02ce86653931",
-      "size_bytes": 17907
+      "sha256": "3970942d809da4a4ee60456efc97db0666498a0173d10f1de9829cb5db8051d9",
+      "size_bytes": 18636
     },
     {
       "path": "PHASE2_INCREMENT_01_REPORT.md",
@@ -127,6 +177,11 @@
       "size_bytes": 6453
     },
     {
+      "path": "PHASE2_INCREMENT_05_IMPLEMENTATION_REPORT_2026-10-23.md",
+      "sha256": "e3d9181802c6afc1e9d284f7d88cafe35ad11612e717db16e1292a2c0d0a2c13",
+      "size_bytes": 4443
+    },
+    {
       "path": "PHASE2_ONWARD_HANDOFF.md",
       "sha256": "45bb5941cbbc490fee4c8e529e668fb107b4aca1ff2a6cb6453fcdd7f539c8e0",
       "size_bytes": 36625
@@ -137,19 +192,184 @@
       "size_bytes": 2778
     },
     {
+      "path": "PHASE4_6_COMPLETENESS_ACCEPTANCE_MATRIX_2026-10-21.md",
+      "sha256": "c82a091523214227bad886829f30c52532c6146588098a03f6267bfd1601c334",
+      "size_bytes": 4550
+    },
+    {
+      "path": "PHASE4_6_COMPLETENESS_IMPLEMENTATION_REPORT_2026-10-21.md",
+      "sha256": "c7caf42ed5f83f23cb60fb5829e1037291363b1749d073982bd7f3cb69492e88",
+      "size_bytes": 8312
+    },
+    {
+      "path": "PHASE4_CLOSEOUT_STATUS_2026-10-21.json",
+      "sha256": "b4d7f4cce3c4c12922b50a06a50b8b7dd22dfdcce3e68a2d91aa72f2c0a5a84c",
+      "size_bytes": 1205
+    },
+    {
+      "path": "PHASE4_IMPLEMENTATION_REPORT_2026-10-21.md",
+      "sha256": "e00edeaafc94f074417b7c47bdd6247656e99be09d7706b8492e0de5926695b8",
+      "size_bytes": 3909
+    },
+    {
+      "path": "PHASE5_CORE_HARDENING_REPORT_2026-10-21.md",
+      "sha256": "f182a3990e11acfcd098fbdc841e7b91f3c25fce39e55fce1b3df0f522badca5",
+      "size_bytes": 5907
+    },
+    {
+      "path": "PHASE5_FINAL_GATE_REPORT_2026-10-21.md",
+      "sha256": "7d935abb5abb980c90fedbcd910b058603cc78a501b947ef0fbc8f2f0565b168",
+      "size_bytes": 841
+    },
+    {
+      "path": "PHASE5_INCREMENT_02_FULL_SOURCE_CANDIDATE_STATUS.md",
+      "sha256": "77076a18c90d8a17efa5e5a23ca799bdd6b01b557b38602174c4a4da07b85370",
+      "size_bytes": 1687
+    },
+    {
+      "path": "PHASE5_INCREMENT_03_ACCEPTANCE_MATRIX.md",
+      "sha256": "dd2b58c458369e65bb4530122bace216abeadf0ecba2aa3f4820a97c0e4c2eb2",
+      "size_bytes": 3269
+    },
+    {
+      "path": "PHASE5_INCREMENT_03_IMPLEMENTATION_REPORT_2026-10-21.md",
+      "sha256": "478cfbbc60be7bcf7eb77978c9d04624734dca182ace6717ad07306e5414368b",
+      "size_bytes": 3939
+    },
+    {
+      "path": "PHASE5_INCREMENT_03_README_2026-10-21.md",
+      "sha256": "b8695ef8a36ad28980fd2ec26107d40b4f1d732514d7cc2226ad00ee3bcf9db8",
+      "size_bytes": 3186
+    },
+    {
+      "path": "PHASE5_RELEASE_GATE_STATUS_2026-10-21.json",
+      "sha256": "e0440524970c33483958779e32b50e814d46aed5a6a3163a4e1cc0a5ea9f22b9",
+      "size_bytes": 2738
+    },
+    {
+      "path": "PHASE5_REPAIR_README_2026-10-21.md",
+      "sha256": "d6644a381fec3958b28c7d2495d678e422f091697524a15a2e78a33a48a18c0a",
+      "size_bytes": 2067
+    },
+    {
+      "path": "PHASE6_ACCEPTANCE_MATRIX.md",
+      "sha256": "a344eb5a5424f0ac8f4495cdfcf810b6af35b4edbd4debc4b11553ed74c34e27",
+      "size_bytes": 4189
+    },
+    {
+      "path": "PHASE6_ENTRY_POLICY.md",
+      "sha256": "1e928e4cefab1b99e54aa8c6e9af91f546c3e7b4cbda6bb6686950abf7aba10a",
+      "size_bytes": 3746
+    },
+    {
+      "path": "PHASE6_IMPLEMENTATION_REPORT_2026-10-21.md",
+      "sha256": "a941fd0d0e559261aba88dc62c9a8602c829ec8205e3ef4af33cc6434aca6c9d",
+      "size_bytes": 6219
+    },
+    {
+      "path": "PHASE6_RELEASE_GATE_STATUS_2026-10-21.json",
+      "sha256": "f7c9629fa37a1ad24d364c28f17df57970efb45712a1757e217326acacadf678",
+      "size_bytes": 4212
+    },
+    {
+      "path": "PHASE6_TO_PHASE9_ACCEPTANCE_MATRIX_2026-10-23.md",
+      "sha256": "969feeb7be3a2cf38cd2fe4dfbb60569908b01df0ec4fa5159ce9fe3c0ceddb1",
+      "size_bytes": 3969
+    },
+    {
+      "path": "PHASE6_TO_PHASE9_IMPLEMENTATION_REPORT_2026-10-23.md",
+      "sha256": "1385c7e9bebe70424eeb7e84b2c2447d5fca5eafcfebf3451ec7c4491423a2bb",
+      "size_bytes": 8962
+    },
+    {
+      "path": "PHASE7_ACCEPTANCE_MATRIX.md",
+      "sha256": "e981995e0702eb793f134a4f8422df31f437098d498b513c58fb97939b3c4061",
+      "size_bytes": 4979
+    },
+    {
+      "path": "PHASE7_CI_AND_RELEASE_UNBLOCK_CHECKLIST_2026-10-22.md",
+      "sha256": "122517e04134469de903eb388cc3f16a9fb111107e9ae7d7810d114f04e97273",
+      "size_bytes": 5626
+    },
+    {
+      "path": "PHASE7_DEEP_AUDIT_ACCEPTANCE_REPORT_2026-10-22.md",
+      "sha256": "a1ace8a459c283bec914e06f1a8b794c4f15b843eb6a0f38149886de9b45676e",
+      "size_bytes": 11942
+    },
+    {
+      "path": "PHASE7_FINALIZATION_RELEASE_GATE_STATUS_2026-10-22.json",
+      "sha256": "4d553c2839b19b0806214c7eb8c3d75feecfa4f5cc35e50e19fc37cfd58d44c8",
+      "size_bytes": 4666
+    },
+    {
+      "path": "PHASE7_IMPLEMENTATION_REPORT_2026-10-21.md",
+      "sha256": "f2bdccd4fe719efde46653b3c6633fd0450dac63280ab84f67bc113f51f3557a",
+      "size_bytes": 8234
+    },
+    {
+      "path": "PHASE7_INCREMENT_02_FINALIZATION_REPORT_2026-10-22.md",
+      "sha256": "66c75fc6958673bffb48d0db582c0e5f2937000a8cd1788a759854d6c684ad69",
+      "size_bytes": 8773
+    },
+    {
+      "path": "PHASE7_INCREMENT_03_RELEASE_GATE_STATUS_2026-10-22.json",
+      "sha256": "148884bdd2601d17e558407e444ea7c7e777440c24912e8192eebcf2515f2e9e",
+      "size_bytes": 8059
+    },
+    {
+      "path": "PHASE7_RELEASE_GATE_STATUS_2026-10-21.json",
+      "sha256": "1764809d73e6b3252e054bd8760fe1147c036797aa7891eef63108ab5fbd973a",
+      "size_bytes": 2574
+    },
+    {
+      "path": "PHASE7_REMOTE_REPLAY_EVIDENCE_2026-10-22.json",
+      "sha256": "891fe3279fe05d28a1762b87eb98d6f3da7706b763201501c9eb80ebba2ee8d5",
+      "size_bytes": 3820
+    },
+    {
+      "path": "PHASE8_IMPLEMENTATION_REPORT_2026-10-22.md",
+      "sha256": "9e60d61c395878cf461349ac102e3ad20987e8a6c7e843f0d53acb0c81b40914",
+      "size_bytes": 10336
+    },
+    {
       "path": "README.md",
-      "sha256": "aabd867458c6ea84c79bb7f978a19329f280962fc23bba6966b587614fef3770",
-      "size_bytes": 10193
+      "sha256": "6acb96d27a9dede6ae7fff708d0da1e63ea3efbc281a08fd17dd6d9549bb5850",
+      "size_bytes": 21313
     },
     {
       "path": "RELEASE.txt",
-      "sha256": "32a9db2c159e8e5b64af7c567f522f99d8362e60639fa747639e1d992b2cebc6",
-      "size_bytes": 558
+      "sha256": "827521f9e13e582c861c069400dc63a46ddc7f92caff8460017bf151961a3f55",
+      "size_bytes": 3307
     },
     {
       "path": "RELEASE_NOTES_2.1.0.md",
       "sha256": "a00ec3f7357ee5c9ac79e99167b92cc50530851d00f1a9b99ceb5a2295008a6e",
       "size_bytes": 1275
+    },
+    {
+      "path": "RELEASE_NOTES_2.10.0_PHASE6_INCREMENT_01.md",
+      "sha256": "d8b98c3e181de92e0cf6aa53c67cafeba3f88971d69cf6d8e2a09cf682fd6cb4",
+      "size_bytes": 1937
+    },
+    {
+      "path": "RELEASE_NOTES_2.11.0_PHASE4_6_COMPLETENESS.md",
+      "sha256": "1b84c42cac4306ca26a7251efb606f989d894cb9a7f06ff7c9f04c857cb5ef16",
+      "size_bytes": 1891
+    },
+    {
+      "path": "RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_01.md",
+      "sha256": "4b2e8dff9f281538821a57c048a4094793655fe8993d25297382e0b862a77a46",
+      "size_bytes": 2226
+    },
+    {
+      "path": "RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_02.md",
+      "sha256": "03b2aac3dba72970bad7122bae4a4a90858b159e6ebe46de6c1b7ef1e479dafa",
+      "size_bytes": 1854
+    },
+    {
+      "path": "RELEASE_NOTES_2.12.0_PHASE7_INCREMENT_03.md",
+      "sha256": "7c0dc318660afc062dfd74c355d5bdd6d35d02711a5ebb2ad82031acf3c77336",
+      "size_bytes": 3912
     },
     {
       "path": "RELEASE_NOTES_2.3.0.md",
@@ -217,14 +437,24 @@
       "size_bytes": 1213
     },
     {
+      "path": "RELEASE_NOTES_2.9.2_PHASE5_INCREMENT_03.md",
+      "sha256": "0518a915aaccf8af61869bd31445b939aaf8936ceb6bd74d6e8266cc1beacfe4",
+      "size_bytes": 1376
+    },
+    {
       "path": "SHA256SUMS.txt",
-      "sha256": "ccfe8674815bb4c6a7f568a090b330508ee88716d93cbb3e5391b22da89b9d64",
-      "size_bytes": 19869
+      "sha256": "4c0449ae44ae5d6215405a3c160623633295c953965251e791f3ad3651d04fc8",
+      "size_bytes": 45872
     },
     {
       "path": "SOURCE_ARCHIVE_COMPARISON.md",
       "sha256": "0c0fd5353b12f12bb20f02d82f3ea0cb3e80629d40ffc1078a4d7e011ad45239",
       "size_bytes": 3539
+    },
+    {
+      "path": "STAGE4_STAGE5_REPORTING_AND_ACCEPTANCE.md",
+      "sha256": "9acebef43c8cfc37496cb2d843bd2fb7399a48506586cdffa39fa144b57e6c61",
+      "size_bytes": 13991
     },
     {
       "path": "apps/api/.python-version",
@@ -233,8 +463,18 @@
     },
     {
       "path": "apps/api/app/auth.py",
-      "sha256": "1a57f3f0ae3054b557e85e913624f33236b9e54810d088f02074369a99641a48",
-      "size_bytes": 1326
+      "sha256": "a474281ff18b186cfba52c45ee350a153eac25c2f76c6995efd60433fe30e1e4",
+      "size_bytes": 1764
+    },
+    {
+      "path": "apps/api/app/branch_access.py",
+      "sha256": "77f011fe31f10aec6981aff5ab39ae3e79d12de177997a840c8113f4bcf3cff4",
+      "size_bytes": 5763
+    },
+    {
+      "path": "apps/api/app/business_insights.py",
+      "sha256": "4cd7b6349a9f3c85a90dfeb02414ae2579cc176f5afeea6e585d613ab14cc728",
+      "size_bytes": 18476
     },
     {
       "path": "apps/api/app/catalog.py",
@@ -247,29 +487,39 @@
       "size_bytes": 1201
     },
     {
+      "path": "apps/api/app/commerce_rules.py",
+      "sha256": "1d8b347772ea05349c8f1f9bfdf46e7921dc40ae5ff93d936b6c8fdbe9547447",
+      "size_bytes": 7734
+    },
+    {
       "path": "apps/api/app/config.py",
-      "sha256": "45df60d688b6f7e251120592631b6aa8493aec90b44519a1299adf3d1749f63b",
-      "size_bytes": 3093
+      "sha256": "ec35bb5682ef1d26c52b281086c5283b5f664a58f95f98883e6b9796ca131310",
+      "size_bytes": 3565
     },
     {
       "path": "apps/api/app/db.py",
-      "sha256": "7eaf08016262f50df6a0cf5facd32d580749163430abef7054aba21b9f505164",
-      "size_bytes": 2014
+      "sha256": "30b6d71c29b68ffe9d93fe75f710cd5b0e475128141b3b0b8d5b60506a210345",
+      "size_bytes": 2709
     },
     {
       "path": "apps/api/app/dependencies.py",
-      "sha256": "a5a84654c38a7f3f04c2d96659886388dd19433b3d0d7e5d03820485446c07f0",
-      "size_bytes": 2827
+      "sha256": "7f1ebfa64516e6e3ef10dc99e09dcb8e2cf8d80929e8f68d2c955e83a6577820",
+      "size_bytes": 3097
     },
     {
       "path": "apps/api/app/health.py",
-      "sha256": "cc7daaa9cd6665e62de39e1cc99651750cf560fb013f631f9735735766b295e6",
-      "size_bytes": 8376
+      "sha256": "76ea0cea41c946eab009ba65a351df0bfb45977ad4d90ff2667f515d4b83169e",
+      "size_bytes": 12060
     },
     {
       "path": "apps/api/app/inventory.py",
-      "sha256": "79a80b6c5bb979f58f3c7d732f96cbccd32446626f83e933abc6c14980b1a784",
-      "size_bytes": 8276
+      "sha256": "3e056f18122d708b184b4f56e08bb28dcdaead9f87ae6f4df8f36b085840dd70",
+      "size_bytes": 8351
+    },
+    {
+      "path": "apps/api/app/inventory_intelligence.py",
+      "sha256": "e6ee66c9ce030b8961fc90629ba08be8894f5beb68a24e036ac4564ad3cc88c1",
+      "size_bytes": 3386
     },
     {
       "path": "apps/api/app/kernel.py",
@@ -278,13 +528,18 @@
     },
     {
       "path": "apps/api/app/main.py",
-      "sha256": "ed804b47c0910eeb11670c49da13c0a5b4d7e9d0d46c60721e68a8a30c3e0935",
-      "size_bytes": 4194
+      "sha256": "83ae988be492dc0541af3e7fa0df33e5086bb3a3489f383dffa7f6082c8e9cba",
+      "size_bytes": 6062
     },
     {
       "path": "apps/api/app/models.py",
       "sha256": "ff1aac3f03d771ea3f6bf16d176e89b64528a68a3d7b4296d81c12cb45d5a8a1",
       "size_bytes": 61521
+    },
+    {
+      "path": "apps/api/app/purchasing_rules.py",
+      "sha256": "4394d71c4badd83f13661cf04eecbbb8967a4d18b92909483648550ee6886036",
+      "size_bytes": 4774
     },
     {
       "path": "apps/api/app/routes/__init__.py",
@@ -293,48 +548,88 @@
     },
     {
       "path": "apps/api/app/routes/analytics.py",
-      "sha256": "96b9b3bd60e941809157c738cdc6214d9329fec139dd0ac13063bc936f68aa7c",
-      "size_bytes": 6370
+      "sha256": "751010cc1ca41fe1b388f9a8f0e258dc384d5953154b348388979e7be5f312eb",
+      "size_bytes": 25088
     },
     {
       "path": "apps/api/app/routes/auth.py",
-      "sha256": "8d5905c608dc991e3ed4f4d712a2f4b2346c169d38559c5142667eca4c3bf09d",
-      "size_bytes": 21016
+      "sha256": "f774e8bf67e6f72f78363954de129eae0cd227f7691b6ffafb7c7080624e9721",
+      "size_bytes": 23244
     },
     {
       "path": "apps/api/app/routes/catalog.py",
-      "sha256": "3819b7b9affc3f6d7727c3e999682e2bc980e1bea1ce8bd84bd0d33f9ef177fe",
-      "size_bytes": 42412
+      "sha256": "d64f7f4282227b63b3b0d8d3c1aee443cdbd43064deb06cdeb07320250873b52",
+      "size_bytes": 42140
     },
     {
       "path": "apps/api/app/routes/commerce.py",
-      "sha256": "66e2db372bad8b116f31a6e1e4c14052264b70c9e1b28783f98f4bc9fb0e8a29",
-      "size_bytes": 45073
+      "sha256": "8ace862ef4bd0a5772adda8b276b0ec1ad92bfc73fa723925a083219f9ec21f2",
+      "size_bytes": 76013
     },
     {
       "path": "apps/api/app/routes/finance.py",
-      "sha256": "37d9e1297777c53faed9bb89ddc874a46eb564e385ab3450efa08f1d49f2c5c9",
-      "size_bytes": 18767
+      "sha256": "2f51932c35a1f9c3aaa204fcf95cb6d8903b547bc9eb9d8a126a202a714fd07f",
+      "size_bytes": 33756
     },
     {
       "path": "apps/api/app/routes/inventory.py",
-      "sha256": "29b6028b662f45e9581955f955c339e25f7a2ec289f2b38936a3adf565397d32",
-      "size_bytes": 35020
+      "sha256": "f3b4441c7a6a70f93d26340e1430994b473f58c3254a5536cd909f80e22bc875",
+      "size_bytes": 68564
+    },
+    {
+      "path": "apps/api/app/routes/membership_admin.py",
+      "sha256": "1b97c6c4030f20803f1f8cb2dc159ad8764db228369cd02e3293673c8824c6e9",
+      "size_bytes": 38513
     },
     {
       "path": "apps/api/app/routes/organization.py",
-      "sha256": "d591f3c1142cbf0379220e9fc156db9fce230226bf240b8f9c7d4641a8c268aa",
-      "size_bytes": 7840
+      "sha256": "ec9b6efea31333f7e407e2db1d15be0dac62370a8cfe68a155a47061da8fc5de",
+      "size_bytes": 25036
+    },
+    {
+      "path": "apps/api/app/routes/purchasing.py",
+      "sha256": "a8e18959ed1ad7136f1dbe0c1aaf4a8e22345ce7cb7d9b548f0e1b0a13d35aa5",
+      "size_bytes": 99631
     },
     {
       "path": "apps/api/app/routes/rbac.py",
-      "sha256": "365f819daee55f266f043c2cec58daafec4b7ed499a7f17030dec5dc79e4bbac",
-      "size_bytes": 2304
+      "sha256": "50af60f71299a439244c3020b1624626c083127a25a897b8df2440f0f7ef0ce9",
+      "size_bytes": 2286
+    },
+    {
+      "path": "apps/api/app/routes/team_chat.py",
+      "sha256": "427d34fdf50330d41986f73cd5c61fc8d77264a726d063dd9b48162b4435d851",
+      "size_bytes": 11491
+    },
+    {
+      "path": "apps/api/app/routes/workspace_context.py",
+      "sha256": "6acdff0859b9d3217c01066494c38775d6b9f127d4591dcf4ed9f9139d3b9e93",
+      "size_bytes": 20854
     },
     {
       "path": "apps/api/app/security.py",
       "sha256": "d251dfd2627a891727e821e4eb9f37b1189094b2b79e4e3de8e408e60ceef85f",
       "size_bytes": 260
+    },
+    {
+      "path": "apps/api/app/workers/__init__.py",
+      "sha256": "ce58042a870450b31a5f751bac8f3c2097efc5a03fbc6b2a0b87a162df63d73e",
+      "size_bytes": 85
+    },
+    {
+      "path": "apps/api/app/workers/analytics_outbox.py",
+      "sha256": "0e5ea86df70bd03c326f0e247eca999ddeebf6024617b8518838c21017b87784",
+      "size_bytes": 5258
+    },
+    {
+      "path": "apps/api/app/workspace_domain.py",
+      "sha256": "7153109b251bfcd3af1ddd38785563b0537a27a1c25e9834d4ee4ee1ae7e4b1d",
+      "size_bytes": 3593
+    },
+    {
+      "path": "apps/api/app/workspace_models.py",
+      "sha256": "0a4354aeb9bf8c1ba69d996484392eaffd5b793b7d59fe58a2df937f5cc37852",
+      "size_bytes": 2947
     },
     {
       "path": "apps/api/pyproject.toml",
@@ -347,9 +642,44 @@
       "size_bytes": 29
     },
     {
+      "path": "apps/api/tests/test_analytics_product_summary_contract.py",
+      "sha256": "1d9bd952adadf9813eea17e503bffc63b773dec0ff288c1ba14d7506e214f1f1",
+      "size_bytes": 1341
+    },
+    {
+      "path": "apps/api/tests/test_analytics_refresh_queue_contract.py",
+      "sha256": "ddf8db90b1e98c72a0a717ef801f39da03a0fa2e2907e823341c4f647ee39666",
+      "size_bytes": 1815
+    },
+    {
+      "path": "apps/api/tests/test_auth_login_workspace_context.py",
+      "sha256": "b1b3ea3c3aefbd866e48df5ec9e231d9d8ccf5d2f2166f826b9c5f2f31804c0d",
+      "size_bytes": 9199
+    },
+    {
       "path": "apps/api/tests/test_auth_refresh.py",
       "sha256": "6dbf4a010a3aca082742ba48e760b6c76c65c4e0b1a9aa2d9f68e807b869e370",
       "size_bytes": 4044
+    },
+    {
+      "path": "apps/api/tests/test_business_insights.py",
+      "sha256": "c655ad2f63df94deed32620557b4a266eba070b4ff1055d498f53f84b58378b3",
+      "size_bytes": 8770
+    },
+    {
+      "path": "apps/api/tests/test_commerce_business_date_contract.py",
+      "sha256": "437c8c0084a2056ac620d2741687300c1134c0f4bebda9a05be11ea318c20725",
+      "size_bytes": 511
+    },
+    {
+      "path": "apps/api/tests/test_commerce_dashboard_contract.py",
+      "sha256": "827cf28eafc059fce1251e65cc24e8801f550875adbc25b939b82742d3c00b1d",
+      "size_bytes": 1448
+    },
+    {
+      "path": "apps/api/tests/test_commerce_rules.py",
+      "sha256": "0da156fa0c95ec1cb5a211f956403b175bc3c98895e612f0e11f8f4af3ca605d",
+      "size_bytes": 5555
     },
     {
       "path": "apps/api/tests/test_commerce_serialization.py",
@@ -357,14 +687,109 @@
       "size_bytes": 1795
     },
     {
+      "path": "apps/api/tests/test_commerce_tax_and_accounting_regressions.py",
+      "sha256": "5ecc0b9faca6fb44ab4d793d47c270ed1f85829f1c155feb206fd867d56f2ae2",
+      "size_bytes": 2734
+    },
+    {
+      "path": "apps/api/tests/test_inventory_summary_contract.py",
+      "sha256": "9ff345dc6f17a6f65965622bb62bc0e6db2b2079d4427a28c64c73c48301f3b4",
+      "size_bytes": 1611
+    },
+    {
       "path": "apps/api/tests/test_phase1_hardening.py",
-      "sha256": "1e8da7aef8cb48390ba8e88416a894466ed336e5d203f269655d05aab7a3dce2",
-      "size_bytes": 3821
+      "sha256": "4a1fe39869640ec5d92c5bdbba9baf35b9d826d74456f49fe874245e15fa95db",
+      "size_bytes": 4194
     },
     {
       "path": "apps/api/tests/test_phase1_runtime_security.py",
-      "sha256": "32286a09b13fe52564e6d38026293da9d5ec23c7aafe6e94f6fcc16e0ba0495b",
-      "size_bytes": 4534
+      "sha256": "cbffd70e5268e281b5e96d0d987e3a12103175b878d351d78adc7aa20a84efec",
+      "size_bytes": 4543
+    },
+    {
+      "path": "apps/api/tests/test_phase345_currency_safety.py",
+      "sha256": "fbe5ca2d3fa06abadc13ad3f30c9035c660efe2d33e222e6bd0d1e7cecb35fe3",
+      "size_bytes": 6330
+    },
+    {
+      "path": "apps/api/tests/test_phase5_refund_migration.py",
+      "sha256": "3f6f18d5d3c9ad734aa139451b7c279fb6aebe47e555e396447e754da6563be9",
+      "size_bytes": 3126
+    },
+    {
+      "path": "apps/api/tests/test_phase5_sales_contract.py",
+      "sha256": "5012be9f5556db68238246a7f64bd582601a6f9e13a7422febd94077ff1ecf38",
+      "size_bytes": 8482
+    },
+    {
+      "path": "apps/api/tests/test_phase6_inventory_intelligence.py",
+      "sha256": "648d05e78441285abfda819cc79903abfb7cbc6eb9a223fb8641e80f182337b7",
+      "size_bytes": 4217
+    },
+    {
+      "path": "apps/api/tests/test_phase7_purchasing_contract.py",
+      "sha256": "70c9bf131ca6ed54121d37e89d2ada4a0eccf089d3c4f244df451373850e98fe",
+      "size_bytes": 7473
+    },
+    {
+      "path": "apps/api/tests/test_phase7_purchasing_model_validation.py",
+      "sha256": "ff81fed30a7af8bc8e556485c5456227c421d8f2bfb6969d7da0cd12cd91ae1f",
+      "size_bytes": 3729
+    },
+    {
+      "path": "apps/api/tests/test_phase7_purchasing_rules.py",
+      "sha256": "6cb270c06e2f7ffdd64fd02db1cc7707189f0bb1e1fca9ed41c61267e6cdc143",
+      "size_bytes": 3333
+    },
+    {
+      "path": "apps/api/tests/test_phase8_finance_workflows_contract.py",
+      "sha256": "06b95a01d8c9e15ebb2f62b9cb09b2c79e70aa07fa6f6f1af9940792bff8fb17",
+      "size_bytes": 7367
+    },
+    {
+      "path": "apps/api/tests/test_phase8_payment_reference_safety.py",
+      "sha256": "c7416896ec3acb3240a9a20415182d590cf78853d6b6a551d2a6228194ec622e",
+      "size_bytes": 2076
+    },
+    {
+      "path": "apps/api/tests/test_phase9_insights_contract.py",
+      "sha256": "291cdd66b389a0083b5bf699dddcbd47aa7c810853d96a52235d5350eb4ec1d9",
+      "size_bytes": 1559
+    },
+    {
+      "path": "apps/api/tests/test_post_commit_rls_refresh_regression.py",
+      "sha256": "32db4e491a041c57bae4f0fe44ee07506c8401072012b0c5e784e7743332f794",
+      "size_bytes": 1367
+    },
+    {
+      "path": "apps/api/tests/test_shared_refresh_cookie.py",
+      "sha256": "34dffd3db53fbf0b1fcf89b417385fa7644ea8b2edc71512a9ba199e92f59147",
+      "size_bytes": 1518
+    },
+    {
+      "path": "apps/api/tests/test_stage2_cross_module_contracts.py",
+      "sha256": "d7620656be543a19ba33052c2ad4fd5901706eed41e7388a850a8c0e9e8cee29",
+      "size_bytes": 5718
+    },
+    {
+      "path": "apps/api/tests/test_stage4_reporting_acceptance.py",
+      "sha256": "3cd7d092a3676951ef22bb7d89b83c180f4d4b251d40bcc8a44f57272eb65c62",
+      "size_bytes": 3447
+    },
+    {
+      "path": "apps/api/tests/test_team_chat_contract.py",
+      "sha256": "662cd077c17c889ec773df4ee46a37084bbe4b7779cf63d5e603eec74f6aadb3",
+      "size_bytes": 1927
+    },
+    {
+      "path": "apps/api/tests/test_tenant_context_reapply.py",
+      "sha256": "542877928916ce48d63813834c2e95c68a043df9e9cb4e515321ac1e88bbaa83",
+      "size_bytes": 1215
+    },
+    {
+      "path": "apps/api/tests/test_workspace_setup_language.py",
+      "sha256": "62c9b67929c746051a5dc1b9acd1b1e0621a0dd1a5994b3aa1917814c1f6849e",
+      "size_bytes": 2457
     },
     {
       "path": "apps/web/.env.example",
@@ -378,48 +803,53 @@
     },
     {
       "path": "apps/web/app/accounting/page.tsx",
-      "sha256": "f9572a93274d0ff901e931d7fdaa55c44e63dc6863b1f171642403a0a90db974",
-      "size_bytes": 5511
+      "sha256": "b1fb1ad5569a6f598f95f25b829d3aff882db930543a375fdd338f773d022d6a",
+      "size_bytes": 56212
+    },
+    {
+      "path": "apps/web/app/administration/members/page.tsx",
+      "sha256": "13e10c66cfad12b5fe993dfa7fe1c35da011f1605c18b9f2027322b8e58ecc80",
+      "size_bytes": 17666
     },
     {
       "path": "apps/web/app/administration/page.tsx",
-      "sha256": "c287cae65534860b55ac2068f341fd167aa711cb7c19b160a657d1b9b2142b14",
-      "size_bytes": 594
+      "sha256": "2cb6d298add68b61f17589100bc0a3cd817bc730e5b6bf55d4e30b0b2c165f80",
+      "size_bytes": 18708
     },
     {
       "path": "apps/web/app/api/lexa/[...path]/route.ts",
-      "sha256": "16cef4482cdb67af5fe34c44bafd7991ee1b1dc47e0298f24c2df5185baa7c57",
-      "size_bytes": 2836
+      "sha256": "9e4a5a958771f9373c0c3d0c5fc5f647d3517989531eac8d0c03f881363486dd",
+      "size_bytes": 3285
     },
     {
       "path": "apps/web/app/commerce/page.tsx",
-      "sha256": "f80bdf006d450c64cd312ca320d1288fd654a8b27549723cfef6fb0372169a4e",
-      "size_bytes": 24839
+      "sha256": "c9f3faed115b0c17b27f96290d03426342704da931793bd5ea15dbb959f1bfbb",
+      "size_bytes": 51820
     },
     {
       "path": "apps/web/app/compliance/page.tsx",
-      "sha256": "560ea12b021eb11cde20aacea2127e9645deb80eeaa5c1402c1254c0d2a6c0d5",
-      "size_bytes": 4737
+      "sha256": "9aa0f9bb5b3445b704a3e52f6b4edd5d32ce7e701bcc40bc91d66b0d58578fd1",
+      "size_bytes": 19325
     },
     {
       "path": "apps/web/app/customers/page.tsx",
-      "sha256": "13b6b7185a42fed8f65423444060598166b350386aef4eedb944627701d931c2",
-      "size_bytes": 73
+      "sha256": "011254acaf7a9268cf4626cba7f23bd2ac45ba6727776d9b63875ba7e9b40c73",
+      "size_bytes": 10881
     },
     {
       "path": "apps/web/app/globals.css",
-      "sha256": "2cc1cbcee3eb8da693e6567844a6cdae94af3f4fbd429ef030005ed42e39b69c",
-      "size_bytes": 86780
+      "sha256": "16332e178d0af24f8d0db56b6e1d2743c8813fdbbd3f8e9d5a7e073304b135fa",
+      "size_bytes": 156740
     },
     {
       "path": "apps/web/app/intelligence/page.tsx",
-      "sha256": "f0d3841c14e03f82ea7f851ed13b077f9d5066a0a3ca7b9f873c7411ef84ac64",
-      "size_bytes": 665
+      "sha256": "ab3b9782b831a415fec0ea0d432ff5b9794e719f3714499f7e03fff4aeb8aa89",
+      "size_bytes": 17103
     },
     {
       "path": "apps/web/app/inventory/error.tsx",
-      "sha256": "1e9b7bf44d56c5733d82665562e39e696e8c2acc4a4ca8e3f313ab591854a956",
-      "size_bytes": 338
+      "sha256": "12b4f9157d72fa5e2e61c36e646c9f221b77da11824561d7e646e871c87401fe",
+      "size_bytes": 336
     },
     {
       "path": "apps/web/app/inventory/loading.tsx",
@@ -428,33 +858,38 @@
     },
     {
       "path": "apps/web/app/inventory/page.tsx",
-      "sha256": "724eacf86a0cc819b276f53bbdf03f250b3428b4a2725a58071a1e07f43a2afe",
-      "size_bytes": 34279
+      "sha256": "a2499665ab2e640b1b8fa6663126da7a3a5fe23d7184662d2b49f0a71eb63c4e",
+      "size_bytes": 52431
     },
     {
       "path": "apps/web/app/invite/page.tsx",
-      "sha256": "749ac3a9fde34299657631c285bbabd48e2a7ed344a14d8814de268be4b8aa7b",
-      "size_bytes": 832
+      "sha256": "c70eff1741643c0b69a34b181e30e7ae29c959c68c75d3115d69ff65d3476a87",
+      "size_bytes": 3473
     },
     {
       "path": "apps/web/app/layout.tsx",
-      "sha256": "c5a5adc3ac120cf0e9783900e03b84d248dd6592a7e1d5df42a27f215b0650fb",
-      "size_bytes": 594
+      "sha256": "13c3c30cb8d1130f5361cc9179816c57900f7ab74f114fc83249f0e8d7a3a2db",
+      "size_bytes": 656
     },
     {
       "path": "apps/web/app/login/page.tsx",
-      "sha256": "2051626c99cc5969a1c6e7fb88f97abbed515096164b8d280269dc5ac0402a78",
-      "size_bytes": 4977
+      "sha256": "e1de8cfff93697b36d8e165e6fed014b560222177a937689ce416c55201a122c",
+      "size_bytes": 4999
+    },
+    {
+      "path": "apps/web/app/onboarding/page.tsx",
+      "sha256": "2a94b9de608855e3353a62f785edcac7591602fb9838c264c8c8e4fb6c18d97c",
+      "size_bytes": 5198
     },
     {
       "path": "apps/web/app/page.tsx",
-      "sha256": "d8c6a784e417b188c5b2886c9dab33f828e004bf12ba6e20c7f92f63d01abb60",
-      "size_bytes": 11901
+      "sha256": "f7642d7d3bf173b83e70ea8a1a3bc60b03ff61f0e95b9bb2815961e04ce9cf58",
+      "size_bytes": 24887
     },
     {
       "path": "apps/web/app/products/error.tsx",
-      "sha256": "d8bb071d79c16bd9f9296eda17514ed526f3c68e51b0a6618427e320d93d81ec",
-      "size_bytes": 327
+      "sha256": "be9a45fa644e540b886a1988926920c6ba0778f2c942ee4bf9670a738ce9e29a",
+      "size_bytes": 323
     },
     {
       "path": "apps/web/app/products/loading.tsx",
@@ -463,23 +898,23 @@
     },
     {
       "path": "apps/web/app/products/page.tsx",
-      "sha256": "9413ac424aeb3b0fb17940f9e9c6f73073433e7644e4711dc311b9839e90a73a",
-      "size_bytes": 23233
+      "sha256": "5332eb5e146b52545adcd6f9e2cc0b52424c22537446e8d922aa107133cc474c",
+      "size_bytes": 24553
     },
     {
       "path": "apps/web/app/purchasing/page.tsx",
-      "sha256": "8b4525e2337d26abc6a9416c7700ea26e80f14523a19ed46471c7f61bf1d63ae",
-      "size_bytes": 640
+      "sha256": "17260a3dcc56dc7047e8b6ee45f794ac365b098b5cfef9c52b4ad39c9fb9dc85",
+      "size_bytes": 66142
     },
     {
       "path": "apps/web/app/register/page.tsx",
-      "sha256": "adcd88ef41dc148f9772ec033ec550d274d64308053f8e9790189dbec014d235",
-      "size_bytes": 12626
+      "sha256": "68c66dd0bd614ebf60ff51c28fe9bc26d70682784028537e58989db2c5fbd31c",
+      "size_bytes": 12469
     },
     {
       "path": "apps/web/app/reports/page.tsx",
-      "sha256": "03841577aa44114a16d8b4f6085a1948dc23f7a5360a124845c4a34ff0d9fd74",
-      "size_bytes": 6498
+      "sha256": "d0c18953b6393fad42fd5c4c3b20304cb9145f9367769c85eb8e2aa79903879c",
+      "size_bytes": 30875
     },
     {
       "path": "apps/web/app/sales/page.tsx",
@@ -488,28 +923,108 @@
     },
     {
       "path": "apps/web/app/settings/page.tsx",
-      "sha256": "08d6fb850baa07e64b1487032e1999110c487c8de5b5fe5e308df2171dbc4a1e",
-      "size_bytes": 606
+      "sha256": "0245028ff61fc7b972202b27ce7ce5956094f49b632f8b48a7f2fe31f8c08ed0",
+      "size_bytes": 7951
+    },
+    {
+      "path": "apps/web/app/team-chat/page.tsx",
+      "sha256": "cb0b0fd89964a8c1cfb22dc6f8d8eeb5b606f2c102df053f374d9115b8f83686",
+      "size_bytes": 13113
+    },
+    {
+      "path": "apps/web/app/workspace/page.tsx",
+      "sha256": "11ac01e7a61482250b296d97788f24b617b3f2da951b0e5e55fcc2d478f7c6ca",
+      "size_bytes": 2842
     },
     {
       "path": "apps/web/components/app-shell.tsx",
-      "sha256": "a4e08028090ebb67499a4e5b9fcd9b4e433a1c1315e0668f82b260bf417d52ca",
-      "size_bytes": 11294
+      "sha256": "c56b0233c7b67974530663184a468ec39251bff6492341fbf388011979e93903",
+      "size_bytes": 19527
     },
     {
-      "path": "apps/web/components/module-foundation.tsx",
-      "sha256": "c9611c00d37d434b91365ccf8662275529f3b554358675c1f854dc518bf3ecbd",
-      "size_bytes": 1413
+      "path": "apps/web/components/dashboard-charts.tsx",
+      "sha256": "0c0a154ec889a0da7099d3659c5c489e8bc68118975128211fe017fbb0455529",
+      "size_bytes": 16109
     },
     {
       "path": "apps/web/components/ui.tsx",
-      "sha256": "ba7e893c9d9789ea6b5f684ac22b648b7d647e78cbb93b369412a677f8be4984",
+      "sha256": "cc99fc50f6a92a617f1485b6e1ee8bd33e0fc316c2bd712c15bfbe550204af89",
       "size_bytes": 14405
     },
     {
+      "path": "apps/web/e2e/README.md",
+      "sha256": "ba46dbb0fede3acbc48ef6cb3bd89e51a88625722e6248f0f4fe39f151ec6620",
+      "size_bytes": 1381
+    },
+    {
+      "path": "apps/web/e2e/acceptance.spec.ts",
+      "sha256": "2f4144b36cae9d70e1c07dcb92f4f057a1819d2493782f4fa3f46feace2e2718",
+      "size_bytes": 4718
+    },
+    {
+      "path": "apps/web/e2e/phase5-sales-acceptance.spec.ts",
+      "sha256": "be914fd15e75b38f6da9f2966ae0b775985a242e3ba10546c2194d0a78a973ed",
+      "size_bytes": 21870
+    },
+    {
+      "path": "apps/web/e2e/phase7-purchasing-acceptance.spec.ts",
+      "sha256": "22d39515a41ec03ffb4b3ca2f75588c549949730377832428444369de56ef46f",
+      "size_bytes": 16805
+    },
+    {
+      "path": "apps/web/e2e/phase8-reports-acceptance.spec.ts",
+      "sha256": "948abf44414a329cec289e860121a5f8b1cbe150fefb56621c53e38fe14c4e39",
+      "size_bytes": 5327
+    },
+    {
       "path": "apps/web/lib/api.ts",
-      "sha256": "1ded64507910fa20cb87241dac1c7191e842d3a32edbc27ddb51a800b4b60659",
-      "size_bytes": 42431
+      "sha256": "14fa67c12d6e2bafc770f7c82a7f772cd2be273c72da9e7539218cb91ecdd32b",
+      "size_bytes": 81671
+    },
+    {
+      "path": "apps/web/lib/business-insight-question.d.mts",
+      "sha256": "5ecda13e5730247c7ed791fe5225522d1041917e9f97fd9c44c5f6d793ab40b2",
+      "size_bytes": 358
+    },
+    {
+      "path": "apps/web/lib/business-insight-question.mjs",
+      "sha256": "3770d45a6f4ac696a02a31988a89a6a4959f90c792f0bde74aba27473ee13537",
+      "size_bytes": 2875
+    },
+    {
+      "path": "apps/web/lib/business-options.ts",
+      "sha256": "4197465cd6cb64128609f275cad718322ee1f3fb391bd0abb75a1f24f8768e3a",
+      "size_bytes": 1315
+    },
+    {
+      "path": "apps/web/lib/date.d.mts",
+      "sha256": "a39d44597fc20c16cfd32665d67d39c51bbcd6f4852d5e925b2631815f292be4",
+      "size_bytes": 108
+    },
+    {
+      "path": "apps/web/lib/date.mjs",
+      "sha256": "346692cfa69c0ed65eb133fd872cce17fc32fef0f51e48ea1f3adf7b982ef8ee",
+      "size_bytes": 496
+    },
+    {
+      "path": "apps/web/lib/navigation.d.mts",
+      "sha256": "fc67c63e52a08ce17e1a075c82ed17de95ce0dfaf6b2eb2566b35c1fcafbc4dc",
+      "size_bytes": 690
+    },
+    {
+      "path": "apps/web/lib/navigation.mjs",
+      "sha256": "6ec80079a9916fc1fb90b7cfcbb3e9a3d60a7cd68ebd78a4b0eb658326d15976",
+      "size_bytes": 5004
+    },
+    {
+      "path": "apps/web/lib/report-export.d.mts",
+      "sha256": "5b2529eab2a7cd9b340f1f3ff167c3f9d42e6578cda81bdfbd546b494e79447c",
+      "size_bytes": 148
+    },
+    {
+      "path": "apps/web/lib/report-export.mjs",
+      "sha256": "71e2007eabeb72bffdeab7668b03d3e6d1c8fed5c119b0c48b877fe12a8b01ac",
+      "size_bytes": 786
     },
     {
       "path": "apps/web/next-env.d.ts",
@@ -523,58 +1038,93 @@
     },
     {
       "path": "apps/web/package-lock.json",
-      "sha256": "488d5e1ef8c97ffaf651239767e78dd1a01ad8cd3d0c716745de3983d4227410",
-      "size_bytes": 34536
+      "sha256": "025c869a432bcab86cf2378b0bc1a33de298bda6e7b26a12d0e83c00a2ff6109",
+      "size_bytes": 36004
     },
     {
       "path": "apps/web/package.json",
-      "sha256": "8ffa96aaf21bc27a47bcda5e707c693d008290bc58c5cc143cb6c157993dd638",
-      "size_bytes": 550
+      "sha256": "599b8af5e89d1807bc8f4ec031fb9eebda9b7e0132fdb4ff4fa7320d96ab88f4",
+      "size_bytes": 871
+    },
+    {
+      "path": "apps/web/playwright.config.ts",
+      "sha256": "74969bc526e0683c2bf70033a0c5cfe650728fa669584192fe8d525bbf16e9f8",
+      "size_bytes": 933
     },
     {
       "path": "apps/web/public/lexa-icon-180.png",
-      "sha256": "c61674f643458788d90fec1a2419f7ff643c7a605b10bf97723ab62b7e4a2567",
-      "size_bytes": 26605
+      "sha256": "1fe3eb26437759d50518bd1f801306f6227eb0fe9da86c1cbb1d67f41201829c",
+      "size_bytes": 12026
     },
     {
       "path": "apps/web/public/lexa-icon-32.png",
-      "sha256": "a4adb085d1f621f4459d9a40ee799e65a6672a700f09ba04bf5b50644f7c2afe",
-      "size_bytes": 2189
+      "sha256": "7befc84b085183c33dd10c55281c265ca44c3f5ed422abaf0fb2064d4bf713bc",
+      "size_bytes": 1498
     },
     {
       "path": "apps/web/public/lexa-icon.png",
-      "sha256": "9f2814e9a2ac38bcf994b743d371a460df17b8f5b4be073afaf0394226847cc5",
-      "size_bytes": 127088
+      "sha256": "e6f4875a6385896d564f6d7d7821eb44d28509acb8dad721da9050e36cbfdb51",
+      "size_bytes": 52481
+    },
+    {
+      "path": "apps/web/public/lexa-logo-light.png",
+      "sha256": "b7cf5e98e72e80080a1ef5a105f09255f4de81dc2000807abc9196afb90e7e17",
+      "size_bytes": 23492
+    },
+    {
+      "path": "apps/web/public/lexa-logo-light.svg",
+      "sha256": "af3865ef18485c5309f4aad14768ecaf4c1a6e40005565eecb4d0cc2bff077f3",
+      "size_bytes": 876
     },
     {
       "path": "apps/web/public/lexa-logo.png",
-      "sha256": "ea5707c9002f101ec54460e19b1ce8dea48cc1f6862c0bc1615fee2958ba2c9d",
-      "size_bytes": 469434
+      "sha256": "1328242b89158c61f6a2f656e379700fe622ee9e5dbe58bd49cf70277a322469",
+      "size_bytes": 25032
+    },
+    {
+      "path": "apps/web/public/lexa-logo.svg",
+      "sha256": "a091ac14f7c20a9b2947cf1c8d2c4294e30d9f3cbe42f0da11d760108110c398",
+      "size_bytes": 875
     },
     {
       "path": "apps/web/public/lexa-mark.png",
-      "sha256": "4d0a660f902929670ec700caa314808a72efd8bb40f8b13e17e4f1b689a29797",
-      "size_bytes": 248009
+      "sha256": "e6f4875a6385896d564f6d7d7821eb44d28509acb8dad721da9050e36cbfdb51",
+      "size_bytes": 52481
+    },
+    {
+      "path": "apps/web/public/lexa-mark.svg",
+      "sha256": "6460f2227b98df29d41ec78edc507355b9b471fe3ebb6bcf3af0c912f3371ea5",
+      "size_bytes": 1050
     },
     {
       "path": "apps/web/public/lexa-wordmark.png",
-      "sha256": "dca8fbcdc76eeb6c3ea6da318896b42926b2a820b0afe0177115e4fa30dbba97",
-      "size_bytes": 152071
+      "sha256": "1328242b89158c61f6a2f656e379700fe622ee9e5dbe58bd49cf70277a322469",
+      "size_bytes": 25032
+    },
+    {
+      "path": "apps/web/tests/commerce-tax-efris-integrity.test.mjs",
+      "sha256": "5ca7cb2d86a863a6e94b71430e498e645c7f608568961adf11ac5846e40afcb8",
+      "size_bytes": 1604
     },
     {
       "path": "apps/web/tests/dashboard-resilience.test.mjs",
-      "sha256": "9557b0055b16871816e54d239684aef6745f1dabd56b68fdc7450fc8c91241f9",
-      "size_bytes": 1063
+      "sha256": "5574be2368074a83116e92feb7079ee38a7a555f8f42cfa6d3111bd3728dbd42",
+      "size_bytes": 1221
     },
     {
       "path": "apps/web/tests/phase0-session-contract.test.mjs",
-      "sha256": "457db47ecdefdfbc002c81806bbcd07b786c399d1b99772808fded4fb528d2b2",
-      "size_bytes": 2190
+      "sha256": "eda0e3828fd3c2612c5865399e69ba17f9b49bebcb2f0c283bc6a8c1d1d46bdf",
+      "size_bytes": 2791
     },
     {
       "path": "apps/web/tests/phase1-ux-contract.test.mjs",
-      "sha256": "ca088b6563a449168292bee10eae3b1c9b683ef5d5545a45f9e7b6c07ee53ed8",
-      "size_bytes": 3045
+      "sha256": "ce3b76568b9a1f851a534eed6b345140738df0460e7f7f76c67d25451c0c7bcb",
+      "size_bytes": 3543
+    },
+    {
+      "path": "apps/web/tests/phase2-setup-readiness-contract.test.mjs",
+      "sha256": "6931085252a277d7ebc4a94cbd84f92d20ebbebfbef11003d280f01a4ac7b02a",
+      "size_bytes": 2181
     },
     {
       "path": "apps/web/tests/phase2-shell-foundation.test.mjs",
@@ -582,34 +1132,124 @@
       "size_bytes": 1520
     },
     {
+      "path": "apps/web/tests/phase2-ui-polish.test.mjs",
+      "sha256": "25de04a55b3e4dd857885a71cb93052b4a2fa5d49ebffd0a63eba96543450c8a",
+      "size_bytes": 3116
+    },
+    {
       "path": "apps/web/tests/phase2-ui-primitives.test.mjs",
-      "sha256": "e0b2bb91991aaf6b11478c06da5bc99991d92f0f77eeb82745285b13e983c970",
-      "size_bytes": 3450
+      "sha256": "852d22912bee3fadff291a0ac228c3c6d75256ddfc6d7c6764e780563dbbe3f3",
+      "size_bytes": 3591
     },
     {
       "path": "apps/web/tests/phase2-workflow-resilience.test.mjs",
-      "sha256": "414c89ddebf68220f8b35235219ca25de1bfb2b33d8162eb96d2ffeaa585d002",
-      "size_bytes": 4888
+      "sha256": "e998af9a15dee562234498cfe683656078e7b92b42efa3a790e46182939cb7de",
+      "size_bytes": 4907
+    },
+    {
+      "path": "apps/web/tests/phase2-workspace-experience.test.mjs",
+      "sha256": "e0e6c4aa69f8d255d2a3c093023f3f30a5bed61a24782b5e9b97669a026a9c6b",
+      "size_bytes": 5286
+    },
+    {
+      "path": "apps/web/tests/phase4-6-completeness.test.mjs",
+      "sha256": "c6ae42448e6b2e6ddce6fb7bf56943610e0ffda0f941827ca1b5b5b74222fdc4",
+      "size_bytes": 4140
+    },
+    {
+      "path": "apps/web/tests/phase4-dashboard-foundation.test.mjs",
+      "sha256": "dc5601f7757ae4573ba43d7f56b6ef5c4cc4e4fa4083129716585639039d2b0a",
+      "size_bytes": 2313
+    },
+    {
+      "path": "apps/web/tests/phase5-e2e-safety-contract.test.mjs",
+      "sha256": "14d38fd45ab2562b4322653152744171cd2216c0f332de462bce1d35024a84a2",
+      "size_bytes": 1586
+    },
+    {
+      "path": "apps/web/tests/phase5-sales-cockpit.test.mjs",
+      "sha256": "8793704d02c50069a4ba44ad56183d62fa1f3d501c3da02cc657a76a39b9bb10",
+      "size_bytes": 2978
+    },
+    {
+      "path": "apps/web/tests/phase6-inventory-intelligence-contract.test.mjs",
+      "sha256": "0e5efe9dc5678115ecd1baf19fb2cbcf858b1c477f2ef51990de6b6516fd0cf7",
+      "size_bytes": 1606
+    },
+    {
+      "path": "apps/web/tests/phase7-finalization-regressions.test.mjs",
+      "sha256": "b854fbfce16b0527cf8340051179733fabd6a175a3e48b3d5ba83fbf59deda55",
+      "size_bytes": 811
+    },
+    {
+      "path": "apps/web/tests/phase7-purchasing-contract.test.mjs",
+      "sha256": "cdf0961ba7ea410ec807a3bdc16cefc491dcc5200898bf8703ab8c24cbc2ada1",
+      "size_bytes": 3008
+    },
+    {
+      "path": "apps/web/tests/phase7-release-polish.test.mjs",
+      "sha256": "3eba4cbb5621ae0961844c5f2a95d1b13c22c60ebef3eccea7c82a15bf12041c",
+      "size_bytes": 2879
+    },
+    {
+      "path": "apps/web/tests/phase8-finance-workflows.test.mjs",
+      "sha256": "413d61435cbc2b5920ead727e8622ba45d79a73dfc5d4e3a9e90099bcceca800",
+      "size_bytes": 4096
+    },
+    {
+      "path": "apps/web/tests/phase8-foundation-polish.test.mjs",
+      "sha256": "e9433b0b037db964e14c92c4251b9f5554133552e2bf2cfa176027f26a51b5e5",
+      "size_bytes": 2634
+    },
+    {
+      "path": "apps/web/tests/phase9-business-insights.test.mjs",
+      "sha256": "252623a0852be0afc715dac4e1f3a93b651721bbc0b636849ef18783969447b7",
+      "size_bytes": 3636
+    },
+    {
+      "path": "apps/web/tests/stage2-3-module-connections.test.mjs",
+      "sha256": "197328eb2ce9409741120633f07f8080e329900c1f3e218eb8dfaf81c40c3782",
+      "size_bytes": 2204
+    },
+    {
+      "path": "apps/web/tests/stage4-reports-acceptance.test.mjs",
+      "sha256": "de3ace3dd3d14ebcebcabcb6332534a43449199d8541784f3665c7c63e4c81d3",
+      "size_bytes": 3952
+    },
+    {
+      "path": "apps/web/tests/stage5-build-regressions.test.mjs",
+      "sha256": "6fde5a796dca42dd56e18834489eae7a04e7cff15790c1a43222d1af98f06b79",
+      "size_bytes": 1539
+    },
+    {
+      "path": "apps/web/tests/team-chat-contract.test.mjs",
+      "sha256": "fb80257b79d6385ec130ecbc9f5ee8013980a09c8d73490278f7d498f2b20e9a",
+      "size_bytes": 1368
     },
     {
       "path": "apps/web/tests/visible-product-contract.test.mjs",
-      "sha256": "b1220c540dacc90f4aae93ab3f803299e9260ee96223749bf4771758774d8eb9",
-      "size_bytes": 2764
+      "sha256": "05678fd1fbdddf1ad9214ebd425b0906fd98bf04e75a2362f5969125dc75e989",
+      "size_bytes": 3003
     },
     {
       "path": "apps/web/tsconfig.json",
-      "sha256": "527ab135cfecd31645208539d1324a6f212b2305f5532ef50f6344d1363ffde7",
-      "size_bytes": 563
-    },
-    {
-      "path": "apps/web/tsconfig.tsbuildinfo",
-      "sha256": "01c0b4d8d3a74e8b2096a1ea2b04ec7e06d94db3b385c9bde8d0cee81e9c9048",
-      "size_bytes": 482092
+      "sha256": "872ee66200e3d47c0bbca235b44dc90a5d0d745c4dcc82a319443d53d76a5423",
+      "size_bytes": 706
     },
     {
       "path": "apps/web/vercel.json",
       "sha256": "4b12609df71cfd64e5d2bb2008ae2979907829ca56d042e8d34f7bf689bb39ff",
       "size_bytes": 92
+    },
+    {
+      "path": "artifacts/phase6-replay-evidence.json",
+      "sha256": "265862d6a0304b8aae7148ce4659d36a6d240fca9af54505b0fa14dfaadacdee",
+      "size_bytes": 16859
+    },
+    {
+      "path": "artifacts/phase6-replay-evidence.json.sha256",
+      "sha256": "3d8f929450bc781212e7a030378249b8b116b1b12b012f39d8e5133892986093",
+      "size_bytes": 94
     },
     {
       "path": "docker-compose.yml",
@@ -620,6 +1260,11 @@
       "path": "docs/DEPLOYMENT_RENDER_VERCEL.md",
       "sha256": "4ef10fcac79dfc66792d88d33030218453d97d500f31152af6e8d4b426ee7f5b",
       "size_bytes": 4239
+    },
+    {
+      "path": "docs/FRESH_NEW_PRODUCT_STRATEGY.md",
+      "sha256": "7f88da195551c6af6a0cdb8c47ed5027606b0ee6943ade688dfd8d872bb867c9",
+      "size_bytes": 16326
     },
     {
       "path": "docs/LEXA_EXPERIENCE_FOUNDATION_v1.4.2.md",
@@ -642,9 +1287,14 @@
       "size_bytes": 914
     },
     {
+      "path": "docs/LEXA_SALES_INTEGRITY_AND_5000_USER_READINESS.md",
+      "sha256": "5bf0a7434cddeb8c29f41d53a4cb491441ef3227181a0a671717840634ed034a",
+      "size_bytes": 7067
+    },
+    {
       "path": "docs/LEXA_STATEMENT_OF_TRUTH_2026-10-19.md",
-      "sha256": "4128852b3a44a71f8bcb1c8dfb4708235e6a58f67826b15f3ce946e532fabc25",
-      "size_bytes": 18675
+      "sha256": "ce59ab6af7e3bb46b732a0e8340d1ec3cffd8143f18199df5b50b151d2e171ba",
+      "size_bytes": 19146
     },
     {
       "path": "docs/MANUAL_DEPLOY_v2.5.0.md",
@@ -652,19 +1302,49 @@
       "size_bytes": 3301
     },
     {
+      "path": "docs/PHASE0_2_CLOSURE_AUDIT_2026-10-20.md",
+      "sha256": "eaa82c166f8e7a3a3b0f43d312620f73e1cb44fbf7e7f7d6f2eb46b0e37e738f",
+      "size_bytes": 20797
+    },
+    {
       "path": "docs/PHASE0_2_FINAL_READINESS_AUDIT_2026-10-20.md",
-      "sha256": "e66923628339189464f06a2b00063bc1eb17e198301f41f6f79411e5e0c51f8f",
-      "size_bytes": 19220
+      "sha256": "500262e01bc66d4bfe57fb140dae48a3ef7d55942df0ac82600aab52e5c73e85",
+      "size_bytes": 19757
+    },
+    {
+      "path": "docs/PHASE0_2_REMAINING_GATE_REGISTER_2026-10-20.md",
+      "sha256": "c0201b891e4019cc4889b36903ed535a4c611d756d6c60e4b8ea4a36834acf2c",
+      "size_bytes": 12114
+    },
+    {
+      "path": "docs/PHASE0_2_SECURITY_CUTOVER_RUNBOOK.md",
+      "sha256": "95dbaedabe3f2cf1d9d618d6467e0edda31258af6b47752b9c6cd18fa0f48aa9",
+      "size_bytes": 10714
+    },
+    {
+      "path": "docs/PHASE0_2_TABLE_ACCESS_DESIGN_2026-10-20.md",
+      "sha256": "83aedbfb21d0e6675c20752412e5a507338e1a46452f9084ef2f95b5dd42a69c",
+      "size_bytes": 11693
     },
     {
       "path": "docs/PHASE0_IMPLEMENTATION_REPORT.md",
-      "sha256": "50dcc3468684ca3b1202a923d46310fe39523337d88eb4fa5d23356e04921aed",
-      "size_bytes": 5691
+      "sha256": "b19f2c0ae0be72a14e40b0746370278dd117f9e15d964e77d3bbdee4a33813aa",
+      "size_bytes": 6162
     },
     {
       "path": "docs/PHASE0_RUNBOOK.md",
       "sha256": "bce16c09832180ca149a3e16220e05227bab718b32d269b0b8f9f9eb7bba8c19",
       "size_bytes": 3614
+    },
+    {
+      "path": "docs/PHASE0_TO_PHASE2_HANDOFF_2026-10-23.md",
+      "sha256": "87dbec2faa8f4f22bd1f95b7ef37559d0a0432348d2bfb7185226e791295e3b6",
+      "size_bytes": 2937
+    },
+    {
+      "path": "docs/PHASE0_TO_PHASE2_IMPLEMENTATION_STATUS_2026-10-23.md",
+      "sha256": "d2520e0d76d8420b637c005711e874a0222d42330ae158588dbc0a9236292a14",
+      "size_bytes": 7228
     },
     {
       "path": "docs/PHASE1_SECURITY_STABILITY_REPORT_2026-10-19.md",
@@ -673,28 +1353,138 @@
     },
     {
       "path": "docs/PHASE1_SECURITY_STABILITY_RUNBOOK.md",
-      "sha256": "2e2df2b00950c5fae65323a9fa4e51d34365b27b960b9e79415d0d7ba23c47bd",
-      "size_bytes": 4678
+      "sha256": "9463e74487eddc9071d3dc2653325054faea1234b6a05e61ad7d12d3bb21c898",
+      "size_bytes": 4723
     },
     {
       "path": "docs/PHASE1_UX_IMPLEMENTATION_REPORT.md",
-      "sha256": "588cd0ec8ac7f62b78dfebd2c5589e2d4dc12dd3d8009d016c067d52150c93d4",
-      "size_bytes": 5510
+      "sha256": "1c7f3c74e5d4969e752311e0c7158c94a6f07ebf5a1305575ce004d9b8354254",
+      "size_bytes": 5981
     },
     {
       "path": "docs/PHASE1_UX_RUNBOOK.md",
-      "sha256": "603f5dd5ce43ab536df9499abc6a364a2ea78bdbb44ee212260992f89d789ebd",
-      "size_bytes": 3266
+      "sha256": "e3d139f284c89f01ffb82a9839cc027013b21467cf6cd9105d7b602dffa3c20e",
+      "size_bytes": 3274
     },
     {
       "path": "docs/PHASE2_PLATFORM_RELEASE_GATE.md",
-      "sha256": "2370f3af4e3c6303ab4f1f5a39031e07d917e4f8970e56be45cb51fe82a8a0ef",
-      "size_bytes": 5801
+      "sha256": "61e9089fe4732cfabee1df9f732dbe3f339985a38cc2f105eca3623d27d6f21f",
+      "size_bytes": 5886
     },
     {
       "path": "docs/PHASE3_ENTRY_CHECKLIST.md",
-      "sha256": "fddc412f2865fbe17f94958c66487fbb1c2b3ad07390b36f74c6226719c431d3",
-      "size_bytes": 3245
+      "sha256": "8d604533639c3f28c76d11db741a786c41c28f740bb6595813db550d4e8cafe0",
+      "size_bytes": 4894
+    },
+    {
+      "path": "docs/PHASE3_TO_PHASE5_HANDOFF_2026-10-23.md",
+      "sha256": "a39a3000fec90529546c0287632a694fba513744dc19846583bd7031afc773d1",
+      "size_bytes": 9083
+    },
+    {
+      "path": "docs/PHASE3_WRITE_PATH_PATCH_2026-10-21.md",
+      "sha256": "f2f3fb3dd8395692c77f795fa94738e79dbc82c6250f7213f9bbb649ca667166",
+      "size_bytes": 2003
+    },
+    {
+      "path": "docs/PHASE4_6_STRATEGY_COVERAGE_2026-10-21.md",
+      "sha256": "3cfe2bae8023010b031219114624fe2ae0a0e8fc28e099b4b589ed364cba82aa",
+      "size_bytes": 4550
+    },
+    {
+      "path": "docs/PHASE4_CLOSEOUT_REPORT_2026-10-21.md",
+      "sha256": "e00edeaafc94f074417b7c47bdd6247656e99be09d7706b8492e0de5926695b8",
+      "size_bytes": 3909
+    },
+    {
+      "path": "docs/PHASE4_KPI_DEFINITIONS.md",
+      "sha256": "e2853f28a354f29dc5a684a213bc56649deb9168a935903fbbeb9e83faea7b6c",
+      "size_bytes": 4687
+    },
+    {
+      "path": "docs/PHASE4_OVERLAY_MANIFEST.json",
+      "sha256": "2307f73cf95c4e2cdd6469c4f99768853fc9ca1945406aa940266f945b70e64a",
+      "size_bytes": 4412
+    },
+    {
+      "path": "docs/PHASE4_OVERLAY_README.md",
+      "sha256": "e9d1a3e15642dc25c1efcab23d185bb08cc0338f4e56aa6b3dc118816dbed380",
+      "size_bytes": 1923
+    },
+    {
+      "path": "docs/PHASE4_RELEASE_ACCEPTANCE_MATRIX.md",
+      "sha256": "128383da7022acb3302b3cd0d78aa9d25c51f3af2803636d0c8805354261ee83",
+      "size_bytes": 4047
+    },
+    {
+      "path": "docs/PHASE4_SOURCE_RECONCILIATION_2026-10-21.md",
+      "sha256": "225844a302f7ad8c62d6aed0f2f68abcc7ced784da391e9d0758a76ab570738e",
+      "size_bytes": 2064
+    },
+    {
+      "path": "docs/PHASE4_UX_RESET_IMPLEMENTATION.md",
+      "sha256": "2681022ab1e1f43c51a050845faf1f81dfe0f4717a4e43e868429867cc925494",
+      "size_bytes": 10018
+    },
+    {
+      "path": "docs/PHASE5_ACCEPTANCE_MATRIX_2026-10-21.md",
+      "sha256": "9f49d003779e254f0463611dc2645c00dc02b7209b5864bdbb316a0b3b5efa20",
+      "size_bytes": 2724
+    },
+    {
+      "path": "docs/PHASE5_ENTRY_BRIEF.md",
+      "sha256": "76dc626fa5596a098b6187988580560ea374c1f718b80206e23625b6e8b4342e",
+      "size_bytes": 3257
+    },
+    {
+      "path": "docs/PHASE5_IMPLEMENTATION_REPORT_2026-10-21.md",
+      "sha256": "0cd6733a864ba9eec2e113d4b93ea62bd273a0284be289e507dde3058a7c814f",
+      "size_bytes": 3903
+    },
+    {
+      "path": "docs/PHASE5_INCREMENT_02_ACCEPTANCE_MATRIX.md",
+      "sha256": "f2506b482143bcc56d3c8a9e78488a50ad90a8569ac01341f07a8c89245de2db",
+      "size_bytes": 2772
+    },
+    {
+      "path": "docs/PHASE5_INCREMENT_02_IMPLEMENTATION_REPORT_2026-10-21.md",
+      "sha256": "ce98c95bc209de04100636114baa34aae503002edb497ff8cb786e4c0fd0411e",
+      "size_bytes": 6447
+    },
+    {
+      "path": "docs/PHASE5_INCREMENT_02_README.md",
+      "sha256": "27ba9a935662cfc688f58b7c49379426f8aa36c87a02678b06b9a1ec138638c7",
+      "size_bytes": 2840
+    },
+    {
+      "path": "docs/PHASE5_INCREMENT_02_SOURCE_MANIFEST.json",
+      "sha256": "d663211714251e62723cfb595cc4788f55c69a0b141cb066efba5b7e87df7c35",
+      "size_bytes": 2079
+    },
+    {
+      "path": "docs/PHASE5_OVERLAY_README.md",
+      "sha256": "27d7993b67ca1e234ea61f9c2e66eb37387dd68724ef0dcc6a568683a9695c16",
+      "size_bytes": 1895
+    },
+    {
+      "path": "docs/PHASE5_SOURCE_MANIFEST.json",
+      "sha256": "130acc2b110dc13edb5899c1cc5d0b93f2846065200ef5ff9c48cc87da96d698",
+      "size_bytes": 5663
+    },
+    {
+      "path": "docs/PHASE5_STAGING_ACCEPTANCE_FIXTURE.example.json",
+      "sha256": "62e07ae63876e447af68ae59975f904f3e9222ace045002635d347aa135dbe14",
+      "size_bytes": 963
+    },
+    {
+      "path": "docs/PHASE6_RUNBOOK.md",
+      "sha256": "6312c2bc63beee0ba565ac2aa4de5afaa9bd13a8a063f978e7b3606ef81e0f25",
+      "size_bytes": 3135
+    },
+    {
+      "path": "docs/PHASE7_STRATEGY_COVERAGE_2026-10-21.md",
+      "sha256": "9de46028bfa676f2eb8b0c78d103b581ef10298f92755a335bbbc979686c3ae0",
+      "size_bytes": 4327
     },
     {
       "path": "docs/PHASE_0_RECOVERY.md",
@@ -782,14 +1572,44 @@
       "size_bytes": 1153
     },
     {
+      "path": "docs/decisions/ADR-DB-001-permanent-replacement-of-lost-migrations.md",
+      "sha256": "660de0c6d0ec91764b38a5c9ac4bdec20e9bb6f109f194155ee28308cb12e101",
+      "size_bytes": 3222
+    },
+    {
+      "path": "docs/research/LEXA_PHASE0_2_UI_UX_RESEARCH_2026-10-20.md",
+      "sha256": "d5a686e845d169939462f5589f5c83e685fea73f24e46899dc679c0edec50b24",
+      "size_bytes": 9392
+    },
+    {
       "path": "docs/research/LEXA_PRODUCT_UX_AI_RESEARCH_AND_INCREMENTAL_ROADMAP_2026-10-13.md",
       "sha256": "3cc6b63c385509f36c62a9e96b5a6524aad38e644d8f2057d3058c4f7e6a6a70",
       "size_bytes": 83862
     },
     {
+      "path": "docs/stage1/IMPLEMENTATION_NOTES.md",
+      "sha256": "7af75f1f7e397dd40c2a1eaccada0fa94b4fecbce33f640cf85d430ee1449774",
+      "size_bytes": 4047
+    },
+    {
+      "path": "docs/stage1/IMPLEMENTATION_REPORT.md",
+      "sha256": "ee23d3f6742ecac577fbe7a91f31e8eea2811e30411464700606d45ccd21b588",
+      "size_bytes": 8566
+    },
+    {
+      "path": "docs/stage1/STAGE1_SOURCE_AND_DEPLOYMENT_PLAN.md",
+      "sha256": "3496c6c6d97a1e9cb14092da03e034cc21dfa4127fd3ef53bfde58b155631db5",
+      "size_bytes": 6748
+    },
+    {
+      "path": "docs/stage1/lexa-zip-extract.yml",
+      "sha256": "c88cfb58d120c8ca1ae2c11d89e3f3cf5330caf0c6c20c649834e1b0f6c71a97",
+      "size_bytes": 7591
+    },
+    {
       "path": "handoff/reference/LEXA_DEEP_DIVE_2026-10-19.md",
-      "sha256": "b7cfd0ab8c01b36d5c57a07dcf4ee3aa91496df31f38f9aa8171ee7c8dc2f6fe",
-      "size_bytes": 5911
+      "sha256": "5387f5156a0cc640ab4916301ed8d941d831d5c7f804ba36e5ba70b3b51b06bd",
+      "size_bytes": 6382
     },
     {
       "path": "handoff/reference/LEXA_First_Increment.patch",
@@ -913,8 +1733,8 @@
     },
     {
       "path": "migrations/021_phase5_analytics_foundation.sql",
-      "sha256": "d26742cfadbb0ae1e1db4563c955dd3271cca4aaceec4a79190feefe27dca298",
-      "size_bytes": 21774
+      "sha256": "44868e8a899d9a96ca059b10f62fa8404d84934d46d0fca214fb43e134fb7614",
+      "size_bytes": 21855
     },
     {
       "path": "migrations/022_phase6a_brain_foundation.sql",
@@ -927,6 +1747,11 @@
       "size_bytes": 15310
     },
     {
+      "path": "migrations/027_release_convergence.sql",
+      "sha256": "404334dde3e34a80d3176b1ba38347eb1def3cc8793f6b52d3a663cbc05b19cd",
+      "size_bytes": 16980
+    },
+    {
       "path": "migrations/028_phase0_auth_rls_runtime_hardening.sql",
       "sha256": "ea167797ded1c7a2bce83027d3ed28a972889909181155965cca5a876010867e",
       "size_bytes": 5975
@@ -937,14 +1762,84 @@
       "size_bytes": 2904
     },
     {
+      "path": "migrations/029_phase3_runtime_privilege_surface.sql",
+      "sha256": "bd7677c11d008ea4b6fac95dbff374cdf9db7f49629c7edbe28a4250e70e6c59",
+      "size_bytes": 1536
+    },
+    {
+      "path": "migrations/030_phase3_workspace_memberships.sql",
+      "sha256": "d626d141963bacf1ba8d0d9d4e89b4a1e6033c1a0f8b77466574ff8fec8374f0",
+      "size_bytes": 9151
+    },
+    {
+      "path": "migrations/031_phase3_auth_surface_rls.sql",
+      "sha256": "0e887fd1f3b56c147d8658fc9f32a0f3804be2c8ffc283a28693ba6953abaa53",
+      "size_bytes": 4083
+    },
+    {
+      "path": "migrations/033_phase5_refund_settlement_consistency.sql",
+      "sha256": "6f18ba14598174004da7626582874464e9929a4e093c7c8ffa034fb868629c6f",
+      "size_bytes": 18671
+    },
+    {
+      "path": "migrations/034_phase5_return_accounting_journals.sql",
+      "sha256": "fb237bfa761512a4b4ed9a7b8e48d4ee4dc6e4aafae9bc4ec7cf2ec2ba715d07",
+      "size_bytes": 11105
+    },
+    {
+      "path": "migrations/035_phase5_none_return_receivable_guard.sql",
+      "sha256": "106147cdbe77cc43d0b06a222715124f17547a430709c17cae067527aa6f89b8",
+      "size_bytes": 6647
+    },
+    {
+      "path": "migrations/036_phase6_inventory_intelligence.sql",
+      "sha256": "dd4ca5dbc869ed1fc8b9133d5ff627c3ba3f78c0e3554f8a419ba994bf8ef723",
+      "size_bytes": 3236
+    },
+    {
+      "path": "migrations/037_phase6_inventory_ageing_index.sql",
+      "sha256": "5aed3b599766199edf4aba1ea8c72eb6f289bc0d3d2ff53bf21d58ca74b461e4",
+      "size_bytes": 506
+    },
+    {
+      "path": "migrations/038_phase6_movement_health_indexes.sql",
+      "sha256": "0fcd8b0b42a13b608f1f96fb4ad7eb8a9f475fc5edb3057491432e0a1c7b69b6",
+      "size_bytes": 1536
+    },
+    {
+      "path": "migrations/039_phase7_supplier_ledger_landed_costs.sql",
+      "sha256": "8997f69c173e50e8aa6cd23fb276bb98fd5ed0ad88695f2e7ee38467477a6179",
+      "size_bytes": 14391
+    },
+    {
+      "path": "migrations/040_phase8_finance_workflows.sql",
+      "sha256": "ae70d3f6b9a332662a85c7b66401e3dc98d585cf12215e062ab6423c655e1f9c",
+      "size_bytes": 18326
+    },
+    {
+      "path": "migrations/041_commerce_integrity_scaling.sql",
+      "sha256": "72deff0ddebfbb9c59af3b01340ca9c7db08f16fe696f44701ff1bb00eeb3280",
+      "size_bytes": 30122
+    },
+    {
+      "path": "migrations/042_team_chat_foundation.sql",
+      "sha256": "f9a5b89d768e9fe44de5af38f2c1e352b99bea99d0ae3f7d3bd72864303dd9cb",
+      "size_bytes": 6432
+    },
+    {
+      "path": "migrations/043_phase5_journal_currency_guard.sql",
+      "sha256": "654199aaaffd02b3a1135bbfc61296ed432c1d73f0e0de55f234cb57c5312772",
+      "size_bytes": 2942
+    },
+    {
       "path": "migrations/README.md",
-      "sha256": "5b9b7a391b2d66155f5fbae86dcaae5c5156390a08aa6b8bf70ad2b7d7bbb3a5",
-      "size_bytes": 3950
+      "sha256": "024d304c27a0f4fe119bc1c12e0d26beb4c065abfdaf41761e29785c10eca9cc",
+      "size_bytes": 3872
     },
     {
       "path": "migrations/SOURCE_RECOVERY.md",
-      "sha256": "85e991e0261318fea84b368843a52bd95f619888ce5fcc9aed31820a210ac2fc",
-      "size_bytes": 3305
+      "sha256": "1dcb9f7bc3ea3b7fe46e0e911d555f0ed7d2e7f40bc98bb14070ac9ee71ca240",
+      "size_bytes": 5944
     },
     {
       "path": "migrations/live_ledger_snapshot_2026-10-13.json",
@@ -957,9 +1852,99 @@
       "size_bytes": 4042
     },
     {
+      "path": "migrations/live_ledger_snapshot_2026-10-21.json",
+      "sha256": "ef05e08e7353acd9f8cb534a6f9d2b3ee14dc01d1dae0c85bb850e45ab945793",
+      "size_bytes": 4592
+    },
+    {
+      "path": "migrations/migration_dispositions.json",
+      "sha256": "3303ea9d395cfd13656c39f644a8c123b475aa8659918a95c398a260fa506986",
+      "size_bytes": 5683
+    },
+    {
+      "path": "migrations/reconstructed/004_catalog_and_rbac_hardening.replay-equivalent.sql",
+      "sha256": "1bfef40d29727cfe8877c35543cbe58a5b9884751045f88fe9d973800eca3529",
+      "size_bytes": 12716
+    },
+    {
+      "path": "migrations/reconstructed/005a_phase0_outbox_contract_reconciliation.replay-only.sql",
+      "sha256": "bb0b471e47ef5ed7734bfb2c4327f20a75bf8c0f0effbbd2d4eba11fd8b084ef",
+      "size_bytes": 4609
+    },
+    {
+      "path": "migrations/reconstructed/010_phase2_catalog_intelligence.equivalent.sql",
+      "sha256": "a1d414eb36186e28fbc24e3fd2274b9eae688b0e0f5556b83ce53430649c8d8e",
+      "size_bytes": 10522
+    },
+    {
+      "path": "migrations/reconstructed/011_phase2_catalog_runtime_constraints.equivalent.sql",
+      "sha256": "650aad6e622bc230b6ea85575bc2eed52e5387085f3d718e97ec162bfdc4e1b8",
+      "size_bytes": 8129
+    },
+    {
+      "path": "migrations/reconstructed/016_payments_tenant_identity_compatibility.equivalent.sql",
+      "sha256": "690d7279944f5a395c0b37958cd8a94994524177633e2c3e95e3de7e2dc95d19",
+      "size_bytes": 452
+    },
+    {
+      "path": "migrations/reconstructed/021_phase5_analytics_foundation.decoded-malformed-copy.sql",
+      "sha256": "bc50a9430919310dc371a1557f1912336328144c6ba2cb845a2e527416ac74d7",
+      "size_bytes": 21672
+    },
+    {
+      "path": "migrations/reconstructed/021_phase5_analytics_foundation.repair-candidate.sql",
+      "sha256": "44868e8a899d9a96ca059b10f62fa8404d84934d46d0fca214fb43e134fb7614",
+      "size_bytes": 21855
+    },
+    {
+      "path": "migrations/reconstructed/023_phase4_purchasing_core.equivalent.sql",
+      "sha256": "f1631d11e65e7b3dc6d9d755b57cb7449139762cd6004b7a1146fc0cfdbe16e2",
+      "size_bytes": 13582
+    },
+    {
+      "path": "migrations/reconstructed/024_phase4_purchasing_security.equivalent.sql",
+      "sha256": "696365a93831c30b98b89884ad59c0950949bfd21514cdf3ae0a98a74ccc1419",
+      "size_bytes": 2353
+    },
+    {
+      "path": "migrations/reconstructed/025_phase4_purchasing_permissions.equivalent.sql",
+      "sha256": "71777cb9740f55bd1f52bfa3c7a11bc677b5958216aad319a19a32f7dfbe09ad",
+      "size_bytes": 1193
+    },
+    {
+      "path": "migrations/reconstructed/025a_phase2_membership_branch_contract_reconciliation.replay-only.sql",
+      "sha256": "ff7ccc94249c6b7aa95ecc75c54a201e9a8f3875f280d3c03ca329cabbac1b74",
+      "size_bytes": 2826
+    },
+    {
+      "path": "migrations/reconstructed/026_phase4_membership_branch_integrity.equivalent.sql",
+      "sha256": "992be2a5c405ccfea2ead9aa2fcce0d45240aee27618de64e0952aaa76691cec",
+      "size_bytes": 2082
+    },
+    {
+      "path": "migrations/reconstructed/README.md",
+      "sha256": "76c7dc6cfdb69c3e7b43a23aebcac7ff41cd8df21595af0e0e416fe5471a36e4",
+      "size_bytes": 1566
+    },
+    {
+      "path": "migrations/reconstructed/clean_replay_order.json",
+      "sha256": "c2b03f41e76cdca5ac4149ca70edc0863216f3fec6a5cdb3b171be8c07741e7d",
+      "size_bytes": 8873
+    },
+    {
+      "path": "migrations/reconstructed/schema_observation_compatibility.equivalent.sql",
+      "sha256": "36e31c3877f19efcbf8db556c6566850b0fed1aa87f3d7845c4f11cebb82aa72",
+      "size_bytes": 7753
+    },
+    {
+      "path": "migrations/reconstructed_source_manifest.json",
+      "sha256": "f2f27d4d2feb5f87a40cdae3e50677af28920da64b19fdb2630d646e1709b1d0",
+      "size_bytes": 10613
+    },
+    {
       "path": "migrations/source_gaps.json",
-      "sha256": "551ab9a21374818b505b6c7556025791d2eaa158cdb1ef9aaac550c459f16584",
-      "size_bytes": 3286
+      "sha256": "98199d8047736dcbdd2aabcd068c796f195b07e530dc8bb027fdf3a15b652292",
+      "size_bytes": 7376
     },
     {
       "path": "pytest.ini",
@@ -968,8 +1953,33 @@
     },
     {
       "path": "render.yaml",
-      "sha256": "4ace0cfdf67bd8675d93ce693b4cfa8db7110ae9f0a40b0153bc453ba0e9cee8",
-      "size_bytes": 1012
+      "sha256": "ca0b0121d3ff6ee2abf120d5b08551b41ad5c56fa77c329bd8560d1b53003a63",
+      "size_bytes": 1085
+    },
+    {
+      "path": "reports/LEXA_Historical_ZIP_Recovery_Scan_2026-10-20.json",
+      "sha256": "2a8241c2f4e1cf2185e8d771c5ae5e12e967d730acfab10186e0a99c40da430d",
+      "size_bytes": 784
+    },
+    {
+      "path": "reports/LEXA_Isolated_Schema_Replay_Diff_2026-10-20.json",
+      "sha256": "e1f2a2e0aa5071dc2221071308a549426307f26e543b7d564420e5a20781c4cc",
+      "size_bytes": 3457
+    },
+    {
+      "path": "reports/LEXA_Phase0-2_Closure_Increment_08_2026-10-20.md",
+      "sha256": "ce8b85e6a960419f2d60792a6fa7916caa138e5179b8fc044ac4960f42037461",
+      "size_bytes": 11080
+    },
+    {
+      "path": "reports/LEXA_Phase2_Validation_Results_2026-10-20.json",
+      "sha256": "2680d5eeb07d6b2262db064423e9b07ed20c7e4791f8c6aff88bc2664e1fd4a2",
+      "size_bytes": 5720
+    },
+    {
+      "path": "reports/PATCH_APPLY_INSTRUCTIONS.md",
+      "sha256": "97d9b9c2e1c0f23ae5c16d61b8b53c9daa9645520daa9dd37c0230803918171b",
+      "size_bytes": 1568
     },
     {
       "path": "scripts/apply-deletion-manifest.sh",
@@ -977,14 +1987,34 @@
       "size_bytes": 697
     },
     {
+      "path": "scripts/audit_frontend_actions.mjs",
+      "sha256": "292ec77f3d8e505c5d7f91a71e1903ff2110607fdd27b3b445ff22ac6376c183",
+      "size_bytes": 5188
+    },
+    {
       "path": "scripts/backup-neon.sh",
       "sha256": "248d05e74df3329d1aa59f535b5fbfb285c77b60592aeee57af7c09e61c9f1f9",
       "size_bytes": 463
     },
     {
+      "path": "scripts/build_phase0_3_replay_candidates.py",
+      "sha256": "f68e88723edfb39a64774f700435a29dcba1bdf7c5cc19a9a382f2aa42ec4192",
+      "size_bytes": 5709
+    },
+    {
+      "path": "scripts/check_migration_recovery_manifest.py",
+      "sha256": "2e4efad0ee4a11eb76a631240d2e0d4d8d56f27c8c74a7aaecbdca76d42f5440",
+      "size_bytes": 6405
+    },
+    {
       "path": "scripts/check_migration_sources.py",
-      "sha256": "f928b095137fcf9a1f8c1e3b12ebe0c4be4d370159c559dac5dde83c4f7581cc",
-      "size_bytes": 3501
+      "sha256": "6b703124110078c5f7d0a70c5a40a5908f7c4ee456e1490f6702d08c59de0534",
+      "size_bytes": 9867
+    },
+    {
+      "path": "scripts/check_phase6_replay_evidence.py",
+      "sha256": "7c400faba575b5b81d0ffd75adf70dae49deabb35513a7b06effb5d1465b7f19",
+      "size_bytes": 8003
     },
     {
       "path": "scripts/cleanup-obsolete-frontend-routes.sh",
@@ -992,9 +2022,34 @@
       "size_bytes": 983
     },
     {
+      "path": "scripts/generate_phase345_release_gate.py",
+      "sha256": "787e6b4295cfe0a724332a1f7b22cc499202396e56628d9ab1dc9e7b4d483308",
+      "size_bytes": 3040
+    },
+    {
+      "path": "scripts/generate_phase6_ci_gate_evidence.py",
+      "sha256": "05220f4ba13277b8d95d5ec27c78c51a11a674f9660b43e04b75e696edc77557",
+      "size_bytes": 2874
+    },
+    {
       "path": "scripts/package_phase2_zip.py",
       "sha256": "d1cc03e8ef1036bcbbeb7af559e63d24c3d7908f8abe4b7377ffa9f32f63d510",
       "size_bytes": 7471
+    },
+    {
+      "path": "scripts/package_phase4_6_completeness.py",
+      "sha256": "94767a92c98109aea246aa0606ddef4a86e92b2b753e884016b34bfc0631e0cc",
+      "size_bytes": 7644
+    },
+    {
+      "path": "scripts/run_clean_migration_replay.py",
+      "sha256": "80069bc8027c387b7be59ad1d511aef2354457786594634b3073641625e33be4",
+      "size_bytes": 29030
+    },
+    {
+      "path": "scripts/run_stage4_stage5_acceptance.sh",
+      "sha256": "562a4314d17f02e1644136eb899f8eae6196002eaa163d45ca190a316571b412",
+      "size_bytes": 4165
     },
     {
       "path": "scripts/smoke_phase0.py",
@@ -1048,8 +2103,28 @@
     },
     {
       "path": "tests/integration/test_phase5_analytics_contract.py",
-      "sha256": "1c103e0729b184535b29ec950ee603a03a9d411d7f27ba493b7246cca3260e5f",
-      "size_bytes": 1146
+      "sha256": "66e4756a7578e1ca9d4517b2f4d4ae34ee1496ba016dfecef132ef2220baf813",
+      "size_bytes": 1144
+    },
+    {
+      "path": "tests/test_migration_recovery_manifest.py",
+      "sha256": "5bbf63e55350e6628bb22dee6c133f1f5c66f86bbc8f3b63fff5703b3f35e25e",
+      "size_bytes": 1307
+    },
+    {
+      "path": "tests/test_phase4_6_completeness_contract.py",
+      "sha256": "b7b7caa9e785b11f2ae39cca7b7a79b8af145f1d9be8e956027b058ea465a3e6",
+      "size_bytes": 3910
+    },
+    {
+      "path": "tests/test_stage1_canonical_source_contract.py",
+      "sha256": "ab6dc5c4d3a00fa894c4bf2a4bfbb0fc75fc8065e6f79839ea48a014b03b9454",
+      "size_bytes": 1470
+    },
+    {
+      "path": "tests/unit/test_analytics_currency_contract.py",
+      "sha256": "31f1309ee0304f71a553a97993d2aeaf84462b006db2b144501a9e16cb28bd43",
+      "size_bytes": 881
     },
     {
       "path": "tests/unit/test_auth_registration_contract.py",
@@ -1068,18 +2143,18 @@
     },
     {
       "path": "tests/unit/test_deployment_audit.py",
-      "sha256": "7dca872aa8d7ef1960e738c1dbd59dfbf97c78d17b434c9935b7eda99a0232c5",
-      "size_bytes": 5018
+      "sha256": "cdf6b7357ba7b6ae117363bc772f6ce0fd8483a0460dbe7c8be0fe4321eb46b6",
+      "size_bytes": 5019
     },
     {
       "path": "tests/unit/test_dev_session_contract.py",
-      "sha256": "407ccdf972449bcb2d9199a847c1d46dac0e0c1c37726c54f16691dafc99f439",
-      "size_bytes": 1768
+      "sha256": "ef9c1f07ffebd5e376dc7a92e91cfe22f400a3e93d0f7186525fc9a0e538c5a7",
+      "size_bytes": 2117
     },
     {
       "path": "tests/unit/test_frontend_customer_language.py",
-      "sha256": "3d308e7adc8ed40f65f37548d8fdc92ddfac9d85db2b0e77e3f815765b632c7a",
-      "size_bytes": 2398
+      "sha256": "953b37110f7e38c85cf1ca7858f5ae42862d1ccb63a14929b1e18b936c140c90",
+      "size_bytes": 2399
     },
     {
       "path": "tests/unit/test_importable_contract.py",
@@ -1092,14 +2167,19 @@
       "size_bytes": 3118
     },
     {
+      "path": "tests/unit/test_login_workspace_context_source_contract.py",
+      "sha256": "00e2b32622467358e71103d301a3f075b62ba4c6d428dc1f59ca299afab017b7",
+      "size_bytes": 1682
+    },
+    {
       "path": "tests/unit/test_migration_source_integrity.py",
-      "sha256": "1be4048fe0f4663216434609eaf89fb512a49eb9fa89ca8b32cd6fb3e7ad95b9",
-      "size_bytes": 2801
+      "sha256": "18ceec1ad83eefdf8150cd7a9799ade44edc30a0dc341743bdc4210fb14d71e9",
+      "size_bytes": 7480
     },
     {
       "path": "tests/unit/test_phase0_readiness_contract.py",
-      "sha256": "d581ec95853bae1fb088773ebc07152ede857ff56cad95333019204808f2eef6",
-      "size_bytes": 3196
+      "sha256": "cb1f105063286de3ac4d6addd44a35d7a3fd8de387e3bc167aef1c903746c68e",
+      "size_bytes": 4251
     },
     {
       "path": "tests/unit/test_phase0_smoke_script.py",
@@ -1110,6 +2190,11 @@
       "path": "tests/unit/test_phase1_business_kernel_contract.py",
       "sha256": "3bd7e9b52fe720c82e73dab5fe1e6ad638eb84e8479781a82c9986acfc5f8a8f",
       "size_bytes": 1661
+    },
+    {
+      "path": "tests/unit/test_phase345_release_gate.py",
+      "sha256": "a7cebf9828c304ebf53cac1d39703556237e494039b85510e4477383e1e20560",
+      "size_bytes": 2144
     },
     {
       "path": "tests/unit/test_phase3_inventory_readiness_contract.py",
@@ -1123,8 +2208,8 @@
     },
     {
       "path": "tests/unit/test_phase4a_frontend_contract.py",
-      "sha256": "be45b2ac476f324deb7a0a9e7ad36c4c2c6232846822373b7d1077c49415c086",
-      "size_bytes": 1172
+      "sha256": "cc395d8ceec03b15b307d664293ffd9fdb3a13aa4c677c6238b9bd837e82aeb0",
+      "size_bytes": 1343
     },
     {
       "path": "tests/unit/test_phase4b_accounting_contract.py",
@@ -1132,12 +2217,17 @@
       "size_bytes": 2302
     },
     {
+      "path": "tests/unit/test_phase8_foundation_contract.py",
+      "sha256": "430b5f937913549848feec17684e31b613cdb707b786f20eb1b33954f69c44db",
+      "size_bytes": 2925
+    },
+    {
       "path": "tsconfig.contract.json",
       "sha256": "bc38eb243806e2fd8dee3b03aa2bb1719eb2d350e680cb0259906c1ffbfebc9d",
       "size_bytes": 336
     }
   ],
-  "files_included": 223,
+  "files_included": 441,
   "increment": "05",
   "manifest_version": 2,
   "project": "LEXA"

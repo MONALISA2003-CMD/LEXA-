@@ -9,6 +9,7 @@ test('internal team chat is connected to real tenant/branch-scoped API calls', (
   const page = read('app/team-chat/page.tsx');
   const api = read('lib/api.ts');
   const shell = read('components/app-shell.tsx');
+  const navigation = read('lib/navigation.mjs');
   assert.match(page, /getTeamConversations/);
   assert.match(page, /getTeamMessages/);
   assert.match(page, /sendTeamMessage/);
@@ -16,7 +17,7 @@ test('internal team chat is connected to real tenant/branch-scoped API calls', (
   assert.match(page, /Updates every 12 seconds/);
   assert.match(page, /Branch conversations are visible only to team members assigned to that branch/);
   assert.match(api, /postIdempotent<TeamMessage>/);
-  assert.match(shell, /\["\/team-chat", "Team chat", "chat"\]/);
+  assert.match(navigation, /\["\/team-chat", "Team chat", "chat"\]/);
 });
 
 test('chat has responsive layout, bounded messages and no AI/external provider claim', () => {

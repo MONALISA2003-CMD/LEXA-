@@ -40,9 +40,10 @@ test("business insights use saved sales and inventory information with clear emp
 
 test("navigation exposes core business work without presenting insights as an action workflow", () => {
   const shell = read("components/app-shell.tsx");
-  assert.match(shell, /\["\/reports", "Reports"/);
+  const navigation = read("lib/navigation.mjs");
+  assert.match(navigation, /\["\/reports", "Reports"/);
   assert.match(shell, /Business reports/);
-  assert.doesNotMatch(shell, /\["\/intelligence"/);
+  assert.doesNotMatch(navigation.split("export const secondaryNavigation")[0], /\["\/intelligence"/);
   assert.doesNotMatch(shell, /v2\.9\.0/);
   assert.match(shell, /Search takes you to the right part of LEXA using saved business records|Search takes you to the right part of your business using your saved records/);
 });

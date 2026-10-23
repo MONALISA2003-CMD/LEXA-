@@ -6,6 +6,7 @@ const read = (path) => fs.readFileSync(new URL(path, root), "utf8");
 const home = read("app/page.tsx");
 const api = read("lib/api.ts");
 const shell = read("components/app-shell.tsx");
+const navigation = read("lib/navigation.mjs");
 const styles = read("app/globals.css");
 const routeTests = fs.readFileSync(new URL("../../apps/api/tests/test_stage2_cross_module_contracts.py", root), "utf8");
 
@@ -16,7 +17,7 @@ assert.match(home, /getPurchasingSummary\(\)/);
 assert.match(home, /supplier_balances_by_currency\.find/);
 assert.match(home, /purchasingSummaryState === "error".*Unavailable/s);
 assert.match(api, /export type PurchasingSummary/);
-assert.match(shell, /Business details/);
+assert.match(navigation, /Business details/);
 assert.match(shell, /Finish business setup/);
 assert.match(styles, /--emerald: #10B981/);
 assert.match(styles, /--teal: #13B8B0/);

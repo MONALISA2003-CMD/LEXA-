@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import Link from "next/link";
 import type { AnalyticsDailyMetric } from "../lib/api";
 
 const money = (value: string | number, currencyCode?: string | null) => {
@@ -150,7 +151,7 @@ export function ProductPerformanceBars({ rows, currencyCode }: {
   if (!safeRows.length) return <div className="chart-empty-state"><strong>No product sales in this period</strong><span>Product comparisons will appear after sales are recorded.</span></div>;
   return <div className="product-comparison-bars" role="list" aria-label="Product sales comparison">
     {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
-      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || ""}</small></div>
+      <div className="product-comparison-label">{row.href ? <Link className="report-record-link" href={row.href}>{row.label}</Link> : <strong>{row.label}</strong>}<small>{row.detail || ""}</small></div>
       <div className="product-comparison-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
       <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
     </div>)}
@@ -168,7 +169,7 @@ export function ExpenseCategoryBars({ rows, currencyCode }: {
   if (!safeRows.length) return <div className="chart-empty-state"><strong>No recorded expenses in this period</strong><span>Expense categories will appear here after an expense is recorded.</span></div>;
   return <div className="product-comparison-bars" role="list" aria-label="Expenses by category">
     {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
-      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || "Recorded expenses"}</small></div>
+      <div className="product-comparison-label">{row.href ? <Link className="report-record-link" href={row.href}>{row.label}</Link> : <strong>{row.label}</strong>}<small>{row.detail || "Recorded expenses"}</small></div>
       <div className="product-comparison-track expense-comparison-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
       <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
     </div>)}
@@ -186,7 +187,7 @@ export function PaymentMethodBars({ rows, currencyCode }: {
   if (!safeRows.length) return <div className="chart-empty-state"><strong>No recorded payments in this period</strong><span>Payment methods will appear here after customer payments are recorded.</span></div>;
   return <div className="product-comparison-bars" role="list" aria-label="Money recorded by payment method">
     {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
-      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || "Recorded customer payments"}</small></div>
+      <div className="product-comparison-label">{row.href ? <Link className="report-record-link" href={row.href}>{row.label}</Link> : <strong>{row.label}</strong>}<small>{row.detail || "Recorded customer payments"}</small></div>
       <div className="product-comparison-track payment-method-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
       <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
     </div>)}
@@ -204,7 +205,7 @@ export function StockValueByLocationBars({ rows, currencyCode }: {
   if (!safeRows.length) return <div className="chart-empty-state"><strong>No current stock value to compare</strong><span>Location values will appear after stock has been recorded and cost information is available.</span></div>;
   return <div className="product-comparison-bars" role="list" aria-label="Stock value by location">
     {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
-      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || "Current stock snapshot"}</small></div>
+      <div className="product-comparison-label">{row.href ? <Link className="report-record-link" href={row.href}>{row.label}</Link> : <strong>{row.label}</strong>}<small>{row.detail || "Current stock snapshot"}</small></div>
       <div className="product-comparison-track stock-value-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
       <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
     </div>)}
@@ -221,7 +222,7 @@ export function CustomerBalanceBars({ rows, currencyCode }: {
   if (!safeRows.length) return <div className="chart-empty-state"><strong>No outstanding customer balances</strong><span>Balances will appear here when customers have an amount remaining to pay.</span></div>;
   return <div className="product-comparison-bars" role="list" aria-label="Outstanding customer balances">
     {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
-      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || "Amount remaining"}</small></div>
+      <div className="product-comparison-label">{row.href ? <Link className="report-record-link" href={row.href}>{row.label}</Link> : <strong>{row.label}</strong>}<small>{row.detail || "Amount remaining"}</small></div>
       <div className="product-comparison-track customer-balance-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, row.value / maxValue * 100))}%` }} /></div>
       <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
     </div>)}
@@ -238,7 +239,7 @@ export function BranchPerformanceBars({ rows, currencyCode }: {
   if (!safeRows.length) return <div className="chart-empty-state"><strong>No location sales in this period</strong><span>Location comparisons will appear when completed sales are recorded for accessible locations.</span></div>;
   return <div className="product-comparison-bars" role="list" aria-label="Sales by business location">
     {safeRows.map((row, index) => <div className="product-comparison-row" role="listitem" key={`${row.label}-${index}`}>
-      <div className="product-comparison-label">{row.href ? <a className="report-record-link" href={row.href}>{row.label}</a> : <strong>{row.label}</strong>}<small>{row.detail || "Sales after returns"}</small></div>
+      <div className="product-comparison-label">{row.href ? <Link className="report-record-link" href={row.href}>{row.label}</Link> : <strong>{row.label}</strong>}<small>{row.detail || "Sales after returns"}</small></div>
       <div className="product-comparison-track branch-performance-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, Math.max(0, row.value) / maxValue * 100))}%` }} /></div>
       <b className="product-comparison-value">{money(row.value, currencyCode)}</b>
     </div>)}

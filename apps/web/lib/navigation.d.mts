@@ -1,1 +1,10 @@
+export type WorkspaceNavigationItem = readonly [href: string, label: string, icon: string];
+export type WorkspaceSearchSuggestion = readonly [label: string, href: string];
+export const primaryNavigation: WorkspaceNavigationItem[];
+export const quickNavigation: WorkspaceNavigationItem[];
+export const secondaryNavigation: WorkspaceNavigationItem[];
+export const workspaceSearchSuggestions: WorkspaceSearchSuggestion[];
+export const applicationRoutes: string[];
+export function isRouteActive(pathname: string, href: string): boolean;
+export function resolveBusinessSearchDestination(query: string): string;
 export function safeReturnPath(next: string | null, currentOrigin: string): string;

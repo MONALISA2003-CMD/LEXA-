@@ -38,7 +38,7 @@ assert.match(reports, /BranchPerformanceBars/);
 assert.match(reports, /href={`\/sales\?view=history&start_date=/);
 assert.match(reports, /payment_channel_id=/);
 assert.match(charts, /role="list" aria-label="Product sales comparison"/);
-assert.match(charts, /row.href \? <a className="report-record-link"/);
+assert.match(charts, /<Link className="report-record-link" href=\{row.href\}>/);
 assert.match(sales, /payment_channel_id: salesPaymentChannelId/);
 assert.match(sales, /Payment method<select value={salesPaymentChannelId}/);
 assert.match(sales, /query.get\("start_date"\)/);
