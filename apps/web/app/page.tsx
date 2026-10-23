@@ -78,18 +78,24 @@ export default function HomePage() {
   const [readinessState, setReadinessState] = useState<LoadState>("loading");
   const [message, setMessage] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
+  const [analyticsRefreshVersion, setAnalyticsRefreshVersion] = useState(0);
   const analyticsRequest = useRef(0);
-  const periodEffectMounted = useRef(false);
+  const lastAnalyticsKey = useRef("");
+  const operationalRefreshInFlight = useRef(false);
 
   const busy = [dashboardState, analyticsState, productsState, inventorySummaryState, purchasingSummaryState, adjustmentsState, countsState, transfersState, readinessState].some(state => state === "loading");
   const selectedRange = useMemo(() => rangeFor(analyticsPeriod, dashboard?.business_date ?? today()), [analyticsPeriod, dashboard?.business_date, dashboard?.currency_code]);
 
-  async function loadAnalyticsRange(period: DashboardPeriod, businessDate = dashboard?.business_date ?? today()) {
+  async function loadAnalyticsRange(
+    period: DashboardPeriod,
+    businessDate = dashboard?.business_date ?? today(),
+    currencyOverride = businessCurrency,
+  ) {
     const requestId = ++analyticsRequest.current;
     const range = rangeFor(period, businessDate);
     setAnalyticsState("loading");
     setProductsState("loading");
-    const currencyCode = businessCurrency;
+    const currencyCode = currencyOverride;
     if (!currencyCode || !/^[A-Z]{3}$/.test(currencyCode)) {
       setAnalytics(null); setAnalyticsState("error");
       setProductMetrics([]); setProductsState("error");
@@ -134,18 +140,38 @@ export default function HomePage() {
   }
 
   async function load() {
-    await Promise.all([loadOperationalData(), loadAnalyticsRange(analyticsPeriod)]);
+    if (operationalRefreshInFlight.current) return;
+    operationalRefreshInFlight.current = true;
+    setAnalyticsState("loading");
+    setProductsState("loading");
+    try {
+      await loadOperationalData();
+    } finally {
+      // Wait until the dashboard date and profile currency have settled, then
+      // let one keyed effect refresh analytics. This avoids duplicate overview /
+      // product requests when profile and dashboard responses arrive separately.
+      operationalRefreshInFlight.current = false;
+      setAnalyticsRefreshVersion(version => version + 1);
+    }
     setLastUpdatedAt(new Intl.DateTimeFormat("en-UG", { hour: "2-digit", minute: "2-digit" }).format(new Date()));
   }
 
   useEffect(() => { void load(); }, []);
   useEffect(() => {
-    if (!periodEffectMounted.current) { periodEffectMounted.current = true; return; }
-    void loadAnalyticsRange(analyticsPeriod);
-  }, [analyticsPeriod]);
-  useEffect(() => {
-    if (dashboard?.business_date || businessCurrency) void loadAnalyticsRange(analyticsPeriod, dashboard?.business_date ?? today());
-  }, [dashboard?.business_date, dashboard?.currency_code, businessCurrency]);
+    if (operationalRefreshInFlight.current || dashboardState === "loading") return;
+    const currencyCode = businessCurrency;
+    if (!currencyCode || !/^[A-Z]{3}$/.test(currencyCode)) {
+      analyticsRequest.current += 1;
+      setAnalytics(null); setAnalyticsState("error");
+      setProductMetrics([]); setProductsState("error");
+      return;
+    }
+    const businessDate = dashboard?.business_date ?? today();
+    const key = `${analyticsRefreshVersion}:${analyticsPeriod}:${businessDate}:${currencyCode}`;
+    if (lastAnalyticsKey.current === key) return;
+    lastAnalyticsKey.current = key;
+    void loadAnalyticsRange(analyticsPeriod, businessDate, currencyCode);
+  }, [analyticsPeriod, businessCurrency, dashboard?.business_date, dashboardState, analyticsRefreshVersion]);
   useEffect(() => {
     const query = new URLSearchParams(window.location.search).get("q");
     if (query) setMessage(`Search for: ${query}`);

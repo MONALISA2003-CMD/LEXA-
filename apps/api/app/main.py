@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 from .config import settings
 from .performance import elapsed_ms, format_server_timing, is_slow_request
+from .telemetry import RequestTelemetry, bind_request_telemetry, reset_request_telemetry
 from .health import check_database, check_redis
 from .routes import auth, organization, rbac, catalog, inventory, commerce, finance, analytics, workspace_context, membership_admin, purchasing, team_chat
 from .kernel import router as kernel_router
@@ -54,6 +55,8 @@ async def request_id_middleware(request: Request, call_next):
     except ValueError:
         request_id = str(uuid4())
     request.state.request_id = request_id
+    telemetry = RequestTelemetry(request_id=request_id)
+    telemetry_token = bind_request_telemetry(telemetry)
     started_at = time.perf_counter()
     unhandled_error = False
     try:
@@ -62,28 +65,39 @@ async def request_id_middleware(request: Request, call_next):
         unhandled_error = True
         logger.exception("unhandled_request_error", extra={"request_id": request_id, "path": request.url.path, "method": request.method})
         response = JSONResponse(status_code=500, content={"detail": {"code": "INTERNAL_ERROR", "message": "LEXA could not complete the request.", "request_id": request_id}})
+    finally:
+        reset_request_telemetry(telemetry_token)
     duration_ms = elapsed_ms(started_at, time.perf_counter())
     response.headers["X-Request-ID"] = request_id
-    response.headers["Server-Timing"] = format_server_timing(duration_ms)
+    response.headers["Server-Timing"] = format_server_timing(
+        duration_ms,
+        db_duration_ms=telemetry.db_duration_ms,
+        db_query_count=telemetry.db_query_count,
+    )
     request_log_context = {
         "request_id": request_id,
         "path": request.url.path,
         "method": request.method,
         "status_code": response.status_code,
         "duration_ms": duration_ms,
+        "db_query_count": telemetry.db_query_count,
+        "db_duration_ms": telemetry.db_duration_ms,
+        "slow_db_query_count": telemetry.slow_db_query_count,
     }
     # Keep routine traffic quiet. Slow requests and handled 5xx responses remain
     # discoverable without logging URLs, query values, request bodies or secrets.
     if is_slow_request(duration_ms):
         logger.warning(
-            "slow_request request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f",
+            "slow_request request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f db_duration_ms=%.2f db_query_count=%s slow_db_query_count=%s",
             request_id, request.method, request.url.path, response.status_code, duration_ms,
+            telemetry.db_duration_ms, telemetry.db_query_count, telemetry.slow_db_query_count,
             extra=request_log_context,
         )
     if response.status_code >= 500 and not unhandled_error:
         logger.error(
-            "request_failed_5xx request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f",
+            "request_failed_5xx request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f db_duration_ms=%.2f db_query_count=%s slow_db_query_count=%s",
             request_id, request.method, request.url.path, response.status_code, duration_ms,
+            telemetry.db_duration_ms, telemetry.db_query_count, telemetry.slow_db_query_count,
             extra=request_log_context,
         )
     return response

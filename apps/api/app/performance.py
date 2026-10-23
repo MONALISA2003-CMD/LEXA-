@@ -26,15 +26,30 @@ def elapsed_ms(started_at: float, finished_at: float) -> float:
     return round(max(0.0, duration), 2)
 
 
-def format_server_timing(duration_ms: float) -> str:
-    """Format the app-only timing value for the standard Server-Timing header."""
+def format_server_timing(
+    duration_ms: float, *, db_duration_ms: float | None = None, db_query_count: int = 0
+) -> str:
+    """Format application and aggregate database timings for Server-Timing."""
     try:
         duration = float(duration_ms)
     except (TypeError, ValueError):
         duration = 0.0
     if not math.isfinite(duration):
         duration = 0.0
-    return f"api;dur={max(0.0, duration):.2f}"
+    metrics = [f"api;dur={max(0.0, duration):.2f}"]
+    if db_query_count > 0:
+        try:
+            db_duration = float(db_duration_ms or 0.0)
+        except (TypeError, ValueError):
+            db_duration = 0.0
+        if not math.isfinite(db_duration):
+            db_duration = 0.0
+        # Query count is a useful diagnostic descriptor; no SQL or business data
+        # is exposed in response headers.
+        metrics.append(
+            f'db;dur={max(0.0, db_duration):.2f};desc="{max(0, int(db_query_count))} queries"'
+        )
+    return ", ".join(metrics)
 
 
 def is_slow_request(duration_ms: float, threshold_ms: int | None = None) -> bool:

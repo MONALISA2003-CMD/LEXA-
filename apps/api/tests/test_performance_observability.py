@@ -22,6 +22,8 @@ def test_server_timing_header_is_safe_and_uses_api_metric_name():
     assert format_server_timing(14.237) == "api;dur=14.24"
     assert format_server_timing(-1) == "api;dur=0.00"
     assert format_server_timing(float("nan")) == "api;dur=0.00"
+    assert format_server_timing(22, db_duration_ms=4.5, db_query_count=3) == 'api;dur=22.00, db;dur=4.50;desc="3 queries"'
+    assert format_server_timing(22, db_duration_ms=float("inf"), db_query_count=1) == 'api;dur=22.00, db;dur=0.00;desc="1 queries"'
 
 
 def test_slow_request_threshold_is_bounded_and_invalid_values_fall_back(monkeypatch):
@@ -44,9 +46,12 @@ def test_slow_request_decision_respects_threshold_and_ignores_non_finite_values(
 def test_api_middleware_adds_timing_without_logging_request_contents():
     source = (API_ROOT / "app" / "main.py").read_text(encoding="utf-8")
     assert "started_at = time.perf_counter()" in source
-    assert 'response.headers["Server-Timing"] = format_server_timing(duration_ms)' in source
-    assert '"slow_request request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f"' in source
-    assert '"request_failed_5xx request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f"' in source
+    assert 'response.headers["Server-Timing"] = format_server_timing(' in source
+    assert "db_duration_ms=telemetry.db_duration_ms" in source
+    assert '"slow_request request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f db_duration_ms=%.2f db_query_count=%s slow_db_query_count=%s"' in source
+    assert '"request_failed_5xx request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f db_duration_ms=%.2f db_query_count=%s slow_db_query_count=%s"' in source
+    assert "RequestTelemetry(request_id=request_id)" in source
+    assert "db_query_count=telemetry.db_query_count" in source
     assert '"path": request.url.path' in source
     assert 'request.url.query' not in source
     assert "request.body" not in source
