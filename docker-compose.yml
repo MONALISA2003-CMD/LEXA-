@@ -1,5 +1,3 @@
-name: lexa-local
-
 services:
   postgres:
     image: pgvector/pgvector:pg17
@@ -21,90 +19,6 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  api:
-    image: lexa-api:local
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
-    environment:
-      APP_ENV: development
-      PORT: "8000"
-      DATABASE_URL: ${LEXA_LOCAL_DATABASE_URL:-postgresql+psycopg://lexa:lexa@postgres:5432/lexa}
-      REDIS_URL: ${LEXA_LOCAL_REDIS_URL:-redis://redis:6379/0}
-      JWT_SECRET: ${JWT_SECRET:-local-development-only-secret-change-before-use-1234567890}
-      JWT_ISSUER: lexa
-      JWT_AUDIENCE: lexa-web
-      DATABASE_APP_ROLE: ""
-      DATABASE_LOGIN_ROLE: lexa
-      CORS_ORIGINS: http://localhost:3000
-      PUBLIC_APP_URL: http://localhost:3000
-      ANALYTICS_REFRESH_WORKER_ENABLED: "false"
-    ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
-      interval: 15s
-      timeout: 3s
-      retries: 5
-      start_period: 20s
-    restart: unless-stopped
-
-  analytics-worker:
-    image: lexa-api:local
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
-    command: ["python", "-m", "app.workers.analytics_outbox"]
-    environment:
-      APP_ENV: development
-      DATABASE_URL: ${LEXA_LOCAL_DATABASE_URL:-postgresql+psycopg://lexa:lexa@postgres:5432/lexa}
-      REDIS_URL: ${LEXA_LOCAL_REDIS_URL:-redis://redis:6379/0}
-      JWT_SECRET: ${JWT_SECRET:-local-development-only-secret-change-before-use-1234567890}
-      DATABASE_APP_ROLE: ""
-      DATABASE_LOGIN_ROLE: lexa
-      ANALYTICS_WORKER_POLL_SECONDS: "10"
-      ANALYTICS_WORKER_BATCH_SIZE: "20"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    # This long-running worker has no HTTP listener; do not inherit the API
-    # container's HTTP healthcheck. Queue progress is observed from worker logs.
-    healthcheck:
-      disable: true
-    restart: unless-stopped
-
-  web:
-    image: lexa-web:local
-    build:
-      context: ./apps/web
-      dockerfile: Dockerfile
-    environment:
-      NODE_ENV: production
-      PORT: "3000"
-      LEXA_API_URL: http://api:8000
-    ports:
-      - "3000:3000"
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
-      interval: 15s
-      timeout: 3s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
 
 volumes:
   postgres_data:

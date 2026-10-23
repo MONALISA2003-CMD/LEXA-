@@ -129,6 +129,24 @@ def main() -> int:
                 dbname, server_addr = cur.fetchone()
                 if dbname.lower() in {"neondb", "postgres", "production", "prod", "lexa"}:
                     raise RuntimeError("target database name is not an allowed disposable name")
+        # Migration 029 references Neon’s platform role when checking role
+        # membership. Vanilla PostgreSQL CI containers do not have that role,
+        # so create an empty NOLOGIN compatibility role only in this already-
+        # guarded disposable loopback database. This gives it no privileges and
+        # never connects to or modifies a Neon/production database.
+        with psycopg.connect(database_url, connect_timeout=5) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM pg_roles WHERE rolname = %s",
+                    ("neon_superuser",),
+                )
+                if cur.fetchone() is None:
+                    cur.execute("CREATE ROLE neon_superuser NOLOGIN")
+                    print(
+                        "Created disposable replay compatibility role "
+                        "neon_superuser (NOLOGIN)."
+                    )
+
         completed: list[str] = []
         env = os.environ.copy()
         env["PGCONNECT_TIMEOUT"] = "5"

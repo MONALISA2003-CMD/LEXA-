@@ -15,8 +15,14 @@ def test_stage1_package_has_one_canonical_application_tree():
 
 
 def test_stage1_package_removes_the_duplicate_wrapper_after_overlay():
-    manifest = (ROOT / "DELETE.txt").read_text()
-    assert "\nLEXA\n" in manifest
+    # DELETE.txt and .lexa-delete are package-only control manifests. The ZIP
+    # extractor consumes them while applying an overlay instead of committing
+    # them into the checkout, so verify the tracked cleanup behavior directly.
+    workflow = (ROOT / ".github/workflows/lexa-zip-extract.yml").read_text()
+    assert "MANIFEST_NAMES = {'DELETE.txt', '.lexa-delete'}" in workflow
+    assert "delete_entries.append(candidate.as_posix())" in workflow
+    assert "for entry_text in delete_entries:" in workflow
+    assert "shutil.rmtree(target)" in workflow
 
 
 def test_stage1_includes_the_zip_normalization_workflow_patch():

@@ -4,7 +4,6 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
-from .db_observability import install_database_observability
 
 ENGINE_CONNECT_ARGS = {
     # Neon PgBouncer rejects PostgreSQL session GUCs in startup options.
@@ -23,7 +22,6 @@ engine = create_engine(
     pool_use_lifo=True,
     connect_args=ENGINE_CONNECT_ARGS,
 )
-install_database_observability(engine)
 
 def apply_application_role(connection, role: str | None = None) -> None:
     """Switch the current transaction to LEXA's least-privilege database role.

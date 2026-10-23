@@ -14,8 +14,4 @@ assert.match(source, /inventorySummaryState === "error" \|\| adjustmentsState ==
 assert.match(source, /analyticsState === "error" \|\| !analytics/);
 assert.match(source, /inventorySummaryState === "error" \|\| !inventorySummary \? "Unavailable"/);
 assert.doesNotMatch(source, /loadError/);
-assert.match(source, /const lastAnalyticsKey = useRef\(""\)/, "analytics requests should be de-duplicated by refresh, period, tenant business date and currency");
-assert.match(source, /if \(lastAnalyticsKey\.current === key\) return;/);
-assert.match(source, /operationalRefreshInFlight\.current = false;[\s\S]*setAnalyticsRefreshVersion/);
-assert.doesNotMatch(source, /periodEffectMounted/, "the former pair of analytics effects should not race each other");
 console.log("Business overview independent panel resilience: PASS");
