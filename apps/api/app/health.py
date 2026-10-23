@@ -21,6 +21,10 @@ REQUIRED_APP_MIGRATIONS = (
     "038_phase6_movement_health_indexes",
     "039_phase7_supplier_ledger_landed_costs",
     "040_phase8_finance_workflows",
+    "041_commerce_integrity_scaling",
+    "042_team_chat_foundation",
+    "043_phase5_journal_currency_guard",
+    "044_phase3_password_reset_security",
 )
 REQUIRED_SCHEMA_COLUMNS = (
     ("suppliers", "supplier_party_id"),
@@ -32,6 +36,8 @@ REQUIRED_TABLES = (
     "schema_migrations",
     "tenants",
     "users",
+    "sessions",
+    "user_security_tokens",
     "tenant_memberships",
     "roles",
     "permissions",
@@ -264,6 +270,28 @@ def check_database() -> tuple[bool, str | dict[str, object] | None]:
                         "code": "LEXA_AUTH_SCHEMA_NOT_READY",
                         **{key: bool(auth_contract[key]) for key in auth_contract},
                     }
+                return False, "LEXA_AUTH_SCHEMA_NOT_READY"
+
+            password_reset_contract = connection.execute(text("""
+                SELECT
+                  EXISTS (SELECT 1 FROM public.schema_migrations WHERE version='044_phase3_password_reset_security') AS migration_present,
+                  to_regprocedure('public.lexa_issue_password_reset(text,text,timestamptz)') IS NOT NULL AS issue_present,
+                  to_regprocedure('public.lexa_consume_password_reset(text,text)') IS NOT NULL AS consume_present,
+                  to_regprocedure('public.lexa_revoke_password_reset(text)') IS NOT NULL AS revoke_present,
+                  COALESCE(has_function_privilege('lexa_app', to_regprocedure('public.lexa_issue_password_reset(text,text,timestamptz)'), 'EXECUTE'), false) AS issue_executable,
+                  COALESCE(has_function_privilege('lexa_app', to_regprocedure('public.lexa_consume_password_reset(text,text)'), 'EXECUTE'), false) AS consume_executable,
+                  COALESCE(has_function_privilege('lexa_app', to_regprocedure('public.lexa_revoke_password_reset(text)'), 'EXECUTE'), false) AS revoke_executable,
+                  (SELECT count(*)=3 FROM pg_proc p JOIN pg_roles r ON r.oid=p.proowner
+                    WHERE p.oid IN (
+                      to_regprocedure('public.lexa_issue_password_reset(text,text,timestamptz)'),
+                      to_regprocedure('public.lexa_consume_password_reset(text,text)'),
+                      to_regprocedure('public.lexa_revoke_password_reset(text)')
+                    ) AND p.prosecdef AND r.rolbypassrls) AS definer_owner_bypasses_rls
+            """)).mappings().one()
+            if not all(bool(password_reset_contract[key]) for key in password_reset_contract):
+                logger.warning("password_reset_schema_readiness_failed", extra={key: bool(value) for key, value in password_reset_contract.items()})
+                if settings.app_env.strip().lower() != "production":
+                    return False, {"code": "LEXA_AUTH_SCHEMA_NOT_READY", **{key: bool(value) for key, value in password_reset_contract.items()}}
                 return False, "LEXA_AUTH_SCHEMA_NOT_READY"
 
         return True, None

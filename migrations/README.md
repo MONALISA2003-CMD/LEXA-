@@ -42,3 +42,16 @@ python scripts/check_migration_sources.py --strict --require-semantic-validation
 `036_phase6_inventory_intelligence.sql` adds per-tenant, per-location, per-variant replenishment policies with forced RLS and least-privilege grants. The advisory API computes demand from completed product sales less completed returns received at the location; it subtracts reserved and inbound quantities from availability/shortfall and shows the formula. It never posts inventory or creates/approves purchase orders. See `PHASE6_IMPLEMENTATION_REPORT_2026-10-21.md` and `PHASE6_ACCEPTANCE_MATRIX.md`.
 
 The policy table's migration is not deployed to production in this package. Local replay plan verification has passed; execution and semantic validation remain required in CI on the exact uploaded source SHA.
+
+## Phase 3 Increment — password reset and current-workspace session controls
+
+`044_phase3_password_reset_security.sql` adds narrowly scoped `SECURITY DEFINER`
+functions to issue, consume, or invalidate hashed single-use password-reset tokens.
+The consume function updates the password and revokes all active sessions for the
+user across all workspaces. It is forward-only and does not alter existing
+passwords, sessions, or tokens at migration time. Apply it through the reviewed
+migration runner before deploying API code that requires migration `044`.
+The app role can execute only the three named functions; `PUBLIC` cannot execute
+them. A one-time link is sent through Resend when `RESEND_API_KEY`, `EMAIL_FROM`,
+and `PUBLIC_APP_URL` are configured in the backend environment. Do not place the
+Resend key in a `NEXT_PUBLIC_*` variable.

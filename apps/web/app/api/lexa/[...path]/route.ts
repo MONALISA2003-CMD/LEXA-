@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const DEFAULT_API_ORIGIN = "https://lexa-n10e.onrender.com";
-const API_ORIGIN = (process.env.LEXA_API_URL || process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_ORIGIN).replace(/\/$/, "");
+const configuredApiOrigin = process.env.LEXA_API_URL || "";
+// Never silently direct an unconfigured preview/production deployment at live data.
+// Local development alone may fall back to the documented local API endpoint.
+const API_ORIGIN = (configuredApiOrigin || (process.env.NODE_ENV !== "production" ? "http://127.0.0.1:8000" : "")).replace(/\/$/, "");
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
+  if (!API_ORIGIN) {
+    return NextResponse.json(
+      { detail: { code: "API_ORIGIN_NOT_CONFIGURED", message: "LEXA's API connection is not configured for this deployment." } },
+      { status: 503, headers: { "Cache-Control": "no-store, max-age=0", "Pragma": "no-cache", "X-Content-Type-Options": "nosniff" } },
+    );
+  }
   const target = `${API_ORIGIN}/${path.join("/")}${request.nextUrl.search}`;
   const headers = new Headers();
   const authorization = request.headers.get("authorization");
@@ -16,6 +24,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   }
   const cookie = request.headers.get("cookie");
   if (cookie) headers.set("cookie", cookie);
+  // Vercel overwrites x-real-ip at its edge. Only forward this platform-derived
+  // address with a server-only shared secret; FastAPI rejects unverified claims.
+  const proxySecret = process.env.LEXA_PROXY_SHARED_SECRET || "";
+  const clientIp = request.headers.get("x-real-ip") || "";
+  if (proxySecret.length >= 32 && clientIp) {
+    headers.set("x-lexa-client-ip", clientIp);
+    headers.set("x-lexa-proxy-secret", proxySecret);
+  }
   const init: RequestInit = { method: request.method, headers, cache: "no-store" };
   if (!["GET", "HEAD"].includes(request.method)) init.body = await request.text();
 

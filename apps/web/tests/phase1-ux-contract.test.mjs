@@ -43,7 +43,7 @@ assert.match(login, /autoComplete="username"/);
 assert.match(login, /autoComplete="current-password"/);
 assert.match(login, /Show password/);
 assert.match(login, /WorkspaceSelectionError/);
-assert.doesNotMatch(login, /Forgot password/i);
+assert.match(login, /href="\/forgot-password"/);
 
 // Onboarding: resumable safe draft, idempotent retry, and no secrets in session storage.
 assert.match(register, /lexa-onboarding-draft-v1/);

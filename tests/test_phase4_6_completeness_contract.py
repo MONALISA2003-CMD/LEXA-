@@ -20,12 +20,13 @@ def test_inventory_ageing_is_tenant_and_location_scoped_and_labels_unknown_prove
 
 def test_clean_replay_contains_ageing_migration_and_evidence_gate_checks_it():
     order = json.loads((ROOT / "migrations/reconstructed/clean_replay_order.json").read_text())
-    assert order["steps"][-5]["path"] == "migrations/039_phase7_supplier_ledger_landed_costs.sql"
-    assert order["steps"][-4]["path"] == "migrations/040_phase8_finance_workflows.sql"
-    assert order["steps"][-3]["path"] == "migrations/041_commerce_integrity_scaling.sql"
-    assert order["steps"][-2]["path"] == "migrations/042_team_chat_foundation.sql"
-    assert order["steps"][-1]["path"] == "migrations/043_phase5_journal_currency_guard.sql"
-    assert len(order["steps"]) == 47
+    assert order["steps"][-6]["path"] == "migrations/039_phase7_supplier_ledger_landed_costs.sql"
+    assert order["steps"][-5]["path"] == "migrations/040_phase8_finance_workflows.sql"
+    assert order["steps"][-4]["path"] == "migrations/041_commerce_integrity_scaling.sql"
+    assert order["steps"][-3]["path"] == "migrations/042_team_chat_foundation.sql"
+    assert order["steps"][-2]["path"] == "migrations/043_phase5_journal_currency_guard.sql"
+    assert order["steps"][-1]["path"] == "migrations/044_phase3_password_reset_security.sql"
+    assert len(order["steps"]) == 48
     replay = (ROOT / "scripts/run_clean_migration_replay.py").read_text()
     verifier = (ROOT / "scripts/check_phase6_replay_evidence.py").read_text()
     assert "037_phase6_inventory_ageing_index" in replay

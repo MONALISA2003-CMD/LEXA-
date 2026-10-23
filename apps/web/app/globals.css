@@ -1515,3 +1515,28 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px
   .workspace-section, .panel, .command-panel, .quick-links a, .command-suggestions button { transition: none !important; }
   .workspace-section:hover, .panel:hover, .command-panel:hover, .quick-links a:hover, .command-suggestions button:hover { transform: none; }
 }
+
+/* Phase 3: accessible sign-in recovery and account-session controls. */
+.auth-forgot-row { display: flex; justify-content: flex-end; margin: -4px 0 2px; }
+.auth-forgot-row a { color: var(--emerald-dark, #087F5B); font-size: 13px; font-weight: 750; text-decoration: underline; text-underline-offset: 3px; }
+.auth-link-button { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.auth-forgot-row a:focus-visible { outline: var(--focus-ring, 3px solid #496CFF); outline-offset: 3px; border-radius: 4px; }
+.security-session-list { display: grid; gap: 12px; }
+.security-session { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px; }
+.security-session-main { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+.security-session-icon { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 13px; background: #e6f7f0; color: #087f5b; font-size: 17px; font-weight: 900; }
+.security-session h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 5px; color: var(--navy, #13233F); font-size: 15px; }
+.security-session p { margin: 0; color: var(--muted, #6d7b91); font-size: 13px; }
+.security-session dl { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 13px 0 0; }
+.security-session dl div { min-width: 145px; }
+.security-session dt { color: var(--muted, #6d7b91); font-size: 11px; font-weight: 750; }
+.security-session dd { margin: 3px 0 0; color: var(--ink, #26364f); font-size: 12px; }
+.security-current-pill { display: inline-flex; align-items: center; font-size: 10px; }
+.button-danger-soft { border-color: #f2d4d4; color: #a52e37; background: #fff8f8; }
+.button-danger-soft:hover:not(:disabled) { border-color: #e8b7bb; background: #ffeded; }
+@media (max-width: 640px) {
+  .security-session { align-items: stretch; flex-direction: column; padding: 16px; }
+  .security-session dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+  .security-session dl div { min-width: 0; }
+  .security-session > button { width: 100%; }
+}

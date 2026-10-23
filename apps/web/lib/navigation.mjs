@@ -26,6 +26,7 @@ export const secondaryNavigation = [
   ["/workspace", "Switch business", "switch"],
   ["/onboarding", "Business setup", "check"],
   ["/settings", "Settings", "settings"],
+  ["/settings/security", "Sign-in and security", "shield"],
 ];
 
 export const workspaceSearchSuggestions = [
@@ -44,12 +45,15 @@ export const workspaceSearchSuggestions = [
   ["Business details", "/administration"],
   ["Business setup", "/onboarding"],
   ["Settings", "/settings"],
+  ["Sign-in and active sessions", "/settings/security"],
+  ["Forgot password and session security", "/settings/security"],
   ["Switch business", "/workspace"],
 ];
 
 /** Segment-safe route activity; /sales does not activate /sales-history. */
 export function isRouteActive(pathname, href) {
   if (typeof pathname !== "string" || typeof href !== "string") return false;
+  if (href === "/settings" && pathname.startsWith("/settings/")) return false;
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -64,6 +68,7 @@ export function resolveBusinessSearchDestination(query) {
   if (/\b(team|member|members|permission|role|invite|access control)\b/.test(lower)) return `/administration/members?q=${encoded}`;
   if (/\b(setup|onboarding|setup progress)\b/.test(lower)) return "/onboarding";
   if (/\b(switch business|workspace|businesses)\b/.test(lower)) return "/workspace";
+  if (/\b(password|forgot password|reset password|active session|sessions|sign-in security|account security)\b/.test(lower)) return `/settings/security?q=${encoded}`;
   if (/\b(setting|settings|business profile|currency|branch)\b/.test(lower)) return `/administration?q=${encoded}`;
   if (/\b(customer|client|debtor|receivable|credit balance)\b/.test(lower)) return `/customers?q=${encoded}`;
   if (/\b(inventory|stock|warehouse|transfer|count|adjustment|low stock)\b/.test(lower)) return `/inventory?q=${encoded}`;
@@ -81,7 +86,7 @@ export const applicationRoutes = [
   "/", "/accounting", "/administration", "/administration/members", "/commerce",
   "/compliance", "/customers", "/intelligence", "/inventory", "/invite", "/login",
   "/onboarding", "/products", "/purchasing", "/register", "/reports", "/sales",
-  "/settings", "/team-chat", "/workspace",
+  "/settings", "/settings/security", "/forgot-password", "/reset-password", "/team-chat", "/workspace",
 ];
 
 /**

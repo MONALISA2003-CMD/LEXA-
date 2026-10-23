@@ -69,6 +69,7 @@ export default function LoginPage() {
             <FormField id="login-password" label="Password" required>
               <div className="auth-password-wrap"><input id="login-password" name="password" type={showPassword ? "text" : "password"} value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" required aria-invalid={Boolean(error && !choices.length)} /><button type="button" className="auth-password-toggle" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>{showPassword ? "Hide" : "Show"}</button></div>
             </FormField>
+            <div className="auth-forgot-row"><Link href="/forgot-password">Forgot password?</Link></div>
             {choices.length > 0 && <div className="auth-workspace-select"><label htmlFor="login-workspace">Business</label><select id="login-workspace" value={workspace} onChange={event => setWorkspace(event.target.value)} required><option value="">Select a business</option>{choices.map(choice => <option key={choice.tenant_id} value={choice.tenant_id}>{choice.tenant_name}</option>)}</select></div>}
             <button className="button button-dark auth-submit" type="submit" disabled={busy}>{busy ? "Checking your details…" : choices.length ? "Continue to business" : "Sign in"}</button>
           </form>

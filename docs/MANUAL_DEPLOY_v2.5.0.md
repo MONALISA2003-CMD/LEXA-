@@ -61,12 +61,16 @@ apps/web
 
 Use the Next.js framework defaults and the package's existing build scripts.
 
-Set:
+Set the **server-only** variables in Vercel (use a separate API origin for each deployment environment):
 
 ```text
-NEXT_PUBLIC_API_URL=<exact HTTPS URL of the deployed Render API>
-LEXA_API_URL=<same exact HTTPS URL of the deployed Render API>
+LEXA_API_URL=<exact HTTPS URL of the intended Render API>
+LEXA_PROXY_SHARED_SECRET=<same random 32+ character secret configured in Render>
 ```
+
+Do not set `NEXT_PUBLIC_API_URL` for browser API routing. The same-origin proxy only uses `LEXA_API_URL`; an unconfigured Preview/Production deployment fails closed rather than silently proxying to live data. Configure `LEXA_PROXY_SHARED_SECRET` in both Vercel and Render with the identical random value, never with a `NEXT_PUBLIC_` prefix.
+
+For password recovery, also configure `RESEND_API_KEY`, a verified `EMAIL_FROM`, and `PUBLIC_APP_URL=https://lexa-green.vercel.app` on the Render API. Password reset stays unavailable until the email provider and shared-secret trust boundary are configured.
 
 The browser talks to the Next.js same-origin proxy. Refresh credentials remain in an HttpOnly cookie; access tokens remain memory-only.
 

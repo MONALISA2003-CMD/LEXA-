@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     jwt_audience: str = "lexa-web"
     access_token_minutes: int = 30
     refresh_token_days: int = 30
+    # Password reset email is optional for booting older deployments, but reset endpoints stay disabled until configured.
+    resend_api_key: str = ""
+    email_from: str = ""
+    lexa_proxy_shared_secret: str = ""
+    public_app_url: str = "https://lexa-green.vercel.app"
+    password_reset_minutes: int = Field(default=20, ge=5, le=60)
+    email_timeout_seconds: int = Field(default=8, ge=2, le=20)
     # Per-process limits. The application uses Neon pooling, so these values
     # must be sized across all Render instances/workers, not per user account.
     database_pool_size: int = Field(default=5, ge=1, le=30)
@@ -43,7 +50,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
-def validate_production_settings(*, app_env: str, database_app_role: str, jwt_secret: str, cors_origins: list[str], database_url: str | None = None, database_login_role: str = "lexa_runtime_login_p3") -> bool:
+def validate_production_settings(*, app_env: str, database_app_role: str, jwt_secret: str, cors_origins: list[str], database_url: str | None = None, database_login_role: str = "lexa_runtime_login_p3", public_app_url: str | None = None, lexa_proxy_shared_secret: str | None = None) -> bool:
     if app_env.strip().lower() != "production":
         return True
     if database_app_role != "lexa_app":
@@ -54,6 +61,20 @@ def validate_production_settings(*, app_env: str, database_app_role: str, jwt_se
         raise ValueError("CORS_ORIGINS must contain only explicit production origins")
     if not re.fullmatch(r"[a-z_][a-z0-9_]*", database_login_role):
         raise ValueError("DATABASE_LOGIN_ROLE must be a simple PostgreSQL role identifier")
+    if len((lexa_proxy_shared_secret or "").strip()) < 32:
+        raise ValueError("LEXA_PROXY_SHARED_SECRET must be set to the same random value (at least 32 characters) in Vercel and Render in production")
+    if public_app_url is not None:
+        public_url = urlsplit(public_app_url.strip())
+        expected_schemes = {"https"} if app_env.strip().lower() == "production" else {"http", "https"}
+        if (public_url.scheme.lower() not in expected_schemes or not public_url.hostname
+                or public_url.path not in {"", "/"}
+                or public_url.username is not None or public_url.password is not None
+                or public_url.query or public_url.fragment):
+            raise ValueError("PUBLIC_APP_URL must be a valid trusted origin/base URL; production requires HTTPS without credentials, query, or fragment")
+        try:
+            _ = public_url.port
+        except ValueError as exc:
+            raise ValueError("PUBLIC_APP_URL contains an invalid port") from exc
     if database_url is not None:
         parsed = urlsplit(database_url.strip())
         if "-pooler" not in (parsed.hostname or ""):
@@ -74,4 +95,6 @@ validate_production_settings(
     cors_origins=settings.cors_origin_list,
     database_url=settings.database_url,
     database_login_role=settings.database_login_role,
+    public_app_url=settings.public_app_url,
+    lexa_proxy_shared_secret=settings.lexa_proxy_shared_secret,
 )

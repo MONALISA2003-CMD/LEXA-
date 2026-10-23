@@ -163,7 +163,7 @@ def main() -> int:
                        '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                        '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
                        '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs',
-                       '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation','043_phase5_journal_currency_guard')
+                       '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation','043_phase5_journal_currency_guard','044_phase3_password_reset_security')
                 """)
                 migration_rows = sorted(row[0] for row in cur.fetchall())
                 expected_migrations = sorted([
@@ -172,8 +172,31 @@ def main() -> int:
                     '033_phase5_refund_settlement_consistency','034_phase5_return_accounting_journals',
                     '035_phase5_none_return_receivable_guard','036_phase6_inventory_intelligence',
                     '037_phase6_inventory_ageing_index','038_phase6_movement_health_indexes','039_phase7_supplier_ledger_landed_costs',
-                    '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation','043_phase5_journal_currency_guard',
+                    '040_phase8_finance_workflows','041_commerce_integrity_scaling','042_team_chat_foundation','043_phase5_journal_currency_guard','044_phase3_password_reset_security',
                 ])
+                cur.execute("""
+                    SELECT
+                      EXISTS (SELECT 1 FROM public.schema_migrations WHERE version='044_phase3_password_reset_security'),
+                      to_regprocedure('public.lexa_issue_password_reset(text,text,timestamptz)') IS NOT NULL,
+                      to_regprocedure('public.lexa_consume_password_reset(text,text)') IS NOT NULL,
+                      to_regprocedure('public.lexa_revoke_password_reset(text)') IS NOT NULL,
+                      (SELECT count(*)=3 FROM pg_proc p JOIN pg_roles r ON r.oid=p.proowner
+                        WHERE p.oid IN (
+                          to_regprocedure('public.lexa_issue_password_reset(text,text,timestamptz)'),
+                          to_regprocedure('public.lexa_consume_password_reset(text,text)'),
+                          to_regprocedure('public.lexa_revoke_password_reset(text)')
+                        ) AND p.prosecdef AND r.rolbypassrls),
+                      has_function_privilege('lexa_app', to_regprocedure('public.lexa_issue_password_reset(text,text,timestamptz)'), 'EXECUTE'),
+                      has_function_privilege('lexa_app', to_regprocedure('public.lexa_consume_password_reset(text,text)'), 'EXECUTE'),
+                      has_function_privilege('lexa_app', to_regprocedure('public.lexa_revoke_password_reset(text)'), 'EXECUTE')
+                """)
+                (password_reset_migration, password_reset_issue, password_reset_consume, password_reset_revoke,
+                 password_reset_owner_rls, password_reset_exec_issue, password_reset_exec_consume,
+                 password_reset_exec_revoke) = cur.fetchone()
+                password_reset_contract_count = sum(bool(x) for x in (
+                    password_reset_migration, password_reset_issue, password_reset_consume, password_reset_revoke,
+                    password_reset_owner_rls, password_reset_exec_issue, password_reset_exec_consume,
+                    password_reset_exec_revoke))
                 cur.execute("""
                     SELECT to_regclass('public.inventory_replenishment_policies') IS NOT NULL,
                            COALESCE((SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.inventory_replenishment_policies'::regclass), false),
@@ -310,6 +333,8 @@ def main() -> int:
         if routine_count != 4: failures.append(f"expected four required return/accounting routines, found {routine_count}")
         if age_index_count != 1: failures.append("Phase 6 stock-age analysis index is missing")
         if health_index_count != 4: failures.append(f"Phase 6 movement-health indexes are incomplete or invalid: found {health_index_count}/4")
+        if password_reset_contract_count != 8:
+            failures.append(f"Phase 3 password-reset migration/functions/owner/grants contract failed: {password_reset_contract_count}/8 checks passed")
         if phase7_table_count != 6 or phase7_rls_forced != 6 or phase7_policy_count != 6:
             failures.append(f"Phase 7 supplier/landed-cost tables must all exist with forced RLS and tenant policies: tables={phase7_table_count}/6, forced={phase7_rls_forced}/6, policies={phase7_policy_count}/6")
         if not phase7_cost_index: failures.append("Phase 7 active supplier cost tier uniqueness index is missing")

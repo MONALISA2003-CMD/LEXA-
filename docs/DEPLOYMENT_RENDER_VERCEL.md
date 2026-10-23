@@ -33,9 +33,11 @@ Create a Next.js project from the same repository:
 
 The source includes `apps/web/vercel.json` with `buildCommand: npm run build`, which overrides the obsolete dashboard shell command. The obsolete Business Engine and Kernel frontend route modules are removed from this increment; the backend infrastructure is not removed. The cleanup script remains available for existing checkouts, but is no longer required by the Vercel build.
 
-Set `NEXT_PUBLIC_API_URL` to the exact HTTPS URL of the Render API, for example:
+Set the **server-only** `LEXA_API_URL` to the exact HTTPS URL of the Render API, for example:
 
 `https://lexa-api.onrender.com`
+
+The browser should use LEXA's same-origin `/api/lexa/*` proxy. Do not use a `NEXT_PUBLIC_API_URL` fallback in the proxy: a Preview deployment must fail closed unless its own `LEXA_API_URL` is configured, rather than silently connecting to the live database.
 
 After the Vercel URL is known, put that URL in the Render API's `CORS_ORIGINS`. If more than one browser origin is required, separate them with commas.
 
@@ -45,15 +47,16 @@ After the Vercel URL is known, put that URL in the Render API's `CORS_ORIGINS`. 
 2. Add the Render environment variables.
 3. Create Render Key Value and set `REDIS_URL` to its connection URL.
 4. Set `DATABASE_URL` to the production Neon connection string using the `postgresql+psycopg://` scheme.
-5. Deploy and confirm `/health` returns HTTP 200 for process liveness. Configure the Render service health-check path to `/ready`, then confirm `/ready` returns HTTP 200 only when the canonical Neon identity, required schema, migration 028, refresh lookup function, execute grant, SECURITY DEFINER owner contract, and Redis-compatible cache check all pass. A reachable but non-canonical or incomplete Neon branch is intentionally reported as not ready.
+5. Deploy and confirm `/health` returns HTTP 200 for process liveness. Configure the Render service health-check path to `/ready`, then confirm `/ready` returns HTTP 200 only when canonical Neon identity, the required schema, migrations `028`, `033`–`044` (excluding explicitly QA-only migration `032`), refresh lookup function, password-reset functions and grants, SECURITY DEFINER owner contracts, and Redis-compatible cache check all pass. A reachable but non-canonical or incomplete Neon branch is intentionally reported as not ready.
 6. Create the Vercel project with Root Directory `apps/web`.
-7. Set `NEXT_PUBLIC_API_URL` to the Render API URL and deploy.
+7. Set server-only `LEXA_API_URL` to the intended Render API origin, set `LEXA_PROXY_SHARED_SECRET` in Vercel and Render to the same random value (at least 32 characters), and deploy the frontend.
 8. Add the Vercel production URL to Render `CORS_ORIGINS` and redeploy the API.
-9. Confirm the Vercel home page reports the API as online.
+9. If enabling account recovery, set `RESEND_API_KEY` and a verified `EMAIL_FROM` in Render and confirm `PUBLIC_APP_URL` is the trusted HTTPS Vercel origin. Reset links remain disabled in production until the email sender and proxy secret are configured.
+10. Confirm the Vercel home page reports the API as online and verify an unconfigured Preview responds with `API_ORIGIN_NOT_CONFIGURED` rather than reading production data.
 
 ## Important security rule
 
-Never commit production `DATABASE_URL`, `REDIS_URL`, or `JWT_SECRET`. The source specification requires production secrets to stay out of source control and ordinary developer environment files.
+Never commit production `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `RESEND_API_KEY`, or `LEXA_PROXY_SHARED_SECRET`. Keep `LEXA_PROXY_SHARED_SECRET` server-only: set the same randomly generated value in Vercel and Render, never in a `NEXT_PUBLIC_*` variable. FastAPI only trusts a forwarded client IP when this secret matches; otherwise it uses the transport peer address. Do not trust a client-supplied `X-Forwarded-For` or custom IP header directly.
 
 ## Runtime probes
 

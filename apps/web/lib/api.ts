@@ -96,7 +96,7 @@ export function getCachedSession(): AuthResponse | null {
 
 function requiresSession(path: string): boolean {
   if (/^\/(health|ready)$/.test(path)) return false;
-  if (/^\/api\/v1\/auth\/(login|register|refresh|logout)$/.test(path)) return false;
+  if (/^\/api\/v1\/auth\/(login|register|refresh|logout|forgot-password|reset-password)$/.test(path)) return false;
   // Invitation preview/accept are token-authorized public routes; they must not trigger cookie refresh.
   if (/^\/api\/v1\/invitations\/(preview|accept)(\?|$)/.test(path)) return false;
   return true;
@@ -282,6 +282,15 @@ function refreshSession(): Promise<AuthResponse> {
 }
 
 export async function login(body: LoginRequest) { const response = await getJson<AuthResponse>("/api/v1/auth/login", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }); setAccessToken(response.access_token); return response; }
+export function requestPasswordReset(email: string) {
+  return getJson<{ message: string }>("/api/v1/auth/forgot-password", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ email: email.trim() }) });
+}
+export function completePasswordReset(token: string, newPassword: string) {
+  return getJson<{ status: string; message: string }>("/api/v1/auth/reset-password", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ token, new_password: newPassword }) });
+}
+export type ActiveAuthSession = { id: string; created_at: string; last_used_at?: string|null; expires_at: string; device_name: string; platform?: string|null; is_current: boolean };
+export function getMyAuthSessions() { return getJson<{ items: ActiveAuthSession[] }>("/api/v1/auth/sessions"); }
+export function revokeMyAuthSession(sessionId: string) { return getJson<{ status: string; session_id: string }>(`/api/v1/auth/sessions/${encodeURIComponent(sessionId)}/revoke`, { method:"POST" }); }
 export type RegisterRequest = { email: string; password: string; tenant_name: string; country_code: string; currency_code: string; branch_name: string; warehouse_name: string; location_name: string };
 export function register(body: RegisterRequest, idempotencyKey = key()) { return getJson<RegisterResponse>("/api/v1/auth/register", { method:"POST", headers:{"Content-Type":"application/json","Idempotency-Key":idempotencyKey}, body:JSON.stringify(body) }); }
 

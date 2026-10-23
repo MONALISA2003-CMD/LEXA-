@@ -147,6 +147,7 @@ export default function SettingsPage() {
         <div className="foundation-grid">
           <Link className="panel foundation-panel" href="/onboarding"><div className="panel-head"><div><h2>Business setup</h2><p>Review your branches, stock locations and required setup.</p></div><span aria-hidden="true">→</span></div></Link>
           <Link className="panel foundation-panel" href="/administration/members"><div className="panel-head"><div><h2>Team and access</h2><p>Manage team members and who can access the business.</p></div><span aria-hidden="true">→</span></div></Link>
+          <Link className="panel foundation-panel" href="/settings/security"><div className="panel-head"><div><h2>Sign-in and security</h2><p>Review active sessions, sign out devices and recover your account.</p></div><span aria-hidden="true">→</span></div></Link>
           <Link className="panel foundation-panel" href="/reports"><div className="panel-head"><div><h2>Business reports</h2><p>Review performance using your saved business details.</p></div><span aria-hidden="true">→</span></div></Link>
         </div>
       </section>

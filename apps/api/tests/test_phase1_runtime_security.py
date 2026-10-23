@@ -68,12 +68,21 @@ def test_production_database_requires_runtime_login_pooler_and_tls():
         database_app_role="lexa_app",
         jwt_secret="x" * 40,
         cors_origins=["https://lexa-green.vercel.app"],
+        lexa_proxy_shared_secret="test-only-random-secret-value-0123456789-abcdef",
     )
     good = "postgresql://lexa_runtime_login_p3:example@ep-test-pooler.c-5.neon.tech/neondb?sslmode=require"
     assert validate_production_settings(**common, database_url=good)
 
     safe_login_url = "postgresql://lexa_runtime_safe:example@ep-test-pooler.c-5.neon.tech/neondb?sslmode=require"
     assert validate_production_settings(**common, database_url=safe_login_url, database_login_role="lexa_runtime_safe")
+
+    for weak_secret in (None, "", "too-short"):
+        try:
+            validate_production_settings(**{**common, "lexa_proxy_shared_secret": weak_secret}, database_url=good)
+        except ValueError as exc:
+            assert "LEXA_PROXY_SHARED_SECRET" in str(exc)
+        else:
+            raise AssertionError("Production must reject a missing/weak proxy trust secret")
 
     for bad_url in (
         "postgresql://neondb_owner:example@ep-test-pooler.c-5.neon.tech/neondb?sslmode=require",
@@ -105,3 +114,28 @@ def test_runtime_role_migration_removes_elevation_and_preserves_app_role():
     assert "lexa_app" in sql and "cannot set role lexa_app" in sql
     assert "raise exception" in sql
     assert "029_phase1_runtime_role_least_privilege" in sql
+
+
+def test_production_password_reset_url_requires_trusted_https_origin():
+    common = dict(
+        app_env="production",
+        database_app_role="lexa_app",
+        jwt_secret="x" * 40,
+        cors_origins=["https://lexa-green.vercel.app"],
+        lexa_proxy_shared_secret="test-only-random-secret-value-0123456789-abcdef",
+    )
+    assert validate_production_settings(**common, public_app_url="https://lexa-green.vercel.app")
+    bad_urls = (
+        "http://lexa-green.vercel.app",
+        "https://someone:secret@lexa-green.vercel.app",
+        "https://lexa-green.vercel.app/reset-password",
+        "https://lexa-green.vercel.app?next=/",
+        "https://lexa-green.vercel.app:bad",
+    )
+    for url in bad_urls:
+        try:
+            validate_production_settings(**common, public_app_url=url)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"Unsafe production password-reset base URL was accepted: {url.split('@')[-1]}")

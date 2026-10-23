@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and verify a complete, source-only LEXA Phase 2 archive.
+"""Build and verify a complete, source-only LEXA archive.
 
 The archive includes every regular source/project file under the repository root,
 except local runtime artifacts, dependency installations, build output, and actual
@@ -17,7 +17,7 @@ import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-INTERNAL_MANIFEST_TEMPLATE = "PHASE2_INCREMENT_{increment}_MANIFEST.json"
+INTERNAL_MANIFEST_TEMPLATE = "PHASE{phase}_INCREMENT_{increment}_MANIFEST.json"
 REQUIRED_ROOT_PATHS = {
     "README.md",
     ".env.example",
@@ -61,8 +61,8 @@ def iter_source_files() -> list[Path]:
                 continue
             if path.suffix in {".pyc", ".pyo", ".log"}:
                 continue
-            if path.name.startswith("PHASE2_INCREMENT_") and path.name.endswith("_MANIFEST.json"):
-                # Never include a stale generated manifest in the next package.
+            if path.name.startswith("PHASE") and "_INCREMENT_" in path.name and path.name.endswith("_MANIFEST.json"):
+                # Never include a stale generated manifest in a new package.
                 continue
             files.append(path)
     return sorted(files, key=lambda p: p.relative_to(ROOT).as_posix())
@@ -71,6 +71,7 @@ def iter_source_files() -> list[Path]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True, help="Path of output ZIP")
+    parser.add_argument("--phase", default="2", choices=[str(n) for n in range(1, 10)], help="Phase label")
     parser.add_argument("--increment", default="03", help="Increment label")
     args = parser.parse_args()
     out = Path(args.output).resolve()
@@ -78,7 +79,7 @@ def main() -> int:
         parser.error("Output ZIP must be outside the project tree")
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    internal_manifest_name = INTERNAL_MANIFEST_TEMPLATE.format(increment=args.increment)
+    internal_manifest_name = INTERNAL_MANIFEST_TEMPLATE.format(phase=args.phase, increment=args.increment)
     files = iter_source_files()
     if not files:
         raise SystemExit("Refusing to create an empty source archive")
@@ -98,6 +99,7 @@ def main() -> int:
     internal = {
         "manifest_version": 2,
         "project": "LEXA",
+        "phase": args.phase,
         "increment": args.increment,
         "archive_layout": "repository-root-overlay",
         "archive_root": ".",
@@ -148,6 +150,7 @@ def main() -> int:
     archive_sha = hashlib.sha256(out.read_bytes()).hexdigest()
     external = {
         "project": "LEXA",
+        "phase": args.phase,
         "increment": args.increment,
         "archive": out.name,
         "archive_path": str(out),
