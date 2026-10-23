@@ -46,6 +46,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     out.headers.set("x-content-type-options", "nosniff");
     const responseRequestId = response.headers.get("x-request-id");
     if (responseRequestId) out.headers.set("x-request-id", responseRequestId);
+    // Preserve the API's timing signal so browser diagnostics can separate API
+    // handling time from the overall browser-to-Vercel request time.
+    const serverTiming = response.headers.get("server-timing");
+    if (serverTiming) out.headers.set("server-timing", serverTiming);
     const responseHeaders = response.headers as Headers & { getSetCookie?: () => string[] };
     const cookies = responseHeaders.getSetCookie ? responseHeaders.getSetCookie() : (response.headers.get("set-cookie") ? [response.headers.get("set-cookie") as string] : []);
     for (const cookie of cookies) out.headers.append("set-cookie", cookie);
@@ -55,6 +59,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       const headers = new Headers();
       if (retryAfter) headers.set("Retry-After", retryAfter);
       if (responseRequestId) headers.set("X-Request-ID", responseRequestId);
+      const errorServerTiming = response.headers.get("server-timing");
+      if (errorServerTiming) headers.set("Server-Timing", errorServerTiming);
       headers.set("Cache-Control", "no-store, max-age=0");
       headers.set("Pragma", "no-cache");
       headers.set("X-Content-Type-Options", "nosniff");
