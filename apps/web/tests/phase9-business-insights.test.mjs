@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveBusinessInsightQuestion } from "../lib/business-insight-question.mjs";
+import { buildBusinessInsightAnswer } from "../lib/business-insight-answer.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -64,4 +65,73 @@ test("Phase 9 question UI clearly avoids provider transmission and supports acce
   assert.match(page, /not sent to an AI provider/);
   const router = read("lib/business-insight-question.mjs");
   assert.match(router, /Gross margin is not net profit/);
+});
+
+
+test("Phase 9 question answer surfaces only the matching saved insight and provenance", () => {
+  const sales = {
+    id: "sales-movement",
+    title: "Sales movement",
+    status: "available",
+    severity: "attention",
+    summary: "Net sales are down 12.50% against the preceding equal-length period.",
+    period: { from_date: "2026-10-01", to_date: "2026-10-23" },
+    metric: { label: "Net sales", value: "87500.0000", unit: "money", currency_code: "UGX" },
+    comparison: { label: "Previous period", previous_value: "100000.0000", change_value: "-12500.0000", change_percent: "-12.50", unit: "money" },
+    methodology: "Saved daily metrics, compared with the preceding equal-length period.",
+    source: { tables: ["analytics_daily_business_metrics"], record_count: 17, as_of_date: "2026-10-23", refreshed_at: "2026-10-23T11:00:00Z" },
+    evidence: { label: "Open sales reports", href: "/reports" },
+    limitations: ["A decline alone does not identify the cause."],
+  };
+  const answer = buildBusinessInsightAnswer("sales", [sales]);
+  assert.equal(answer.state, "available");
+  assert.equal(answer.title, "Sales movement");
+  assert.equal(answer.summary, sales.summary);
+  assert.equal(answer.insight.metric.value, "87500.0000");
+  assert.equal(answer.insight.source.record_count, 17);
+  assert.equal(answer.insight.period.from_date, "2026-10-01");
+});
+
+test("Phase 9 question answer treats stale and missing insight data as unverified, not zero", () => {
+  const stale = {
+    id: "stock-risk", title: "Stock needing attention", status: "stale", severity: "unknown",
+    summary: "The latest inventory-health snapshot is too old to support current advice.",
+    period: { from_date: "2026-10-20", to_date: "2026-10-23" }, metric: null, comparison: null,
+    methodology: "Uses latest saved stock health snapshot.",
+    source: { tables: ["analytics_inventory_health_metrics"], record_count: 5, as_of_date: "2026-10-20", refreshed_at: null },
+    evidence: { label: "Review stock health", href: "/inventory" }, limitations: ["Refresh the stock snapshot."],
+  };
+  const staleAnswer = buildBusinessInsightAnswer("stock", [stale]);
+  assert.equal(staleAnswer.state, "stale");
+  assert.match(staleAnswer.summary, /too old/);
+  assert.equal(staleAnswer.insight.metric, null);
+
+  const missingAnswer = buildBusinessInsightAnswer("balances", []);
+  assert.equal(missingAnswer.state, "unavailable");
+  assert.match(missingAnswer.summary, /business value has been inferred or substituted as zero|not assumed zero|not substituted as zero|not assumed that missing data means zero/i);
+  assert.equal(missingAnswer.insight, null);
+});
+
+test("Phase 9 overview answer reports coverage instead of inventing a business conclusion", () => {
+  const result = buildBusinessInsightAnswer("all", [
+    { id: "sales-movement", status: "available" },
+    { id: "stock-risk", status: "stale" },
+    { id: "working-capital-balances", status: "partial" },
+  ]);
+  assert.equal(result.state, "overview");
+  assert.equal(result.totalCount, 3);
+  assert.equal(result.reviewableCount, 2);
+  assert.match(result.summary, /3 insights; 2 currently have a reviewable result/);
+});
+
+test("Phase 9 visible answer uses the selected saved insight instead of only a generic route message", () => {
+  const page = read("app/intelligence/page.tsx");
+  assert.match(page, /buildBusinessInsightAnswer/);
+  assert.match(page, /ANSWER FROM SAVED RECORDS/);
+  assert.match(page, /Source:/);
+  assert.match(page, /How it is calculated|Calculation:/);
+  assert.match(page, /questionAnswer\.insight\.evidence\.href/);
+  assert.match(page, /setQuestionFocus\(null\)/);
+  assert.match(page, /setInsightFocus\(result\.focus \?\? "all"\)/);
+  assert.match(page, /missing information is not zero/);
 });

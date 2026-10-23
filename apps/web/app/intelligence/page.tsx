@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AppShell } from "../../components/app-shell";
 import { localDateISO, localMonthStartISO } from "../../lib/date.mjs";
 import { resolveBusinessInsightQuestion } from "../../lib/business-insight-question.mjs";
+import { buildBusinessInsightAnswer } from "../../lib/business-insight-answer.mjs";
 import {
   getAnalyticsOverview,
   getBusinessInsights,
@@ -13,6 +14,7 @@ import {
   getInventorySummary,
   type AnalyticsOverview,
   type BusinessInsight,
+  type BusinessInsightFocus,
   type BusinessInsightsResponse,
   type BusinessProfile,
   type InventorySummary,
@@ -64,6 +66,7 @@ export default function IntelligencePage() {
   const [question, setQuestion] = useState("");
   const [questionMessage, setQuestionMessage] = useState("");
   const [questionStatus, setQuestionStatus] = useState<"supported" | "guardrail" | "unsupported" | "">("");
+  const [questionFocus, setQuestionFocus] = useState<BusinessInsightFocus | null>(null);
   const [inventory, setInventory] = useState<InventorySummary | null>(null);
   const [recommendations, setRecommendations] = useState<ReplenishmentRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,6 +123,9 @@ export default function IntelligencePage() {
     if (insightFocus === "stock") return item.id === "stock-risk";
     return item.id === "working-capital-balances";
   });
+  const questionAnswer = questionStatus === "supported" && questionFocus && businessInsights && !loading
+    ? buildBusinessInsightAnswer(questionFocus, businessInsights.insights)
+    : null;
 
   return <AppShell title="Business insights" eyebrow="Helpful next steps">
     <main className="workspace" style={{ maxWidth: 1400 }}>
@@ -153,16 +159,27 @@ export default function IntelligencePage() {
           const result = resolveBusinessInsightQuestion(question);
           setQuestionMessage(result.message);
           setQuestionStatus(result.status);
-          if (result.focus) setInsightFocus(result.focus);
+          setQuestionFocus(result.focus);
+          setInsightFocus(result.focus ?? "all");
         }}>
           <label htmlFor="business-insight-question">Ask about your saved business figures</label>
           <div className="insight-question-row">
-            <input id="business-insight-question" type="text" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={240} placeholder="e.g. Why did sales change? Is stock running low?" aria-describedby="business-insight-question-help" />
+            <input id="business-insight-question" type="text" value={question} onChange={(event) => { setQuestion(event.target.value); setQuestionMessage(""); setQuestionStatus(""); setQuestionFocus(null); setInsightFocus("all"); }} maxLength={240} placeholder="e.g. Why did sales change? Is stock running low?" aria-describedby="business-insight-question-help" />
             <button type="submit" className="button button-dark">Answer</button>
           </div>
           <small id="business-insight-question-help">Supported now: sales movement, gross margin, stock risk, current receivables and supplier balances. Answers use local rules and saved metrics; this question is not sent to an AI provider.</small>
           {questionMessage && <p className={`insight-question-message ${questionStatus === "guardrail" || questionStatus === "unsupported" ? "is-warning" : ""}`} role="status">{questionMessage}</p>}
         </form>
+        {questionStatus === "supported" && questionFocus && <section className="insight-answer" aria-labelledby="insight-answer-title" aria-live="polite" aria-atomic="true">
+          {loading ? <p role="status">Checking the saved figures for your answer…</p> : !businessInsights ? <><h3 id="insight-answer-title">Answer unavailable</h3><p>LEXA could not verify the saved insight data just now. Refresh the page data before relying on a figure; missing information is not zero.</p></> : questionAnswer ? <>
+            <div className="insight-answer-head"><div><span className="section-label">ANSWER FROM SAVED RECORDS</span><h3 id="insight-answer-title">{questionAnswer.title}</h3></div><span className={`status ${questionAnswer.insight ? insightStatusClass(questionAnswer.insight.severity) : "neutral"}`}>{questionAnswer.insight ? insightStatusLabel(questionAnswer.insight.status) : "Overview"}</span></div>
+            <p className="insight-answer-summary">{questionAnswer.summary}</p>
+            {questionAnswer.insight?.metric && <div className="insight-answer-metric"><small>{questionAnswer.insight.metric.label}</small><strong>{displayInsightMetric(questionAnswer.insight, currency)}</strong></div>}
+            {questionAnswer.insight?.comparison && <p className="insight-answer-comparison"><strong>{questionAnswer.insight.comparison.label}:</strong> {questionAnswer.insight.comparison.unit === "money" ? formatMoney(questionAnswer.insight.comparison.previous_value, currency) : `${questionAnswer.insight.comparison.previous_value}${questionAnswer.insight.comparison.unit === "percentage_points" ? "%" : ""}`} previous value · Change {questionAnswer.insight.comparison.unit === "money" ? formatMoney(questionAnswer.insight.comparison.change_value, currency) : `${Number(questionAnswer.insight.comparison.change_value) > 0 ? "+" : ""}${questionAnswer.insight.comparison.change_value}${questionAnswer.insight.comparison.unit === "percentage_points" ? " percentage points" : ""}`}{questionAnswer.insight.comparison.change_percent !== null ? ` (${Number(questionAnswer.insight.comparison.change_percent) > 0 ? "+" : ""}${questionAnswer.insight.comparison.change_percent}%)` : ""}</p>}
+            {questionAnswer.insight && <div className="insight-answer-footnote"><p><strong>Period:</strong> {questionAnswer.insight.period.from_date} – {questionAnswer.insight.period.to_date}</p><p><strong>Source:</strong> {questionAnswer.insight.source.tables.join(", ")} · {questionAnswer.insight.source.record_count} saved rows{questionAnswer.insight.source.as_of_date ? ` · as of ${questionAnswer.insight.source.as_of_date}` : ""}{questionAnswer.insight.source.refreshed_at ? ` · refreshed ${questionAnswer.insight.source.refreshed_at.replace("T", " ").slice(0, 16)}` : ""}</p><p><strong>Calculation:</strong> {questionAnswer.insight.methodology}</p>{questionAnswer.insight.limitations.slice(0, 2).map(limit => <p key={limit}><strong>Limit:</strong> {limit}</p>)}<Link className="button button-soft button-small" href={questionAnswer.insight.evidence.href}>{questionAnswer.insight.evidence.label}</Link></div>}
+            {questionAnswer.state === "overview" && <p className="insight-answer-footnote">Reporting period: {businessInsights.period.from_date} – {businessInsights.period.to_date} · Currency: {businessInsights.currency_code}{businessInsights.last_successful_refresh_at ? ` · Last successful refresh ${businessInsights.last_successful_refresh_at.replace("T", " ").slice(0, 16)} UTC` : " · Refresh time unavailable"}</p>}
+          </> : <p>No answer could be assembled from the saved response. LEXA has not substituted zero for missing information.</p>}
+        </section>}
         {businessInsights && <div className="filter-row" role="group" aria-label="Filter business insights">
           {[{id:"all",label:"All insights"},{id:"sales",label:"Sales movement"},{id:"margin",label:"Gross margin"},{id:"stock",label:"Stock risk"},{id:"balances",label:"Customer & supplier balances"}].map(option => <button key={option.id} type="button" className={`button button-small ${insightFocus===option.id?"button-dark":"button-soft"}`} aria-pressed={insightFocus===option.id} onClick={()=>setInsightFocus(option.id as typeof insightFocus)}>{option.label}</button>)}
         </div>}

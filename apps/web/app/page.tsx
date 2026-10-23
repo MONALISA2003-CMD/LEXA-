@@ -159,7 +159,13 @@ export default function HomePage() {
       href: "/inventory",
     })),
     ...adjustments.filter(x => x.status === "DRAFT").slice(0, 4).map(x => ({ tone: "info", title: "Stock correction awaiting approval", detail: `${x.reason_code} · ${short(x.id)}`, href: "/inventory" })),
-  ], [inventorySummary, adjustments]);
+    ...(purchasingSummaryState === "success" && purchasingSummary && purchasingSummary.overdue_supplier_bills > 0 ? [{
+      tone: "warning",
+      title: "Supplier bills overdue",
+      detail: `${purchasingSummary.overdue_supplier_bills} supplier bill${purchasingSummary.overdue_supplier_bills === 1 ? " is" : "s are"} past due · review supplier balances`,
+      href: "/purchasing",
+    }] : []),
+  ], [inventorySummary, adjustments, purchasingSummary, purchasingSummaryState]);
 
   const topProducts = useMemo(() => productMetrics.map(row => ({
     id: row.variant_id,
@@ -235,8 +241,8 @@ export default function HomePage() {
 
     <section className="command-grid phase4-operations-grid">
       <div className="panel command-panel"><div className="panel-head"><div><p className="eyebrow">NEEDS ATTENTION</p><h2>Things to check today</h2></div><Link href="/inventory" className="panel-link">Open inventory →</Link></div><div className="attention-list">
-        {(inventorySummaryState === "loading" || adjustmentsState === "loading") ? <LoadingPlaceholder label="Loading items that need attention…" />
-          : (inventorySummaryState === "error" || adjustmentsState === "error") ? <><div className="empty-state compact"><strong>Some items need attention</strong><span>{inventorySummaryState === "error" ? "Stock checks" : "Adjustment approvals"} could not be verified. Available information may be partial.</span><button className="button button-soft" type="button" onClick={() => void load()}>Refresh data</button></div>{attention.map((item, i) => <Link href={item.href} className="attention-row" key={`${item.title}-${i}`}><span className={`attention-dot ${item.tone}`} /><div><strong>{item.title}</strong><small>{item.detail}</small></div><span aria-hidden="true">›</span></Link>)}</>
+        {(inventorySummaryState === "loading" || adjustmentsState === "loading" || purchasingSummaryState === "loading") ? <LoadingPlaceholder label="Loading stock and supplier checks…" />
+          : (inventorySummaryState === "error" || adjustmentsState === "error" || purchasingSummaryState === "error") ? <><div className="empty-state compact"><strong>Some checks could not be verified</strong><span>LEXA could not confirm one or more stock or supplier alerts. Available information may be partial; a missing response is not a zero.</span><button className="button button-soft" type="button" onClick={() => void load()}>Refresh data</button></div>{attention.map((item, i) => <Link href={item.href} className="attention-row" key={`${item.title}-${i}`}><span className={`attention-dot ${item.tone}`} /><div><strong>{item.title}</strong><small>{item.detail}</small></div><span aria-hidden="true">›</span></Link>)}</>
           : attention.length ? attention.map((item, i) => <Link href={item.href} className="attention-row" key={`${item.title}-${i}`}><span className={`attention-dot ${item.tone}`} /><div><strong>{item.title}</strong><small>{item.detail}</small></div><span aria-hidden="true">›</span></Link>)
           : <div className="empty-state compact"><strong>Nothing urgent</strong><span>There is nothing that needs your attention right now.</span></div>}
       </div></div>

@@ -48,8 +48,11 @@ New implementation:
 - `apps/api/tests/test_phase9_insights_contract.py` — permission, branch scope, bounded date and read-only contracts.
 - `apps/web/lib/api.ts` — typed insight payload and client API.
 - `apps/web/lib/business-insight-question.mjs` and `business-insight-question.d.mts` — allowlisted local question router and type contract.
-- `apps/web/app/intelligence/page.tsx` — source-linked cards, supported question field, accessible feedback, filters and evidence links.
+- `apps/web/lib/business-insight-answer.mjs` and `business-insight-answer.d.mts` — selected-focus mapping that returns only the matching saved insight and explicit unavailable/overview states.
+- `apps/web/app/intelligence/page.tsx` — source-linked cards, supported question field, accessible feedback, filters and evidence links plus a direct answer panel with metric, comparison, date scope, source rows, refresh provenance, calculation, limitations and authorized source-screen link.
 - `apps/web/app/globals.css` — responsive insight-card/question-field styles.
+- `apps/web/app/page.tsx` — show overdue supplier bills in the daily attention queue only when the purchasing summary loaded successfully.
+- `apps/web/tests/stage2-3-module-connections.test.mjs` — regression assertion for the new overdue-bill alert.
 - `apps/web/tests/phase9-business-insights.test.mjs` — insight and question-router contracts.
 - `apps/web/tests/phase7-release-polish.test.mjs` and `tests/unit/test_analytics_currency_contract.py` — update existing expected labels and currency boundary count for the new endpoint.
 
@@ -58,8 +61,8 @@ New implementation:
 The following checks passed against the working candidate:
 
 - Python compile check: `python -m compileall -q apps/api/app apps/api/tests scripts`.
-- Complete backend suite: `PYTHONPATH=apps/api python -m pytest -q` — **306 passed**, one existing third-party Starlette cookie deprecation warning.
-- Frontend contracts: `node --test tests/*.test.mjs` from `apps/web` — **62 passed, 0 failed, 0 skipped**.
+- Complete backend suite: `PYTHONPATH=apps/api python -m pytest -q` — **347 passed**, one existing third-party Starlette cookie deprecation warning.
+- Frontend contracts: `node --test tests/*.test.mjs` from `apps/web` — **77 passed, 0 failed, 0 skipped**.
 - TypeScript/JSX syntax transpilation for the changed frontend TypeScript files using the globally available TypeScript compiler — syntax diagnostics: none.
 - Read-only SQL checks against the isolated `LEXA-PHASE7-REPLAY-20261022` clean replay database — **8/8** query shapes ran successfully for daily metrics, product metrics, last refresh, current receivables, supplier ledger, latest stock snapshot, stock summary and capped stock examples. The replay database contains no business fixtures, so this validates SQL/schema shape only; behavioral edge cases are exercised in helper tests.
 
@@ -75,3 +78,15 @@ The following checks passed against the working candidate:
 ## Decision
 
 **Phase 6–8: existing candidate workflows retained and locally regression-tested. Phase 9: deterministic read-only insight/question slice implemented with local targeted acceptance; generative model connection remains intentionally deferred. Overall state: `IMPLEMENTED — LOCAL ACCEPTANCE`, not `PRODUCTION ACCEPTED`.** Proceed to a clean Node 24 install/typecheck/build and authenticated, seeded staging acceptance before publishing or deploying this candidate.
+
+
+## Frontend review increment (23 October 2026)
+
+The owner dashboard now surfaces overdue supplier bills in “Things to check today” when the authorized purchasing summary successfully loads and the overdue count is greater than zero. The alert links to Purchasing and does not invent an alert if purchasing data is unavailable. The frontend contract suite includes a regression assertion for this behavior. This is a local candidate change, not a deployment.
+
+
+## Frontend answer-workflow increment (23 October 2026)
+
+The existing Business Insights question field now follows through beyond classification: a supported question renders a focused answer from the matching saved insight, with its original summary, available metric, comparison, reporting period, source tables/row count, refresh provenance, calculation method, visible limitations, and source-screen destination. “All insights” shows coverage counts rather than inventing a general business conclusion. Missing matching insight data remains unavailable; stale or unavailable insight responses do not surface a fabricated value. Editing the question clears the prior answer so an earlier result is not presented as answering new text.
+
+New regression tests cover answer-to-source mapping, stale/missing-data handling, overview counts and the visible provenance panel. Frontend contract count: 77 passed. Full Node 24 typecheck, Next.js production build, authenticated E2E, populated staging and visual device acceptance remain outstanding.

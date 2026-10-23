@@ -1540,3 +1540,17 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px
   .security-session dl div { min-width: 0; }
   .security-session > button { width: 100%; }
 }
+
+/* Phase 9.1: render the selected, source-backed answer above the full insight set. */
+.insight-answer{display:grid;gap:10px;margin:12px 0 18px;padding:16px;border:1px solid #dbe5ef;border-radius:12px;background:linear-gradient(180deg,#fff 0%,#f8fbfc 100%);min-width:0}
+.insight-answer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.insight-answer-head h3{margin:5px 0 0;font-size:18px;letter-spacing:-.02em;color:#17334b}
+.insight-answer-summary{margin:0;font-size:13px;line-height:1.65;color:#35465a}
+.insight-answer-metric{display:grid;gap:4px;padding:12px;border:1px solid #e0e9ed;border-radius:10px;background:#fff}
+.insight-answer-metric small{font-size:11px;color:#6e7e8f;font-weight:750}
+.insight-answer-metric strong{font-size:24px;letter-spacing:-.025em;color:#143f36;overflow-wrap:anywhere}
+.insight-answer-comparison{margin:0;color:#4c5d70;font-size:12px;line-height:1.6}
+.insight-answer-footnote{display:grid;gap:7px;border-top:1px solid #e7edf1;padding-top:10px}
+.insight-answer-footnote p{margin:0;color:#68798a;font-size:11px;line-height:1.55;overflow-wrap:anywhere}
+.insight-answer-footnote .button{justify-self:start;min-height:40px}
+@media(max-width:560px){.insight-answer{padding:13px}.insight-answer-head{align-items:flex-start}.insight-answer-head .status{white-space:normal}.insight-answer-footnote .button{width:100%;justify-content:center}}

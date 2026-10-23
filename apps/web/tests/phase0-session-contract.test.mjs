@@ -27,7 +27,7 @@ assert.match(shell, /Keep the last verified snapshot visible during route change
 assert.match(home, /const \[dashboardState, setDashboardState\] = useState<LoadState>\("loading"\)/);
 assert.match(home, /const \[analyticsState, setAnalyticsState\] = useState<LoadState>\("loading"\)/);
 assert.match(home, /await Promise\.all\(tasks\)/);
-assert.match(home, /Some items need attention/);
+assert.match(home, /Some checks could not be verified/);
 assert.match(home, /dashboardState === "error" \|\| !dashboard \? "Unavailable"/);
 assert.doesNotMatch(home, /const \[loadError, setLoadError\]/);
 assert.match(shell, /Opening your business/);
