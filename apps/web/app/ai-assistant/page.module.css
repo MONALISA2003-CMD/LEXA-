@@ -1,26 +1,17 @@
-.page { display: grid; gap: 22px; padding-bottom: 36px; }
-.section { min-width: 0; }
-.form { display: grid; gap: 20px; }
-.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.field { display: grid; gap: 8px; min-width: 0; color: var(--ink, #14213d); font-size: 13px; font-weight: 750; }
-.field select, .field textarea { width: 100%; min-width: 0; border: 1px solid var(--line, #dfe6ef); border-radius: 12px; background: #fff; color: var(--ink, #14213d); padding: 12px 13px; outline: none; }
-.field select:focus, .field textarea:focus { border-color: var(--blue, #496cff); box-shadow: 0 0 0 3px rgba(73, 108, 255, .12); }
-.field textarea { min-height: 130px; resize: vertical; line-height: 1.6; font-weight: 450; }
-.field small { color: var(--muted, #65738a); font-size: 11px; line-height: 1.5; font-weight: 450; }
-.consentRow { display: flex; align-items: flex-start; gap: 11px; padding: 15px; border: 1px solid var(--line, #dfe6ef); border-radius: 14px; background: #f8faff; cursor: pointer; }
-.consentRow input { width: 17px; height: 17px; margin-top: 2px; accent-color: var(--blue, #496cff); flex: 0 0 auto; }
-.consentRow span { display: grid; gap: 5px; }
-.consentRow strong { color: var(--ink, #14213d); font-size: 12px; }
-.consentRow small { color: var(--muted, #65738a); font-size: 11px; line-height: 1.55; font-weight: 450; }
-.answer { white-space: pre-wrap; overflow-wrap: anywhere; padding: 20px; border: 1px solid var(--line, #dfe6ef); border-radius: 14px; background: #fff; color: var(--ink, #14213d); font-size: 14px; line-height: 1.8; }
-.answerNote { margin: 12px 0 0; color: var(--muted, #65738a); font-size: 12px; line-height: 1.6; }
-.noticeGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.noticeCard { padding: 16px; border: 1px solid var(--line, #dfe6ef); border-radius: 14px; background: #fff; }
-.noticeCard h3 { margin: 0 0 8px; color: var(--ink, #14213d); font-size: 13px; }
-.noticeCard p { margin: 0; color: var(--muted, #65738a); font-size: 12px; line-height: 1.65; }
-.providerMeta { color: var(--muted, #65738a); font-size: 11px; line-height: 1.5; }
-@media (max-width: 760px) {
-  .formGrid, .noticeGrid { grid-template-columns: 1fr; }
-  .page { gap: 16px; }
-  .answer { padding: 15px; }
-}
+.page { display: grid; gap: 24px; padding-bottom: 40px; }
+.section { display: flex; align-items: flex-start; gap: 16px; padding: 22px; }
+.statusIcon { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 14px; background: #eef2ff; color: #334fc4; font-size: 22px; }
+.statusCopy { min-width: 0; }
+.statusCopy h2 { margin: 6px 0 8px; color: var(--ink, #14213d); font-size: clamp(18px, 2vw, 23px); line-height: 1.3; }
+.statusCopy p { max-width: 760px; margin: 0; color: var(--muted, #65738a); font-size: 14px; line-height: 1.7; }
+.toolsSection { display: grid; gap: 16px; min-width: 0; }
+.toolGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.toolCard { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; gap: 22px; padding: 18px; border: 1px solid var(--line, #dfe6ef); border-radius: 16px; background: #fff; box-shadow: 0 4px 16px rgba(20, 33, 61, .035); }
+.toolCard h3 { margin: 0 0 8px; color: var(--ink, #14213d); font-size: 15px; line-height: 1.4; }
+.toolCard p { margin: 0; color: var(--muted, #65738a); font-size: 13px; line-height: 1.65; }
+.toolLink { display: inline-flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--blue, #334fc4); font-size: 13px; font-weight: 750; text-decoration: none; }
+.toolLink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.toolLink:focus-visible { outline: 3px solid rgba(73, 108, 255, .28); outline-offset: 4px; border-radius: 4px; }
+.footerNote { margin: 0; color: var(--muted, #65738a); font-size: 12px; line-height: 1.7; }
+@media (max-width: 900px) { .toolGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .page { gap: 18px; } .section { padding: 16px; } .statusIcon { width: 38px; height: 38px; flex-basis: 38px; border-radius: 12px; } .toolGrid { grid-template-columns: 1fr; gap: 10px; } .toolCard { padding: 16px; gap: 16px; } }

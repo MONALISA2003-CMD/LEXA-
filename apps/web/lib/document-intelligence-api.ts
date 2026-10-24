@@ -58,10 +58,19 @@ async function requestJson<T>(path: string, init: RequestInit = {}, retry = true
     let message = "LEXA could not complete that request. Please try again.";
     if (payload && typeof payload === "object" && "detail" in payload) {
       const detail = (payload as { detail?: unknown }).detail;
-      if (typeof detail === "string" && detail.trim()) message = detail;
-      else if (detail && typeof detail === "object" && "message" in detail && typeof (detail as { message?: unknown }).message === "string") {
-        message = String((detail as { message: string }).message);
-      }
+      const code = detail && typeof detail === "object" && "code" in detail ? String((detail as { code?: unknown }).code || "") : "";
+      if (code === "DOCUMENT_TOO_LARGE") message = "Choose a file no larger than 10 MB.";
+      else if (code === "DOCUMENT_TYPE_UNSUPPORTED") message = "Upload a PDF, JPG, PNG or WebP file.";
+      else if (code === "DOCUMENT_FILENAME_INVALID") message = "Choose a file with a valid name.";
+      else if (code === "DOCUMENT_EXTRACTION_INPUT_INVALID") message = "LEXA could not read this document. Check the file and try again.";
+      else if (code === "DOCUMENT_SAVE_CONFLICT") message = "This document could not be saved yet. Refresh the list and try again.";
+      else if (code === "DOCUMENT_FIELD_NOT_SUPPORTED") message = "One or more details cannot be reviewed here. Check the document and try again.";
+      else if (code === "DOCUMENT_REQUIRED_FIELDS_MISSING") message = "Check all required details against the original before confirming.";
+      else if (code === "DOCUMENT_ALREADY_REVIEWED") message = "This document has already been reviewed and cannot be changed here.";
+      else if (typeof detail === "string" && /empty/i.test(detail)) message = "Choose a file that contains information to review.";
+      else if (typeof detail === "string" && /valid amount|currency/i.test(detail)) message = "Check that each amount and currency is entered correctly.";
+      else if (typeof detail === "string" && /date/i.test(detail)) message = "Check the date against the original document.";
+      else if (typeof detail === "string" && /required fields/i.test(detail)) message = "Check all required details against the original before confirming.";
     }
     throw new Error(message);
   }
@@ -102,7 +111,11 @@ export async function uploadIntelligenceDocument(file: File, documentType: Intel
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const detail = payload && typeof payload === "object" && "detail" in payload ? (payload as { detail?: unknown }).detail : null;
-    const message = detail && typeof detail === "object" && "message" in detail ? String((detail as { message?: unknown }).message) : typeof detail === "string" ? detail : "LEXA couldn't receive this document. Check the file and try again.";
+    const code = detail && typeof detail === "object" && "code" in detail ? String((detail as { code?: unknown }).code || "") : "";
+    const message = code === "DOCUMENT_TOO_LARGE" ? "Choose a file no larger than 10 MB."
+      : code === "DOCUMENT_TYPE_UNSUPPORTED" ? "Upload a PDF, JPG, PNG or WebP file."
+      : code === "DOCUMENT_FILENAME_INVALID" ? "Choose a file with a valid name."
+      : "LEXA could not receive this document. Check the file and try again.";
     throw new Error(message);
   }
   return payload as IntelligenceDocument;

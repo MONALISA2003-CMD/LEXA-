@@ -8,50 +8,50 @@ export const primaryNavigation = [
   ["/sales", "Sales", "cart"],
   ["/inventory", "Stock", "boxes"],
   ["/products", "Products", "package"],
-  ["/commerce", "Commerce", "commerce"],
+  ["/commerce", "Checkout", "commerce"],
   ["/customers", "Customers", "users"],
   ["/purchasing", "Purchases", "truck"],
-  ["/accounting", "Finance", "wallet"],
+  ["/accounting", "Money & records", "wallet"],
   ["/documents", "Documents", "receipt"],
   ["/reports", "Reports", "chart"],
-  ["/daily-brief", "Daily brief", "chart"],
-  ["/demand-forecast", "Demand forecast", "chart"],
+  ["/daily-brief", "Daily overview", "chart"],
+  ["/demand-forecast", "Sales forecast", "chart"],
   ["/team-chat", "Team chat", "chat"],
-  ["/ai-assistant", "AI assistant", "brain"],
+  ["/ai-assistant", "Business assistant", "brain"],
 ];
 
 // The mobile dock intentionally keeps the four most frequently used routes.
 export const quickNavigation = primaryNavigation.slice(0, 4);
 
 export const secondaryNavigation = [
-  ["/compliance", "Tax and official receipts", "receipt"],
-  ["/administration", "Business settings", "building"],
-  ["/administration/members", "Team and access", "users"],
+  ["/compliance", "Tax and receipts", "receipt"],
+  ["/administration", "Business details", "building"],
+  ["/administration/members", "Team access", "users"],
   ["/workspace", "Switch business", "switch"],
-  ["/onboarding", "Business setup", "check"],
+  ["/onboarding", "Finish setup", "check"],
   ["/settings", "Settings", "settings"],
   ["/settings/security", "Sign-in and security", "shield"],
 ];
 
 export const workspaceSearchSuggestions = [
   ["Today’s sales", "/sales"],
-  ["Inventory and low stock", "/inventory"],
+  ["Stock and low-stock items", "/inventory"],
   ["Products, codes and barcodes", "/products"],
-  ["Checkout and daily closing", "/commerce"],
+  ["Checkout and end-of-day close", "/commerce"],
   ["Customers and balances", "/customers"],
   ["Purchase orders and suppliers", "/purchasing"],
   ["Invoices, receipts and business documents", "/documents"],
-  ["Money, expenses and accounting", "/accounting"],
+  ["Money, expenses and records", "/accounting"],
   ["Business reports and graphs", "/reports"],
-  ["Today’s business brief", "/daily-brief"],
-  ["Product demand forecast", "/demand-forecast"],
-  ["Business intelligence", "/intelligence"],
-  ["AI business assistant", "/ai-assistant"],
-  ["Tax and official receipts", "/compliance"],
+  ["Today’s business overview", "/daily-brief"],
+  ["Expected demand and sales forecast", "/demand-forecast"],
+  ["Business trends and insights", "/intelligence"],
+  ["Business assistant", "/ai-assistant"],
+  ["Tax and receipts", "/compliance"],
   ["Team messages", "/team-chat"],
-  ["Team roles and access", "/administration/members"],
+  ["Team access", "/administration/members"],
   ["Business details", "/administration"],
-  ["Business setup", "/onboarding"],
+  ["Finish business setup", "/onboarding"],
   ["Settings", "/settings"],
   ["Sign-in and active sessions", "/settings/security"],
   ["Forgot password and session security", "/settings/security"],
@@ -71,17 +71,17 @@ export function resolveBusinessSearchDestination(query) {
   if (!q) return "/";
   const lower = q.toLowerCase();
   const encoded = encodeURIComponent(q);
-  if (/\b(ai assistant|ask lexa|artificial intelligence|ai help)\b/.test(lower)) return `/ai-assistant?q=${encoded}`;
+  if (/\b(ai assistant|business assistant|ask lexa|artificial intelligence|ai help)\b/.test(lower)) return `/ai-assistant?q=${encoded}`;
   if (/\b(invoice scan|scan invoice|supplier invoice|expense receipt|document upload|business documents|document intake)\b/.test(lower)) return `/documents?q=${encoded}`;
   if (/\b(ura|efris|tax|fiscal|compliance|tax receipt|official receipt)\b/.test(lower)) return `/compliance?q=${encoded}`;
-  if (/\b(daily brief|business brief|what needs attention|today\x27s brief)\b/.test(lower)) return `/daily-brief?q=${encoded}`;
-  if (/\b(demand forecast|product forecast|forecast stock demand|forecasting demand)\b/.test(lower)) return `/demand-forecast?q=${encoded}`;
+  if (/\b(daily brief|business brief|business overview|what needs attention|today\x27s brief)\b/.test(lower)) return `/daily-brief?q=${encoded}`;
+  if (/\b(demand forecast|sales forecast|expected demand|product forecast|forecast stock demand|forecasting demand)\b/.test(lower)) return `/demand-forecast?q=${encoded}`;
   if (/\b(intelligence|forecast|forecasting|trend|anomaly|insight|insights|business health)\b/.test(lower)) return `/intelligence?q=${encoded}`;
   if (/\b(team|member|members|permission|role|invite|access control)\b/.test(lower)) return `/administration/members?q=${encoded}`;
   if (/\b(setup|onboarding|setup progress)\b/.test(lower)) return "/onboarding";
   if (/\b(switch business|workspace|businesses)\b/.test(lower)) return "/workspace";
   if (/\b(password|forgot password|reset password|active session|sessions|sign-in security|account security)\b/.test(lower)) return `/settings/security?q=${encoded}`;
-  if (/\b(setting|settings|business profile|currency|branch)\b/.test(lower)) return `/administration?q=${encoded}`;
+  if (/\b(setting|settings|business profile|business details|currency|branch)\b/.test(lower)) return `/administration?q=${encoded}`;
   if (/\b(customer|client|debtor|receivable|credit balance)\b/.test(lower)) return `/customers?q=${encoded}`;
   if (/\b(inventory|stock|warehouse|transfer|count|adjustment|low stock)\b/.test(lower)) return `/inventory?q=${encoded}`;
   if (/\b(product|sku|barcode|catalog|category|variant)\b/.test(lower)) return `/products?q=${encoded}`;

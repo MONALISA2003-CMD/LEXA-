@@ -141,7 +141,7 @@ def parse_document_fields(text: str, document_type: str) -> dict[str, Any]:
         "LEXA has not created or posted an invoice, expense, payment, purchase order, or journal entry.",
     ]
     if not clean:
-        warnings.insert(0, "No readable text was extracted. Enter details manually after reviewing the original file.")
+        warnings.insert(0, "No readable text was found. Check the original document and enter the details manually.")
     return {
         "schema_version": "phase3.document_candidate.v1",
         "document_type": doc_type,
@@ -247,7 +247,7 @@ def extract_document(content: bytes, content_type: str, document_type: str) -> d
     candidate = parse_document_fields(output_text, document_type)
     extraction_status = "SUCCEEDED" if output_text else ("UNAVAILABLE" if method == "UNAVAILABLE" else "PARTIAL")
     if timed_out and not output_text:
-        candidate["warnings"].insert(0, "Local text extraction reached its time limit. Review the document manually.")
+        candidate["warnings"].insert(0, "LEXA could not finish reading this document in time. Check it manually.")
     return {
         "extracted_text": output_text,
         "candidate_fields": candidate,

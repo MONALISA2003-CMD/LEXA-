@@ -59,7 +59,7 @@ export async function getDailyBrief(currencyCode?: string): Promise<DailyBrief> 
     currency = profile?.currency_code;
   }
   if (!currency || !/^[A-Z]{3}$/i.test(currency)) {
-    throw new Error("Set up your business profile and currency before opening the daily brief.");
+    throw new Error("Add your business name and currency before opening the daily overview.");
   }
   const token = await authToken();
   const response = await fetch(`/api/lexa/api/v1/intelligence/daily-brief?currency_code=${encodeURIComponent(currency.toUpperCase())}`, {
@@ -69,12 +69,8 @@ export async function getDailyBrief(currencyCode?: string): Promise<DailyBrief> 
   });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = payload && typeof payload === "object" && "detail" in payload ? (payload as { detail?: unknown }).detail : null;
-    if (detail && typeof detail === "object" && "message" in detail && typeof (detail as { message?: unknown }).message === "string") {
-      throw new Error((detail as { message: string }).message);
-    }
-    if (typeof detail === "string" && detail.trim()) throw new Error(detail);
-    throw new Error("LEXA could not verify the daily brief. Refresh the saved reports and try again.");
+    // Keep server diagnostics and internal response codes out of customer-facing copy.
+    throw new Error("LEXA couldn’t load the daily overview. Check your business details and try again.");
   }
   return payload as DailyBrief;
 }

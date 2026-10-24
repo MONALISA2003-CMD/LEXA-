@@ -38,7 +38,7 @@ const FIELDS: { key: FieldName; label: string; kind?: "date" | "number" }[] = [
   { key: "subtotal", label: "Subtotal", kind: "number" },
   { key: "tax_amount", label: "Tax / VAT", kind: "number" },
   { key: "total", label: "Total amount", kind: "number" },
-  { key: "currency_code", label: "Currency code" },
+  { key: "currency_code", label: "Currency (for example, UGX)" },
   { key: "tax_id", label: "Tax identification number" },
 ];
 const EMPTY_REVIEW: ReviewValues = {
@@ -60,10 +60,17 @@ function fileSize(bytes: number) {
 function fromCandidate(field?: CandidateField, fallback?: string | null) {
   return fallback ?? field?.value ?? "";
 }
+function friendlyReadingMethod(method: string) {
+  const value = String(method || "").toLowerCase();
+  if (value.includes("ocr") || value.includes("recognition")) return "Text recognition";
+  if (value.includes("pdf") || value.includes("embedded")) return "Reading document text";
+  if (value.includes("manual")) return "Manual review";
+  return "Document reading";
+}
 function fieldEvidence(field?: CandidateField) {
-  if (!field?.value) return "No value was extracted. Enter it after checking the original document.";
-  if (field.evidence) return `Read from: “${field.evidence}”`;
-  return "No supporting text was detected. Check the original document.";
+  if (!field?.value) return "No detail was found. Check the original document and enter it here if needed.";
+  if (field.evidence) return `Text found: “${field.evidence}”`;
+  return "No text was found to support this detail. Check the original document.";
 }
 function isRequired(type: IntelligenceDocumentType, key: FieldName) {
   const required: Partial<Record<IntelligenceDocumentType, FieldName[]>> = {
@@ -169,7 +176,7 @@ export default function DocumentsPage() {
         ...(reviewReason.trim() ? { reason: reviewReason.trim() } : action === "REJECT" ? { reason: "Rejected after human review." } : {}),
       });
       setSelected(result);
-      setMessage(action === "CONFIRM" ? "Details confirmed. No invoice, expense, payment or journal entry was created." : "Document rejected. No business transaction was created.");
+      setMessage(action === "CONFIRM" ? "Details confirmed. No invoice, expense, payment or accounting entry was created." : "Document rejected. No business transaction was created.");
       await loadDocuments(branchId);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "LEXA couldn't save this review.");
@@ -185,33 +192,33 @@ export default function DocumentsPage() {
   const candidateFields = selected?.candidate_fields?.fields ?? {};
   const canReview = Boolean(selected?.can_review && !reviewing);
 
-  return <AppShell title="Documents" eyebrow="LEXA intelligence">
+  return <AppShell title="Documents" eyebrow="DOCUMENTS & RECORDS">
     <main className={`workspace ${styles.page}`} style={{ maxWidth: 1240 }}>
       <div className="workspace-header">
         <div>
           <span className="workspace-breadcrumb">LEXA · DOCUMENTS</span>
-          <h1>Turn business documents into checked details.</h1>
-          <p>Upload an invoice, receipt or purchase order. LEXA reads locally where possible, shows the evidence and lets your team confirm the details before using the normal business workflow.</p>
+          <h1>Review important details from your documents.</h1>
+          <p>Upload an invoice, receipt or purchase order. LEXA helps find the details, then lets your team check them against the original before using them in business records.</p>
         </div>
-        <div className="header-actions"><button className="button button-soft" onClick={() => void load()} disabled={loading || uploading || reviewing} type="button">{loading ? "Refreshing…" : "Refresh"}</button><Link href="/purchasing" className="button button-dark">Open purchasing</Link></div>
+        <div className="header-actions"><button className="button button-soft" onClick={() => void load()} disabled={loading || uploading || reviewing} type="button">{loading ? "Updating…" : "Refresh"}</button><Link href="/purchasing" className="button button-dark">Open purchases</Link></div>
       </div>
 
-      <div className="notice" role="note"><strong>Review before using.</strong> Text recognition can be wrong. Original files stay within LEXA's branch-scoped store; document text is not sent to an AI provider. Confirmed details are a review result only—LEXA does not create or post financial records from this page.</div>
+      <div className="notice" role="note"><strong>Review before using.</strong> Text recognition can be wrong. Your original files stay within your business's records, and document text is not sent to an outside service. Confirmed details are for review only. This page does not create or save financial records.</div>
       {error && <div className="notice notice-error" role="alert">{error}</div>}
       {message && <div className="notice" role="status">{message}</div>}
 
       <section className={`workspace-section ${styles.section}`} aria-labelledby="document-upload-title">
-        <div className="section-head"><div><span className="section-label">STEP 1 · ADD A DOCUMENT</span><h2 id="document-upload-title">Upload a document</h2><p>PDF, JPG, PNG or WebP · Maximum 10 MB per file.</p></div></div>
+        <div className="section-head"><div><span className="section-label">STEP 1 · ADD A DOCUMENT</span><h2 id="document-upload-title">Upload a document</h2><p>PDF, JPG, PNG or WebP · Up to 10 MB per file.</p></div></div>
         <div className={styles.uploadGrid}>
           <label className={styles.field}><span>Document type</span><select value={documentType} onChange={event => setDocumentType(event.target.value as IntelligenceDocumentType)} disabled={uploading}>{TYPES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-          <label className={styles.field}><span>Business branch</span><select value={branchId} onChange={event => setBranchId(event.target.value)} disabled={uploading || assignedBranches.length === 0} required><option value="">Choose an assigned branch</option>{assignedBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
+          <label className={styles.field}><span>Branch</span><select value={branchId} onChange={event => setBranchId(event.target.value)} disabled={uploading || assignedBranches.length === 0} required><option value="">Choose a branch</option>{assignedBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
           <label className={`${styles.field} ${styles.fileField}`}><span>Choose file</span><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={event => { setFile(event.target.files?.[0] || null); setError(""); }} disabled={uploading} /><small>{file ? `${file.name} · ${fileSize(file.size)}` : "Use a clear scan or photo with readable text."}</small></label>
-          <div className={styles.uploadAction}><button className="button button-dark" type="button" onClick={() => void upload()} disabled={uploading || !file || !branchId}>{uploading ? "Reading document…" : "Upload and read"}</button><small>Files are size-limited and processed without an external model.</small></div>
+          <div className={styles.uploadAction}><button className="button button-dark" type="button" onClick={() => void upload()} disabled={uploading || !file || !branchId}>{uploading ? "Reading document…" : "Upload and read"}</button><small>Files are limited to 10 MB and read within LEXA.</small></div>
         </div>
       </section>
 
       <section className={`workspace-section ${styles.section}`} aria-labelledby="document-review-title">
-        <div className="section-head"><div><span className="section-label">STEP 2 · CHECK THE DETAILS</span><h2 id="document-review-title">Document review</h2><p>Open a saved file to view extracted fields and the text that supports them.</p></div><span className="status neutral">{items.length} saved {items.length === 1 ? "document" : "documents"}</span></div>
+        <div className="section-head"><div><span className="section-label">STEP 2 · CHECK THE DETAILS</span><h2 id="document-review-title">Document review</h2><p>Choose a saved document to see the details found and the text used to identify them.</p></div><span className="status neutral">{items.length} saved {items.length === 1 ? "document" : "documents"}</span></div>
         <div className={styles.reviewLayout}>
           <div className={styles.documentList} aria-label="Saved documents">
             {loading && <p role="status">Loading saved documents…</p>}
@@ -223,22 +230,22 @@ export default function DocumentsPage() {
           </div>
 
           <div className={styles.documentDetail}>
-            {!selected && <div className="empty-state compact"><strong>Select a document</strong><span>Its candidate fields and source evidence will appear here.</span></div>}
+            {!selected && <div className="empty-state compact"><strong>Select a document</strong><span>The details found in the document will appear here.</span></div>}
             {selected && <>
               <div className={styles.detailHead}><div><h3>{selected.original_filename}</h3><p>{TYPES.find(type => type.value === selected.document_type)?.label || selected.document_type} · {fileSize(selected.size_bytes)} · {new Date(selected.created_at).toLocaleString("en-UG")}</p></div><button className="button button-soft" type="button" onClick={() => void download()}>Download original</button></div>
-              <div className={styles.extractionNotice}><strong>{selected.extraction_status === "SUCCEEDED" ? "Text extracted" : selected.extraction_status === "PARTIAL" ? "Some text was found" : "Manual entry needed"}</strong><span>{selected.extraction_method.replaceAll("_", " ").toLowerCase()} · {selected.candidate_fields?.text_character_count ?? 0} characters. Recognition is not verification.</span></div>
+              <div className={styles.extractionNotice}><strong>{selected.extraction_status === "SUCCEEDED" ? "Text found" : selected.extraction_status === "PARTIAL" ? "Some details found" : "Enter details manually"}</strong><span>{friendlyReadingMethod(selected.extraction_method)}. Check every detail against the original.</span></div>
               {selected.candidate_fields?.warnings?.map(warning => <p className={styles.warningLine} key={warning}>{warning}</p>)}
               <div className={styles.fieldsGrid}>
                 {FIELDS.map(({ key, label, kind }) => {
                   const candidate = candidateFields[key];
                   const value = reviewValues[key] || "";
-                  return <label className={styles.field} key={key}><span>{label}{canReview && isRequired(selected.document_type, key) ? " · required" : ""}</span><input type={kind || "text"} min={kind === "number" ? "0" : undefined} step={kind === "number" ? "0.01" : undefined} value={value} disabled={!canReview} onChange={event => setReviewValues(current => ({ ...current, [key]: event.target.value }))} placeholder={canReview ? "Check the original and enter if missing" : "No confirmed value"} /><small>{candidate?.value ? `Extracted: ${candidate.value}${candidate.confidence ? ` · label match ${Math.round(candidate.confidence * 100)}%` : ""}` : "No value extracted"}</small><small>{fieldEvidence(candidate)}</small></label>;
+                  return <label className={styles.field} key={key}><span>{label}{canReview && isRequired(selected.document_type, key) ? " · required" : ""}</span><input type={kind || "text"} min={kind === "number" ? "0" : undefined} step={kind === "number" ? "0.01" : undefined} value={value} disabled={!canReview} onChange={event => setReviewValues(current => ({ ...current, [key]: event.target.value }))} placeholder={canReview ? "Check the original and enter if missing" : "No checked value yet"} /><small>{candidate?.value ? `Found: ${candidate.value}${candidate.confidence ? ` · ${Math.round(candidate.confidence * 100)}% match` : ""}` : "No detail found"}</small><small>{fieldEvidence(candidate)}</small></label>;
                 })}
               </div>
-              {selected.extracted_text_preview && <details className={styles.sourceText}><summary>View extracted text for cross-checking</summary><pre>{selected.extracted_text_preview}</pre></details>}
+              {selected.extracted_text_preview && <details className={styles.sourceText}><summary>View text found in the document</summary><pre>{selected.extracted_text_preview}</pre></details>}
               {selected.review_reason && <p className={styles.warningLine}>Review note: {selected.review_reason}</p>}
-              {canReview && <div className={styles.reviewActions}><label className={styles.field}><span>Review note (optional)</span><input value={reviewReason} onChange={event => setReviewReason(event.target.value)} maxLength={500} placeholder="For example, matched against the supplier's original invoice." /></label><div className="header-actions"><button className="button button-dark" type="button" disabled={reviewing} onClick={() => void review("CONFIRM")}>{reviewing ? "Saving review…" : "Confirm checked details"}</button><button className="button button-soft" type="button" disabled={reviewing} onClick={() => void review("REJECT")}>Reject document</button></div></div>}
-              {selected.status === "CONFIRMED" && <div className="notice" role="status"><strong>Details confirmed by a team member.</strong><p>No business transaction was created. Continue in the relevant module to create a draft record using these checked details.</p><div className="header-actions"><Link className="button button-soft" href={selected.document_type === "SUPPLIER_INVOICE" || selected.document_type === "PURCHASE_ORDER" ? "/purchasing" : "/accounting"}>{selected.document_type === "SUPPLIER_INVOICE" || selected.document_type === "PURCHASE_ORDER" ? "Continue to purchasing" : "Continue to finance"}</Link></div></div>}
+              {canReview && <div className={styles.reviewActions}><label className={styles.field}><span>Note about your review (optional)</span><input value={reviewReason} onChange={event => setReviewReason(event.target.value)} maxLength={500} placeholder="For example, matched against the supplier's original invoice." /></label><div className="header-actions"><button className="button button-dark" type="button" disabled={reviewing} onClick={() => void review("CONFIRM")}>{reviewing ? "Saving review…" : "Confirm checked details"}</button><button className="button button-soft" type="button" disabled={reviewing} onClick={() => void review("REJECT")}>Reject document</button></div></div>}
+              {selected.status === "CONFIRMED" && <div className="notice" role="status"><strong>Details confirmed by a team member.</strong><p>No business transaction was created. Continue in the relevant module to create a draft record using these checked details.</p><div className="header-actions"><Link className="button button-soft" href={selected.document_type === "SUPPLIER_INVOICE" || selected.document_type === "PURCHASE_ORDER" ? "/purchasing" : "/accounting"}>{selected.document_type === "SUPPLIER_INVOICE" || selected.document_type === "PURCHASE_ORDER" ? "Continue to purchases" : "Continue to money records"}</Link></div></div>}
               {selected.status === "REJECTED" && <div className="notice" role="status">This file was rejected during review. No business transaction was created.</div>}
             </>}
           </div>

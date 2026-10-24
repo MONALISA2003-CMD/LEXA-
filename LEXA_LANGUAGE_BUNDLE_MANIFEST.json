@@ -1,0 +1,37 @@
+{
+  "name": "LEXA Product Language Overhaul \u2014 Corrected Source Overlay",
+  "date": "2026-10-24",
+  "target_branch": "main",
+  "type": "source overlay compatible with existing LEXA ZIP extractor",
+  "scope": "assistant unavailable state, navigation terminology, Daily overview and Document review copy, product language standards/inventory",
+  "safety": {
+    "business_logic_changed": false,
+    "permissions_changed": false,
+    "accounting_behavior_changed": false,
+    "database_schema_changed": false,
+    "secrets_changed": false,
+    "provider_configuration_changed": false,
+    "deployment_or_infrastructure_changed": false,
+    "temporary_migration_marker_removed_by_manifest": true
+  },
+  "files": [
+    "apps/web/app/ai-assistant/page.tsx",
+    "apps/web/app/ai-assistant/page.module.css",
+    "apps/web/app/daily-brief/page.tsx",
+    "apps/web/app/documents/page.tsx",
+    "apps/web/lib/daily-brief-api.ts",
+    "apps/web/lib/document-intelligence-api.ts",
+    "apps/web/lib/navigation.mjs",
+    "apps/api/app/intelligence/document_extraction.py",
+    "docs/LEXA_PRODUCT_LANGUAGE_INVENTORY_2026-10-24.md",
+    "docs/LEXA_PRODUCT_LANGUAGE_STANDARDS.md",
+    "apps/web/package.json",
+    "apps/api/app/main.py",
+    "migrations/.lexa-language-overhaul-marker",
+    "DELETE.txt",
+    "README_LANGUAGE_OVERHAUL.md",
+    "VALIDATION_RESULTS.md",
+    "LEXA_LANGUAGE_BUNDLE_MANIFEST.json",
+    "apps/web/tests/lexa-language-overhaul.test.mjs"
+  ]
+}
