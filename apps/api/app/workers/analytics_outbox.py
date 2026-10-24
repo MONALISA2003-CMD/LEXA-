@@ -1,9 +1,8 @@
-"""Durably refresh tenant analytics from committed LEXA outbox events.
+"""Durably refresh tenant analytics and maintain a verified 56-day history window.
 
-The worker is embedded in each API process, so deploying it does not require a
-separate billable service. PostgreSQL row locks and SKIP LOCKED coordinate
-multiple API replicas. If migration 041 is not installed yet, the worker backs
-off and retries rather than failing health checks or spamming logs.
+The worker stays embedded in the API. Migration 041 processes event-driven
+single-day refreshes; migration 047 adds a separate, rate-limited history refresh
+because demand forecasting intentionally refuses incomplete or stale histories.
 """
 from __future__ import annotations
 
@@ -19,6 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from ..db import SessionLocal
 
 logger = logging.getLogger("lexa.analytics_worker")
+_history_migration_missing_reported = False
 
 
 def configured_limits() -> tuple[int, int]:
@@ -34,20 +34,47 @@ def configured_limits() -> tuple[int, int]:
 
 
 def run_once(batch_size: int | None = None) -> dict[str, int] | None:
-    """Run one bounded batch, returning None until migration 041 is present."""
+    """Process queued daily refreshes and, if installed, at most one 56-day backfill.
+
+    The legacy three-key result is preserved for existing operational callers.
+    Backfill counts are logged separately and never mixed with queue metrics.
+    """
+    global _history_migration_missing_reported
     _, default_batch = configured_limits()
     limit = default_batch if batch_size is None else max(1, min(int(batch_size), 100))
     with SessionLocal() as db:
-        function_exists = db.execute(
+        queue_function_exists = db.execute(
             text("SELECT to_regprocedure('public.process_analytics_refresh_queue(integer)') IS NOT NULL")
         ).scalar_one()
-        if not function_exists:
+        if not queue_function_exists:
             db.rollback()
             return None
         result = db.execute(
             text("SELECT processed_count,failed_count,dead_letter_count FROM public.process_analytics_refresh_queue(:limit)"),
             {"limit": limit},
         ).mappings().one()
+
+        history_function_exists = db.execute(
+            text("SELECT to_regprocedure('public.refresh_analytics_forecast_baselines(integer)') IS NOT NULL")
+        ).scalar_one()
+        if history_function_exists:
+            history = db.execute(
+                text("SELECT processed_count,failed_count FROM public.refresh_analytics_forecast_baselines(:limit)"),
+                {"limit": 1},
+            ).mappings().one()
+            history_processed = int(history["processed_count"] or 0)
+            history_failed = int(history["failed_count"] or 0)
+            if history_processed or history_failed:
+                logger.info(
+                    "analytics history backfill processed=%s failed=%s window_days=56",
+                    history_processed, history_failed,
+                )
+            if history_failed:
+                logger.error("analytics history backfill failed; the database recorded a retry cooldown")
+            _history_migration_missing_reported = False
+        elif not _history_migration_missing_reported:
+            logger.warning("analytics history backfill idle: migration 047 is not installed")
+            _history_migration_missing_reported = True
         db.commit()
     return {
         "processed": int(result["processed_count"] or 0),
