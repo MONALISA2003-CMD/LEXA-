@@ -1,37 +1,39 @@
 {
-  "name": "LEXA Product Language Overhaul \u2014 Corrected Source Overlay",
+  "name": "LEXA Full Business Language Overhaul — guarded main-branch package",
   "date": "2026-10-24",
+  "target_repository": "MONALISA2003-CMD/LEXA-",
   "target_branch": "main",
-  "type": "source overlay compatible with existing LEXA ZIP extractor",
-  "scope": "assistant unavailable state, navigation terminology, Daily overview and Document review copy, product language standards/inventory",
+  "baseline_commit_inspected": "36f894b0b0e9203840a333548980e569502cc8c7",
+  "type": "Language audit assets and main-branch guarded application workflow template",
+  "scope": "Plain English across active frontend modules, navigation/search, shared components, user-facing errors, and language-focused regression tests. The workflow applies changes to a full main checkout and commits only after complete validation.",
   "safety": {
-    "business_logic_changed": false,
+    "customer_facing_copy_only_in_language_script": true,
+    "business_logic_intentionally_changed": false,
     "permissions_changed": false,
-    "accounting_behavior_changed": false,
+    "accounting_behaviour_changed": false,
     "database_schema_changed": false,
-    "secrets_changed": false,
-    "provider_configuration_changed": false,
-    "deployment_or_infrastructure_changed": false,
-    "temporary_migration_marker_removed_by_manifest": true
+    "secrets_or_provider_settings_changed": false,
+    "production_data_modified": false,
+    "assistant_external_requests_enabled": false,
+    "commit_only_after_all_tests_pass": true,
+    "workflow_must_be_added_manually_because_extractor_protects_workflow_directory": true
   },
+  "application_steps": [
+    "Upload this ZIP itself to the repository root on main and let the existing LEXA ZIP extractor process it.",
+    "Create .github/workflows/lexa-language-overhaul.yml on main by copying docs/LEXA_LANGUAGE_OVERHAUL_WORKFLOW.yml; the extractor deliberately skips .github/workflows.",
+    "Run LEXA Full Business Language Audit on main and review the entire test/build result and subsequent main CI run."
+  ],
   "files": [
-    "apps/web/app/ai-assistant/page.tsx",
-    "apps/web/app/ai-assistant/page.module.css",
-    "apps/web/app/daily-brief/page.tsx",
-    "apps/web/app/documents/page.tsx",
-    "apps/web/lib/daily-brief-api.ts",
-    "apps/web/lib/document-intelligence-api.ts",
-    "apps/web/lib/navigation.mjs",
-    "apps/api/app/intelligence/document_extraction.py",
-    "docs/LEXA_PRODUCT_LANGUAGE_INVENTORY_2026-10-24.md",
-    "docs/LEXA_PRODUCT_LANGUAGE_STANDARDS.md",
-    "apps/web/package.json",
-    "apps/api/app/main.py",
-    "migrations/.lexa-language-overhaul-marker",
     "DELETE.txt",
     "README_LANGUAGE_OVERHAUL.md",
     "VALIDATION_RESULTS.md",
-    "LEXA_LANGUAGE_BUNDLE_MANIFEST.json",
-    "apps/web/tests/lexa-language-overhaul.test.mjs"
+    "apps/api/app/main.py",
+    "apps/web/package.json",
+    "docs/LEXA_BUSINESS_LANGUAGE_AUDIT_TEST.mjs",
+    "docs/LEXA_LANGUAGE_OVERHAUL_WORKFLOW.yml",
+    "docs/LEXA_PRODUCT_LANGUAGE_INVENTORY_2026-10-24.md",
+    "docs/LEXA_PRODUCT_LANGUAGE_STANDARDS.md",
+    "migrations/.lexa-language-overhaul-marker",
+    "scripts/lexa_apply_business_language.py"
   ]
 }

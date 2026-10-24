@@ -1,55 +1,63 @@
-# LEXA Product-Language Inventory
+# LEXA Product Language Audit — Full Frontend
 
-**Date:** 24 October 2026
-**Approved direction:** Professional and approachable; plain English; technical AI configuration private; unavailable assistant remains useful and truthful.
+**Audience:** Small-business owners, managers and staff in Uganda  
+**Writing style:** Plain, professional, helpful English  
+**Currency and date context:** Keep Uganda's UGX and local date conventions where they are already supported by the product.
 
-This inventory distinguishes copy actually changed by this overlay from the wider module-by-module review standard. The source wording in the rows below is the current copy pattern identified during inspection; replacement text is intended as the product standard.
+## Shared screen language
 
-## Applied in this overlay
-
-| Area | Change applied | Validation focus |
+| Area | Use this wording | Avoid showing customers |
 | --- | --- | --- |
-| Navigation and search | Labels simplified for Checkout, Money & records, Daily overview, Sales forecast, Business assistant, Tax and receipts, Business details, Team access, and Finish setup. Search still resolves established terms and routes. | Keep route paths unchanged; verify links and plain-language search destinations. |
-| Business assistant | Removed provider-list requests, provider selector, the question form, provider-specific disclosures, model/pricing/quota copy, and key-handling instructions from the customer-facing page. | Assistant unavailable state is explicit and contains links to existing business tools. |
-| Daily overview | Removed references to deterministic rules and external AI; simplified data-quality and empty-state copy; changed technical refresh wording to “Last updated.” | Missing information is never shown as zero; business data and write behavior are unchanged. |
-| Sales forecast | Replaced predictive-model terminology and abbreviations with plain descriptions; hid internal table names and implementation status; simplified history requirements and limitations. | Forecast computation, source data, coverage gates, and read-only behavior are unchanged. |
-| Documents and review | Replaced internal processing terminology, branch-scoped storage phrasing, and technical method names; simplified currency labels and error messages; clarified that details must be checked against the original. | Human review remains required; no invoice, payment, expense, or accounting record is created by document review. |
-| Related API messages | Improved user-facing errors for document review, daily overview, and sales forecast; changed user-visible extraction and forecast limitation messages. | Error messages must not claim success or reveal raw technical details. The focused overlay suite passes. |
-| Tests | Updated language contracts and added checks for assistant privacy, availability messaging, route labels, and plain-language forecast/document screens. | Existing behavior and route contracts remain intact. |
+| Business navigation | Business details, Team access, Switch business | Workspace configuration, role/permission configuration |
+| Home page | Business overview, Today's priorities, Needs your attention | Internal health states or system status names |
+| Stock | Stock levels, Stock history, Stock checks, Restock suggestions | Inventory subsystem, ledger in everyday stock tasks, replenishment |
+| Products | Products, Product options, Product codes, Barcodes, Prices | Catalog implementation wording or unexplained SKU jargon |
+| Sales and checkout | Sales, Payments received, Past sales, Ways customers pay, End-of-day payment check | Point-of-sale abbreviations without explanation |
+| Customers | Customer balances, Amounts customers still owe, Past sales | Receivables where a familiar explanation works |
+| Purchases | Purchases and suppliers, Record deliveries, Supplier bills and payments, Amounts due | Payables, unlinked receipt/variance jargon without explanation |
+| Money and records | Money reports, Expenses, Money received, Money spent, Recorded, Difference to check | Internal posting states and unexplained accounting system language |
+| Tax and receipts | Tax, VAT, Official tax documents, EFRIS (explained in context) | Unexplained fiscal/compliance labels or a claim that URA has approved something when it has not |
+| Daily overview | What to check first, Business updates, Information to check | Data-quality anomaly, indicators without context |
+| Sales planning | Sales forecast, Estimated units to sell, Past sales range, For planning only | Predictive intelligence, rolling-origin holdout, unexplained WAPE/MAE |
+| Documents | Invoices and receipts, Details found in the document, Check every detail against the original | Candidate extraction fields, OCR method names |
+| Team messages | Team messages, Conversation, Sign out this device | Thread internals, session revocation |
+| Sign-in and setup | Sign in, Reset password, Finish business setup, First business location | Tokens, session identifiers, tenant configuration |
+| Errors and empty states | What happened, what was saved if known, and what to do next | Stack traces, table names, HTTP codes, route names, internal error codes |
 
-## Whole-interface inventory and wording direction
+## Module-by-module scope
 
-| Module / shared state | Inventory target | Standard wording direction |
-| --- | --- | --- |
-| Home and dashboard | Page title, date range, summary cards, empty states, indicators | “Business overview,” “Today's sales,” “Amount due,” “Last updated.” Keep zero separate from missing data. |
-| Sales and sales history | Sale entry, totals, refunds, status, search, validation | “Record a sale,” “Payment recorded,” “Amount due,” “View sale.” Distinguish sale completion from payment completion. |
-| Stock and products | Counts, transfers, adjustments, low-stock state, product identifiers | “In stock,” “Low stock,” “Stock location,” “Product code.” Explain what needs checking. |
-| Checkout and daily close | Cart, tender/payment, closeout, duplicate submit, authorization | “Checkout,” “Record payment,” “Finish day.” Never say the sale was completed before the server confirms it. |
-| Customers and balances | Customer setup, payment history, credit, overdue status | “Customer,” “Amount due,” “Overdue.” Preserve paid/outstanding distinctions. |
-| Purchases and suppliers | Orders, delivery/receiving, supplier bills and payments | Distinguish placing an order, receiving goods, recording a bill, and paying the supplier. |
-| Money and accounting records | Payment matching, cash, expenses, journal entries, tax | Explain differences in amounts and review steps; do not alter accounting meaning. |
-| Documents | Upload, document types, review, warnings, extracted details | “Details found,” “Check the original,” “Confirm checked details.” A found value is not a verified record. |
-| Daily overview and insights | Warnings, recommendations, freshness, missing data | “What to check first,” “Information to check,” “Last updated.” Mark estimates and uncertainty clearly. |
-| Sales forecast | History, expected demand, forecast quality, unavailable cases | “Expected units,” “Average forecast error,” “Not enough recent sales history.” A forecast is never a guarantee. |
-| Business assistant | Unavailable and available states, safety information | No provider setup, keys, quotas, pricing, or model identifiers in customer screens. Unavailable means no answer is generated. |
-| Tax and receipts | Tax settings, official receipt states, business identity | Keep VAT and official document terms where required; explain unfamiliar terms without inventing tax advice. |
-| Business details and setup | Profile, currency, branches, required setup, progress | State the exact missing detail: “Add your business name and currency to continue.” |
-| Team access | Invite, roles, permissions, member state | Say who has access and what action is permitted. Never reveal internal authorization identifiers. |
-| Settings and workspace | Business switching, preferences, security, sessions | Use “Switch business,” “Settings,” and “Sign-in and security.” Explain access issues in user terms. |
-| Reports | Filters, periods, empty results, unavailable data | State the reporting period; distinguish no activity from unavailable information. |
-| Team chat | Messages, room status, posting errors | Keep actions direct; distinguish a saved message from a failed or pending send. |
-| Shared application shell | Search, navigation, setup alert, account menu, page status | Use one term per feature; state exactly what is missing and link to the right setup step. |
-| Forms and notifications | Required fields, success/failure, destructive confirmation | Say what to enter, what happened, and what the next step is. Avoid generic success messages when a request failed. |
+The applied wording pass covers these active screens and shared pieces:
 
-## Explicitly excluded from customer-facing screens
+1. Home and business overview.
+2. Sales, checkout, payment methods, returns and past sales.
+3. Stock levels, history, counts, corrections, transfers, locations, stock checks and restocking.
+4. Products, options, codes, barcodes and prices.
+5. Customer details, balances and past sales.
+6. Purchases, suppliers, orders, deliveries, supplier bills, payments and balances.
+7. Money records, expenses, customer amounts due, payment checks and reports.
+8. Business details, branches, stock locations and setup.
+9. Team members, team access and invitations.
+10. Tax, VAT, EFRIS and official tax documents.
+11. Daily overview, business insights and sales planning.
+12. Documents and human review of document details.
+13. Business assistant unavailable page.
+14. Sign-in, registration, password recovery, invitation acceptance and business switching.
+15. Team messages.
+16. Shared navigation, search suggestions, loading/empty/error notices, form messages and action buttons.
+17. Shared API error copy that reaches the browser.
 
-- Provider and model names for AI services.
-- API keys, environment-variable names, endpoint names, configuration flags, and server setup instructions.
-- Free/trial quota language, provider rate-limit details, pricing tiers, or paid-service selection.
-- Internal database table names, raw response codes, technical extraction method identifiers, and raw server diagnostics.
+## Language rules
 
-Necessary operation details may remain in server configuration and private operational documentation. This overlay does not change credentials, provider configuration, deployment settings, database writes, permissions, or business rules.
+- Write for business owners and staff who are not software specialists.
+- Prefer short sentences, familiar verbs and specific next steps.
+- Use one name for each action throughout navigation, headings, buttons, help, empty states and confirmation messages.
+- Keep essential accounting and tax meaning accurate. Do not make “invoice” and “receipt” interchangeable, or change the meaning of a payment, refund, tax document or stock movement.
+- A forecast is an estimate, not a promise. Explain uncertainty in ordinary words and do not make a recommendation sound like an automatic purchase.
+- Distinguish a confirmed zero from a missing figure or an unsuccessful request.
+- Never say an action succeeded unless the application confirms it. Say what is known about saved records and offer a safe next step.
+- Never show provider names, model names, keys, quotas, pricing or configuration details in ordinary business screens.
+- Do not enable the paused assistant as part of a wording change.
 
-## Scope note
+## Scope boundaries
 
-This bundle applies the wording changes in the “Applied in this overlay” table and includes the whole-interface inventory as the shared review standard. It does not claim that every literal string in every unbundled screen has already been reviewed; the remaining route-specific copy should be checked against this inventory during subsequent code reviews. No business feature phase is advanced by this language work.
+Only visible wording, navigation labels, empty/loading/error/help copy and their language-focused contract tests are changed by the language pass. Accounting calculations, posting behaviour, tax rules, APIs, permissions, data access, secrets, provider settings and database schema are not redefined by these text changes.
