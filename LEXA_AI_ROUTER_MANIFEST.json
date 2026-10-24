@@ -1,0 +1,29 @@
+{
+  "name": "LEXA Model Registry and Central AI Router",
+  "target_repository": "MONALISA2003-CMD/LEXA-",
+  "target_branch": "main",
+  "baseline_commit": "92cde279faeda3f379bcb83b6c0d219710c146d7",
+  "max_registry_models": 20,
+  "max_enabled_allowlisted_potentially_billable_models": 4,
+  "provider_execution_enabled_by_default": false,
+  "uses_mock_provider_tests": true,
+  "production_data_modified": false,
+  "database_schema_modified": false,
+  "hosted_secrets_modified": false,
+  "workflows_directory_requires_manual_install": true,
+  "contents": [
+    "README_AI_ROUTER.md",
+    "VALIDATION_RESULTS.md",
+    "LEXA_AI_ROUTER_MANIFEST.json",
+    "SHA256SUMS.txt",
+    "apps/api/app/main.py",
+    "apps/web/package.json",
+    "docs/LEXA_AI_MODEL_REGISTRY_SOURCE.py",
+    "docs/LEXA_AI_MODEL_REGISTRY_TESTS.py",
+    "scripts/lexa_apply_ai_router.py",
+    "docs/LEXA_AI_MODEL_ROUTER.md",
+    "docs/LEXA_AI_ROUTER_WORKFLOW.yml",
+    "migrations/.lexa-ai-router-marker",
+    "DELETE.txt"
+  ]
+}

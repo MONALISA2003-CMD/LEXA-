@@ -1,24 +1,28 @@
-# Validation record — LEXA full business-language package
+# Validation record — LEXA AI router build
 
-**Target:** `MONALISA2003-CMD/LEXA-`, branch `main`  
-**Baseline inspected:** `36f894b0b0e9203840a333548980e569502cc8c7`
+**Target:** `MONALISA2003-CMD/LEXA-`, `main`  
+**Main commit inspected:** `92cde279faeda3f379bcb83b6c0d219710c146d7`
 
-## Verified in this session
+## Checks completed in this session
 
-- Re-checked that `main` still points to `36f894b0b0e9203840a333548980e569502cc8c7`.
-- Inspected failed main CI run `40071295539`: the frontend typecheck and Docker/HAProxy checks passed; frontend contract tests and API unit/contract tests failed on stale visible-language expectations and the disabled Assistant contract.
-- Verified the Render LEXA service and Vercel production deployment were both built from the inspected main commit; Vercel reported no grouped runtime errors in the 7-day query.
-- Verified Neon project `LEXA`, default branch `lexa-live`, and database `neondb`; no schema, production data or connection settings were modified.
-- The language application script passes Python syntax compilation.
-- The workflow template parses as YAML, the module inventory and language test asset are present, and the final package is checked for CRC integrity and SHA-256 checksums.
-- Focused language/document regression tests from the prepared overlay passed 12/12 in the available partial workspace.
+- The current main commit and relevant source files were re-read through the GitHub connection.
+- The source-overlay `apps/api/app/main.py` marker matches the current Git blob SHA `6ebd746b06a05d257ce2f266a94d463a4b1411cf`.
+- The `apps/web/package.json` marker matches the current Git blob SHA `a28a43c9e435f4838c85fb124d194f8b51326b3c`.
+- Python syntax compilation passed for the model-registry source asset, the installer script, and the mock-only test asset.
+- A synthetic checkout fixture applied the script successfully and a second application made no further changes (idempotency check).
+- The isolated registry smoke test was rerun against the current source and passed for built-in model records, exact provider/model matching, cost classification, allowlist parsing, JSON size limits, duplicate-ID rejection, OpenRouter dynamic-alias restrictions, and secret-free status output.
+- The guarded workflow template parsed as YAML. The installer fixture passed a second-application idempotency check after materializing the registry and mock-test assets.
+- The script's CI patch map reflects stale assertions observed in the current main CI log: navigation labels, assistant-disabled wording, daily overview data-quality wording and demand-forecast search copy.
+- The guarded installer materializes the registry/test into active paths only when the workflow runs, avoiding a partially applied app commit, and bumps the central policy version to `phase2-model-registry-v1`. The model registry design restricts free/trial/unknown-cost models to synthetic public input; blocks personal data to every external model; requires a provider allowlist + model allowlist; and caps potentially billable enabled model IDs at four.
 
-## What is not yet verified
+## Not yet verified
 
-The complete frontend typecheck, all frontend tests, production frontend build, full API suite and deployment checks have **not** been run against a full checkout containing the complete language pass. The full repository could not be cloned in this session, GitHub write operations returned `403 Resource not accessible by integration`, and Vercel Sandbox creation was denied by the current snapshot-storage limit.
+- The complete LEXA API test suite has not been run against a full checkout with these edits.
+- The complete frontend typecheck, test suite and production build have not been run locally against the full repository.
+- The updated CI and source changes have not been committed to GitHub from this session; the GitHub write integration previously returned `403 Resource not accessible by integration`.
+- No live model/provider request has been made, and no hosted secrets, Neon schema, production data or deployments were changed.
+- Full main CI and deployment status must be checked after the workflow is installed and run in GitHub. Zero bugs cannot be guaranteed before those full checks pass.
 
-The ZIP extractor blocks `.github/workflows` paths, so this package contains the workflow as a template under `docs/`. After upload to `main`, create `.github/workflows/lexa-language-overhaul.yml` through GitHub's web editor by copying that template. Run the workflow on `main`; it applies the wording pass on the actual full source tree and commits only if every check succeeds. Full CI success must be confirmed after that run.
+## Release gate
 
-## Guardrails
-
-The script updates literal customer-facing copy and related test expectations across active frontend modules, shared UI, navigation/search and browser-facing errors. It does not intentionally change accounting calculations, financial posting behaviour, tax rules, APIs, permissions, access policy, secrets, provider configuration, database schema or production records. The Business assistant remains unavailable.
+Keep external model execution disabled. Treat the CI workflow as the final source gate. Do not remove the legacy assistant middleware or enable a provider until a trusted classification/redaction stage, privacy approval, paid-use controls and full CI are complete.
