@@ -15,14 +15,28 @@ test('navigation uses plain labels and preserves routes', () => {
   assert.equal(resolveBusinessSearchDestination('open checkout'), '/commerce?q=open%20checkout');
 });
 
-test('assistant page shows a useful unavailable state without provider setup', async () => {
+test('assistant page exposes an interactive LEXA-only chat without browser-side provider access', async () => {
   const page = await read('app/ai-assistant/page.tsx');
-  assert.match(page, /The assistant isn’t available right now/);
-  for (const phrase of ['API key', 'quota', 'provider', 'OpenAI', 'Gemini', 'Groq', 'paid service', 'NEXT_PUBLIC_', 'model selector']) {
-    assert.doesNotMatch(page.toLowerCase(), new RegExp(phrase.toLowerCase()));
+  const client = await read('lib/ai-assistant-api.ts');
+  assert.match(page, /Your LEXA business assistant/);
+  assert.match(page, /Private to your signed-in workspace/);
+  assert.match(page, /Your business question/);
+  assert.match(page, /<textarea/);
+  assert.match(page, /Ask LEXA/);
+  assert.match(page, /MarkdownAnswer/);
+  assert.doesNotMatch(page, /assistant-provider|Assistant service/);
+  assert.match(page, /Clear chat/);
+  assert.match(page, /This chat stays in this page and is not saved as conversation history/);
+  assert.match(client, /askLexaAssistant/);
+  assert.match(client, /\/api\/lexa\/api\/v1\/ai\/assistant/);
+  assert.match(client, /Authorization: `Bearer \$\{token\}`/);
+  assert.match(client, /include_business_summary: false/);
+  assert.doesNotMatch(client, /tenant_id|user_id|workspace_id/);
+  assert.doesNotMatch(`${page}\n${client}`, /api\.openai\.com|generativelanguage\.googleapis\.com|api\.groq\.com|NEXT_PUBLIC_[A-Z0-9_]*KEY/i);
+  assert.doesNotMatch(page, /The assistant isn’t available right now|This page will not generate or pretend to generate an answer/);
+  for (const href of ['/intelligence', '/daily-brief', '/demand-forecast', '/documents', '/reports']) {
+    assert.ok(page.includes(`href="${href}"`), `missing business-support link ${href}`);
   }
-  for (const href of ['/sales', '/inventory', '/reports', '/purchasing', '/customers', '/documents']) assert.ok(page.includes(`href: "${href}"`));
-  assert.doesNotMatch(page, /fetch\(|<textarea|Get guidance|AI provider/i);
 });
 
 test('daily overview avoids internal table names and external AI provider copy', async () => {

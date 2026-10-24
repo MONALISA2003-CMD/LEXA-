@@ -4,12 +4,13 @@ This source package is prepared for the repository's **LEXA ZIP Extractor** work
 
 ## Changes included
 
-- Replaces the static Business Assistant page with an interactive, in-memory-only chat UI, a safe Markdown renderer, provider discovery, business-area selection, and links to LEXA's local intelligence pages.
+- Replaces the static Business Assistant page with an interactive, in-memory-only chat UI, a safe Markdown renderer, central-policy availability checking, business-area selection, and links to LEXA's local intelligence pages. Provider selection stays server-side so customers do not need to choose a model service.
 - Adds the new `/api/v1/ai/assistant` endpoint. The legacy `/api/v1/ai/assist` endpoint remains blocked.
 - Calls LEXA's central `intelligence.policy` router before a provider is selected. There is no automatic provider fallback.
 - Restricts questions to supported LEXA/business workflows, gives greetings a local answer, rejects common off-topic and prompt-injection requests locally, screens personal identifiers, blocks numeric business details from external transfer by default, and never loads or sends another tenant's saved business data.
-- Limits rate counting by authenticated `tenant_id` and `user_id`; reads only the authenticated tenant's `tenant_settings.timezone` for current business-local date/time/daypart; does not persist prompts or conversation history.
+- Limits rate counting by authenticated `tenant_id` and `user_id`; rejects client-supplied tenant/user/workspace identifiers; reads only the authenticated tenant's `tenant_settings.timezone` for current business-local date/time/daypart; does not persist prompts or conversation history. The UI clears its in-memory conversation if the active workspace changes.
 - Shortens provider timeout and default output budget to improve responsiveness. Assistant responses are normalized to Markdown prose rather than JSON.
+- Uses a supported, lightweight OpenAI fallback model (`gpt-5-mini`) and keeps provider/model choice out of the business-user interface. Provider calls remain server-side and subject to policy allowlists.
 - Extends the existing analytics worker to call a new optional backfill function from migration 047. The worker now schedules a complete 56-day projection refresh for tenants lacking a recent successful refresh, at most one tenant per poll, with a retry cooldown on failures.
 - Adds regression tests for scope/privacy guardrails and the analytics worker's optional 56-day backfill path.
 
@@ -19,7 +20,7 @@ This source package is prepared for the repository's **LEXA ZIP Extractor** work
 2. Wait for **LEXA ZIP Extractor** to extract the files and commit the extracted source. Then inspect the extracted commit, GitHub Actions checks, Render deploy, and Vercel production deployment.
 3. Do not upload the ZIP into `.github/workflows/`. The extractor deliberately protects that path.
 
-The GitHub integration used to prepare this package cannot create branches or push changes directly (GitHub returned `403 Resource not accessible by integration`), so this package has not been committed to the repository by the assistant.
+This package is not committed to the repository by the assistant. Upload it at the repository root through the existing extractor workflow so the full repository tests can run.
 
 ## Render environment values for question-only AI
 
@@ -51,10 +52,14 @@ A read-only check of the live Neon branch found:
 
 After the migrations are reviewed and applied, the worker can establish fresh 56-day projection windows. Forecasting will still say **no recorded demand history** until transactions exist; it must not invent forecasts from missing data.
 
-**Validation limitation:** a prepared Neon validation branch could not be created because the Neon project returned `branches limit exceeded`. The live database was queried read-only to check prerequisites, but migrations 045–047 have not been clean-replay-tested on an isolated branch and must not be applied to production until that test is completed. Do not delete an existing branch without confirming that it is disposable; the project currently has several named validation/replay branches.
+**Migration validation:** migrations 045, 046 and 047 were executed together successfully on the non-production Neon replay branch `lexa-phase3-security-replay-20261021` (`br-dark-breeze-b1mgcaxj`). The branch recorded all three versions; `intelligence_jobs`, `intelligence_runs`, `intelligence_documents` and `intelligence_document_reviews` are present with both row-level security and forced row-level security enabled. The document tables have tenant/branch-scoped policies for `lexa_app`. No migration was run against the live `lexa-live` branch.
+
+**56-day refresh check:** on that replay branch, the new backfill function processed two active tenants on separate bounded calls (`processed_count=1, failed_count=0` per call). A third call correctly returned zero work. Read-only verification then found a recent successful 56-day window for both active tenants, from 30 August 2026 through 24 October 2026. These are coverage-window checks, not proof of recorded demand: forecasts must still remain unavailable or clearly marked insufficient where completed sales history is absent.
 
 ## Validation run in this preparation environment
 
-- Python files: syntax/AST compilation checked.
-- Full API pytest and frontend TypeScript/build suites were not run here because this package intentionally contains only changed/marker files, the network is unavailable for cloning dependencies, and the full application source plus web `node_modules` are not present locally.
-- The new tests are included so the canonical GitHub Actions workflow can run them against the complete repository after extraction.
+- `unzip -t` passed for the incoming archive before repair.
+- Python source syntax/AST compilation is checked during packaging.
+- Migrations 045–047 and the real 56-day worker function were tested against the non-production Neon replay branch described above. Production migration state was checked read-only and remains separate.
+- The complete API pytest and frontend TypeScript/production build suites were not run locally because the ZIP contains only changed/marker files, not the entire application or web dependencies. This ZIP includes updated API and web contract tests for the next GitHub Actions run.
+- The latest source on GitHub had a red Main Build CI run because older contract tests expected a disabled, non-interactive assistant. The included test updates validate authenticated server-side routing, tenant privacy, and the live chat instead of requiring the assistant to stay disabled.

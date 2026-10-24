@@ -58,7 +58,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
     ProviderSpec(provider_id="cerebras", label="Cerebras Inference", tier="Trial or paid usage", key_env="CEREBRAS_API_KEY", model_env="CEREBRAS_MODEL", default_model="zai-glm-4.7", endpoint="https://api.cerebras.ai/v1", api_style="openai-compatible"),
     ProviderSpec(provider_id="openrouter", label="OpenRouter", tier="Model-dependent usage", key_env="OPENROUTER_API_KEY", model_env="OPENROUTER_MODEL", default_model="openrouter/free", endpoint="https://openrouter.ai/api/v1", api_style="openai-compatible"),
     ProviderSpec(provider_id="huggingface", label="Hugging Face Inference Providers", tier="Plan-dependent usage", key_env="HUGGINGFACE_API_KEY", model_env="HUGGINGFACE_MODEL", default_model="Qwen/Qwen3-32B", endpoint="https://router.huggingface.co/v1", api_style="openai-compatible"),
-    ProviderSpec(provider_id="openai", label="OpenAI API", tier="Paid API usage", key_env="OPENAI_API_KEY", model_env="OPENAI_MODEL", default_model="gpt-6-astra", endpoint="https://api.openai.com/v1", api_style="openai-responses"),
+    ProviderSpec(provider_id="openai", label="OpenAI API", tier="Paid API usage", key_env="OPENAI_API_KEY", model_env="OPENAI_MODEL", default_model="gpt-5-mini", endpoint="https://api.openai.com/v1", api_style="openai-responses"),
 )
 PROVIDER_MAP = {provider.provider_id: provider for provider in PROVIDERS}
 
@@ -214,6 +214,7 @@ def _scope_result(question: str, business_time: str = "") -> str:
         r"\b(weather|football|soccer|basketball|movie|celebrity|politics|election|dating|horoscope|lyrics|"
         r"homework|school essay|write (?:me )?a story|poem|video game|recipe|travel itinerary)\b",
         r"\b(write|debug|implement|explain)\s+(?:some\s+)?(?:code|python|javascript|sql|html|css|a program|an api)\b",
+        r"\b(source code|software engineer(?:ing)?|programming|code review|git commands?|pull request|commit hash|deploy a server|build an app|api endpoint|sql query|python script|javascript|typescript|docker|kubernetes|stack trace)\b",
         r"\b(ignore|override)\s+(?:all\s+)?(?:previous|prior|system)\s+instructions\b",
         r"\b(other clients?|other tenants?|another workspace|all tenants|all customers|global customer data)\b",
         r"\b(reveal|show|print)\s+(?:the )?(?:system prompt|hidden instructions|api keys|secrets|passwords)\b",
@@ -250,7 +251,7 @@ def _sensitive_input_kind(question: str) -> str | None:
     """Reject personal identifiers locally; classify numeric business detail separately."""
     personal_patterns = (
         (r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE),
-        (r"\b(?:phone|mobile|telephone|account number|card number|password|pin|national id|passport|date of birth|dob)\s*[:#-]?\s*\S+", re.IGNORECASE),
+        (r"\b(?:phone|mobile|telephone|account number|card number|password|pin|national id|passport|date of birth|dob|tax id|tax identification number|tin|vat number)\s*[:#-]?\s*\S+", re.IGNORECASE),
         # A phone number has 9+ digits; this deliberately excludes common dates
         # such as YYYY-MM-DD and transaction amounts with punctuation.
         (r"\+?\d{1,3}[ ()-]?(?:\d[ ()-]?){8,12}\d\b", 0),
@@ -270,7 +271,8 @@ def _sensitive_input_kind(question: str) -> str | None:
         r"(?:UGX|KES|TZS|RWF|USD|EUR|GBP|\$|€|£)\s*\d",
         r"\b\d+(?:,\d{3})+(?:\.\d+)?\b",
         r"\b\d+(?:\.\d+)?\s*%(?!\w)",
-        r"\b(?:sales|revenue|profit|margin|cash|balance|stock|units|amount|total|expense|cost|price)\b[^.!?\n]{0,32}\b\d{3,}\b",
+        r"\b(?:sales|revenue|profit|margin|cash|balance|stock|units|amount|total|expense|cost|price|quantity|inventory|reorder|payment|payments)\b[^.!?\n]{0,48}\b\d{1,}(?:,\d{3})*(?:\.\d+)?\b",
+        r"\b\d{1,}(?:,\d{3})*(?:\.\d+)?\s*(?:units?|items?|pieces?|products?|orders?|customers?|transactions?|kg|grams?|litres?|liters?|boxes?|cases?)\b",
     )
     if any(re.search(pattern, detail_text, re.IGNORECASE) for pattern in numeric_business):
         return "aggregated_business"

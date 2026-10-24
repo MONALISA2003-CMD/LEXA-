@@ -7,7 +7,7 @@ import { AppShell } from "../../components/app-shell";
 import { askLexaAssistant, getAssistantProviders, type AssistantProvidersResponse } from "../../lib/ai-assistant-api";
 import styles from "./page.module.css";
 
-type ChatMessage = { id: string; role: "user" | "assistant"; text: string; provider?: string; local?: boolean };
+type ChatMessage = { id: string; role: "user" | "assistant"; text: string };
 type Area = "general" | "sales" | "stock" | "purchasing" | "finance" | "customers";
 
 function inlineMarkdown(text: string): ReactNode[] {
@@ -75,7 +75,6 @@ function makeId() {
 
 export default function AiAssistantPage() {
   const [providers, setProviders] = useState<AssistantProvidersResponse | null>(null);
-  const [providerId, setProviderId] = useState("");
   const [area, setArea] = useState<Area>("general");
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -92,9 +91,6 @@ export default function AiAssistantPage() {
     try {
       const result = await getAssistantProviders();
       setProviders(result);
-      setProviderId(current => result.providers.some(item => item.id === current && item.selectable)
-        ? current
-        : (result.providers.find(item => item.selectable)?.id ?? ""));
     } catch (cause) {
       setProviderError(cause instanceof Error ? cause.message : "Assistant settings could not be checked.");
     } finally {
@@ -103,6 +99,34 @@ export default function AiAssistantPage() {
   }, []);
 
   useEffect(() => { void loadProviders(); }, [loadProviders]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const activeWorkspace = () => {
+      try { return window.sessionStorage.getItem("lexa_workspace_id") ?? ""; }
+      catch { return ""; }
+    };
+    let workspaceSnapshot = activeWorkspace();
+    const resetForWorkspaceChange = () => {
+      const currentWorkspace = activeWorkspace();
+      if (currentWorkspace === workspaceSnapshot) return;
+      workspaceSnapshot = currentWorkspace;
+      setMessages([]);
+      setQuestion("");
+      setError("");
+      setProviderError("");
+      void loadProviders();
+    };
+    window.addEventListener("storage", resetForWorkspaceChange);
+    window.addEventListener("focus", resetForWorkspaceChange);
+    window.addEventListener("pageshow", resetForWorkspaceChange);
+    window.addEventListener("lexa:workspace-changed", resetForWorkspaceChange);
+    return () => {
+      window.removeEventListener("storage", resetForWorkspaceChange);
+      window.removeEventListener("focus", resetForWorkspaceChange);
+      window.removeEventListener("pageshow", resetForWorkspaceChange);
+      window.removeEventListener("lexa:workspace-changed", resetForWorkspaceChange);
+    };
+  }, [loadProviders]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages, sending]);
 
   async function submitQuestion(event: FormEvent<HTMLFormElement>) {
@@ -115,19 +139,14 @@ export default function AiAssistantPage() {
     const userMessage: ChatMessage = { id: makeId(), role: "user", text: prompt };
     setMessages(previous => [...previous, userMessage]);
     try {
-      const reply = await askLexaAssistant({ prompt, area, provider: providerId || undefined });
-      setMessages(previous => [...previous, {
-        id: makeId(), role: "assistant", text: reply.answer,
-        provider: reply.provider === "lexa-local" ? undefined : (providers?.providers.find(item => item.id === reply.provider)?.label || reply.provider),
-        local: reply.provider === "lexa-local",
-      }]);
+      const reply = await askLexaAssistant({ prompt, area });
+      setMessages(previous => [...previous, { id: makeId(), role: "assistant", text: reply.answer }]);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "LEXA couldn't respond just now. Please try again.";
       setError(message);
       setMessages(previous => [...previous, {
         id: makeId(), role: "assistant",
         text: `**I couldn't complete that request.** ${message}\n\nPlease try again shortly or use Business Insights, Reports or Daily Brief to review your saved figures.`,
-        local: true,
       }]);
     } finally {
       setSending(false);
@@ -170,7 +189,7 @@ export default function AiAssistantPage() {
             <span className="section-label">BUSINESS GUIDANCE</span>
             <h2>How can I help with LEXA?</h2>
           </div>
-          <span className={styles.statusDot}>{loadingProviders ? "Checking…" : availableProviders.length ? "Ready when you are" : "Safety settings active"}</span>
+          <span className={styles.statusDot}>{loadingProviders ? "Checking…" : availableProviders.length ? "Ready when you are" : "Private guidance available"}</span>
         </div>
 
         {messages.length === 0 ? <div className={styles.welcome}>
@@ -182,7 +201,7 @@ export default function AiAssistantPage() {
           </div>
         </div> : <div className={styles.messages} role="log" aria-live="polite" aria-relevant="additions text">
           {messages.map(message => <article key={message.id} className={`${styles.message} ${message.role === "user" ? styles.userMessage : styles.assistantMessage}`}>
-            <div className={styles.messageLabel}>{message.role === "user" ? "YOU" : "LEXA"}{message.provider && <span>{message.provider}</span>}</div>
+            <div className={styles.messageLabel}>{message.role === "user" ? "YOU" : "LEXA"}</div>
             {message.role === "assistant" ? <MarkdownAnswer text={message.text} /> : <p className={styles.userText}>{message.text}</p>}
           </article>)}
           {sending && <article className={`${styles.message} ${styles.assistantMessage}`} role="status"><div className={styles.messageLabel}>LEXA</div><div className={styles.thinking}><span></span><span></span><span></span><span className={styles.thinkingText}>Preparing guidance…</span></div></article>}
@@ -198,14 +217,10 @@ export default function AiAssistantPage() {
               <select id="assistant-area" value={area} onChange={event => setArea(event.target.value as Area)} disabled={sending}>
                 <option value="general">General LEXA help</option><option value="sales">Sales</option><option value="stock">Stock & inventory</option><option value="purchasing">Purchasing</option><option value="finance">Finance</option><option value="customers">Customers</option>
               </select>
-              <label className={styles.controlLabel} htmlFor="assistant-provider">Assistant service</label>
-              <select id="assistant-provider" value={providerId} onChange={event => setProviderId(event.target.value)} disabled={sending || loadingProviders || availableProviders.length === 0}>
-                {availableProviders.length === 0 ? <option value="">Not enabled</option> : availableProviders.map(provider => <option value={provider.id} key={provider.id}>{provider.label}</option>)}
-              </select>
             </div>
             <button type="submit" className="button button-dark" disabled={sending || loadingProviders || !question.trim()}>{sending ? "Thinking…" : "Ask LEXA"}<span aria-hidden="true"> →</span></button>
           </div>
-          {!loadingProviders && !providers?.enabled && <p className={styles.disabledNote}>External responses are still disabled by the server's safety settings. Local business insights and reports remain available while the approved provider settings are completed.</p>}
+          {!loadingProviders && !providers?.enabled && <p className={styles.disabledNote}>LEXA's private guidance is available, but extended answers are not enabled under the current safety settings. Business Insights, Daily Brief and Reports remain available for your saved records.</p>}
           <p className={styles.disclaimer}>LEXA only answers questions in its business-support scope. Do not enter names, phone numbers, private customer details, payment credentials or account identifiers. For exact saved figures, use Business Insights or Reports.</p>
         </form>
       </section>

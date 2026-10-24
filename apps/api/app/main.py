@@ -105,18 +105,19 @@ async def security_headers_middleware(request: Request, call_next):
 
 
 @app.middleware("http")
-async def hold_legacy_ai_until_policy_gate_is_wired(request: Request, call_next):
-    """Fail closed while the legacy provider adapter is not wired to LEXA policy.
+async def block_legacy_ai_assist_route(request: Request, call_next):
+    """Keep the old assistant URL closed so it cannot bypass the policy router.
 
-    This prevents a configured provider key from bypassing the privacy router.
-    The question is not read by this middleware and is never sent to a provider.
+    The interactive workspace uses /api/v1/ai/assistant, whose provider calls are
+    gated by LEXA's central intelligence policy. This legacy path never reads or
+    forwards a question to a provider.
     """
     if request.method.upper() == "POST" and request.url.path.rstrip("/") == "/api/v1/ai/assist":
         return JSONResponse(
             status_code=503,
             content={"detail": {
                 "code": "AI_POLICY_GATE_REQUIRED",
-                "message": "AI responses are paused while LEXA finishes its privacy and safety checks. Your question was not sent to an external provider.",
+                "message": "This older assistant route is disabled. Use the LEXA business assistant, which applies the current privacy and provider safety checks.",
             }},
         )
     return await call_next(request)

@@ -34,13 +34,21 @@ test('document workspace exposes review rather than automatic invoice or purchas
   assert.doesNotMatch(page, /postPurchaseReceipt\(|postExpense\(|createPurchaseOrder\(/);
 });
 
-test('AI assistant remains unavailable until privacy and execution gates are approved', async () => {
+test('AI assistant uses authenticated server-side policy routing and keeps tenant data out of prompts', async () => {
   const page = await read('app/ai-assistant/page.tsx');
-  assert.match(page, /Guidance for your business/);
-  assert.match(page, /The assistant isn’t available right now/);
-  assert.match(page, /This page will not generate or pretend to generate an answer/);
-  assert.doesNotMatch(page, /executionAvailable\s*&&/);
-  assert.doesNotMatch(page, /fetch\s*\(|api\.openai\.com|generativelanguage\.googleapis\.com|api\.groq\.com/);
+  const client = await read('lib/ai-assistant-api.ts');
+  assert.match(page, /Your LEXA business assistant/);
+  assert.match(page, /Private to your signed-in workspace/);
+  assert.match(page, /Your business question/);
+  assert.match(page, /MarkdownAnswer/);
+  assert.doesNotMatch(page, /assistant-provider|Assistant service/);
+  assert.match(page, /askLexaAssistant/);
+  assert.match(client, /\/api\/lexa\/api\/v1\/ai\/assistant/);
+  assert.match(client, /Authorization: `Bearer \$\{token\}`/);
+  assert.match(client, /include_business_summary: false/);
+  assert.doesNotMatch(client, /tenant_id|user_id|workspace_id/);
+  assert.doesNotMatch(`${page}\n${client}`, /api\.openai\.com|generativelanguage\.googleapis\.com|api\.groq\.com|NEXT_PUBLIC_[A-Z0-9_]*KEY/i);
+  assert.doesNotMatch(page, /fetch\s*\(|The assistant isn’t available right now|This page will not generate or pretend to generate an answer/);
 });
 
 test('document review API uses no browser-side secrets or model endpoints', async () => {

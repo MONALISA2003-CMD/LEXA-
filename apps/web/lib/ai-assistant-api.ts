@@ -34,6 +34,19 @@ async function authToken(): Promise<string> {
   return session.access_token;
 }
 
+
+function friendlyNetworkError(cause: unknown, purpose: "status" | "answer"): Error {
+  if (cause instanceof DOMException && (cause.name === "AbortError" || cause.name === "TimeoutError")) {
+    return new Error(purpose === "answer"
+      ? "LEXA is taking longer than expected. Please try again."
+      : "LEXA could not check availability just now. You can still try your business question.");
+  }
+  if (cause instanceof TypeError) {
+    return new Error("LEXA could not be reached. Check your connection and try again.");
+  }
+  return cause instanceof Error ? cause : new Error("LEXA could not complete the request. Please try again.");
+}
+
 async function readError(response: Response): Promise<string> {
   const payload: unknown = await response.json().catch(() => null);
   if (typeof payload === "object" && payload !== null && "detail" in payload) {
@@ -52,12 +65,18 @@ async function readError(response: Response): Promise<string> {
 
 export async function getAssistantProviders(): Promise<AssistantProvidersResponse> {
   const token = await authToken();
-  const response = await fetch("/api/lexa/api/v1/ai/providers", {
-    method: "GET",
-    credentials: "include",
-    cache: "no-store",
-    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/lexa/api/v1/ai/providers", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(7_000),
+    });
+  } catch (cause) {
+    throw friendlyNetworkError(cause, "status");
+  }
   if (!response.ok) throw new Error(await readError(response));
   return await response.json() as AssistantProvidersResponse;
 }
@@ -65,20 +84,25 @@ export async function getAssistantProviders(): Promise<AssistantProvidersRespons
 export async function askLexaAssistant(input: {
   prompt: string;
   area: "general" | "sales" | "stock" | "purchasing" | "finance" | "customers";
-  provider?: string;
 }): Promise<AssistantReply> {
   const token = await authToken();
-  const response = await fetch("/api/lexa/api/v1/ai/assistant", {
-    method: "POST",
-    credentials: "include",
-    cache: "no-store",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ prompt: input.prompt, area: input.area, provider: input.provider || null, include_business_summary: false }),
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/lexa/api/v1/ai/assistant", {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ prompt: input.prompt, area: input.area, include_business_summary: false }),
+      signal: AbortSignal.timeout(22_000),
+    });
+  } catch (cause) {
+    throw friendlyNetworkError(cause, "answer");
+  }
   if (!response.ok) throw new Error(await readError(response));
   return await response.json() as AssistantReply;
 }

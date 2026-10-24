@@ -137,6 +137,7 @@ def test_phase3_api_ui_and_policy_keep_review_separate_from_business_writes():
     main = (api_root / "app/main.py").read_text(encoding="utf-8")
     ui = (repo_root / "apps/web/app/documents/page.tsx").read_text(encoding="utf-8")
     ai_ui = (repo_root / "apps/web/app/ai-assistant/page.tsx").read_text(encoding="utf-8")
+    ai_client = (repo_root / "apps/web/lib/ai-assistant-api.ts").read_text(encoding="utf-8")
     assert "intelligence.documents.intake" in document_routes
     assert "intelligence.documents.review" in document_routes
     assert "transaction_created\"] = False" in document_routes
@@ -145,13 +146,22 @@ def test_phase3_api_ui_and_policy_keep_review_separate_from_business_writes():
     assert "poppler-utils" in dockerfile and "tesseract-ocr" in dockerfile
     assert "AI_POLICY_GATE_REQUIRED" in main
     assert "No business transaction was created" in ui
-    # This deployment deliberately exposes no AI submission control while policy
-    # and privacy checks are incomplete. Keep the fail-closed UI rather than
-    # changing product behavior to satisfy obsolete execution-enabled assertions.
-    assert "The assistant isn’t available right now." in ai_ui
-    assert "This page will not generate or pretend to generate an answer" in ai_ui
-    assert "executionAvailable" not in ai_ui
+    # The replacement chat must stay interactive while all external execution
+    # remains server-side and subject to the central intelligence policy.
+    assert "Your LEXA business assistant" in ai_ui
+    assert "Private to your signed-in workspace" in ai_ui
+    assert "Your business question" in ai_ui
+    assert "MarkdownAnswer" in ai_ui
+    assert "askLexaAssistant" in ai_ui
+    assert "/api/lexa/api/v1/ai/assistant" in ai_client
+    assert "Authorization: `Bearer ${token}`" in ai_client
+    assert "include_business_summary: false" in ai_client
+    assert "tenant_id" not in ai_client and "user_id" not in ai_client
     assert "fetch(" not in ai_ui
+    assert not any(provider_url in ai_ui + ai_client for provider_url in (
+        "api.openai.com", "generativelanguage.googleapis.com", "api.groq.com"
+    ))
+    assert "NEXT_PUBLIC_" not in ai_ui + ai_client
 
 
 def test_replay_manifest_appends_candidate_migrations_in_order_without_production_opt_in():
