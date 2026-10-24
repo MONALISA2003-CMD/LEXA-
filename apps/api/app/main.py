@@ -1,6 +1,7 @@
 from uuid import UUID, uuid4
 import asyncio
 import logging
+import json
 import os
 import time
 from contextlib import asynccontextmanager
@@ -20,6 +21,7 @@ from .kernel import router as kernel_router
 from .intelligence.routes import router as intelligence_router
 from .intelligence.document_routes import router as intelligence_documents_router
 from .routes.transaction_evidence import router as transaction_evidence_router
+from .routes.tax_reference import router as tax_reference_router
 from .workers.analytics_outbox import run_embedded_worker
 
 logger = logging.getLogger("lexa.api")
@@ -124,6 +126,41 @@ async def block_legacy_ai_assist_route(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def block_live_efris_submission(request: Request, call_next):
+    """Keep fiscalisation manual-only; this deployment has no URA connector."""
+    path = request.url.path.rstrip("/")
+    if request.method.upper() == "POST" and path.startswith("/api/v1/compliance/sales/") and path.endswith("/fiscalize"):
+        return JSONResponse(status_code=409, content={"detail": {
+            "code": "EFRIS_MANUAL_ONLY",
+            "message": "LEXA records tax calculations and official URA references only. Obtain the fiscal document through the official URA portal and record it in LEXA; no EFRIS submission is performed.",
+        }})
+    # Keep manual taxpayer details editable, but reject attempts to enable a
+    # provider mode through the legacy configuration endpoint.
+    if request.method.upper() == "PUT" and path == "/api/v1/compliance/efris/config":
+        try:
+            raw_body = await request.body()
+            config_body = json.loads(raw_body or b"{}")
+        except Exception:
+            return JSONResponse(status_code=400, content={"detail": "EFRIS configuration must be valid JSON."})
+        if not isinstance(config_body, dict):
+            return JSONResponse(status_code=400, content={"detail": "EFRIS configuration must be a JSON object."})
+        if str(config_body.get("integration_mode", "MANUAL")).strip().upper() != "MANUAL":
+            return JSONResponse(status_code=409, content={"detail": {
+                "code": "EFRIS_MANUAL_ONLY",
+                "message": "Only manual URA recordkeeping is available. LEXA does not support or enable system-to-system EFRIS integration.",
+            }})
+        consumed = False
+        async def replay_body():
+            nonlocal consumed
+            if not consumed:
+                consumed = True
+                return {"type": "http.request", "body": raw_body, "more_body": False}
+            return {"type": "http.request", "body": b"", "more_body": False}
+        request._receive = replay_body
+    return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -148,6 +185,7 @@ app.include_router(commerce.router, prefix="/api/v1")
 app.include_router(transaction_evidence_router, prefix="/api/v1")
 app.include_router(finance.router, prefix="/api/v1")
 app.include_router(finance.compliance, prefix="/api/v1")
+app.include_router(tax_reference_router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(purchasing.router, prefix="/api/v1")
 app.include_router(team_chat.router, prefix="/api/v1")

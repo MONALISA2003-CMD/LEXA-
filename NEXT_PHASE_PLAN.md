@@ -12,9 +12,11 @@ Phase 2 uses existing business tables and requires **no new database migration**
 
 Additional return/refund caps and role-based denials remain covered by the repository's existing Phase 5 acceptance suite. Phase 2's authenticated staging journey itself has not run without the staging fixture and QA session.
 
-## Phase 3 — Uganda integrations
+## Phase 3 — Uganda tax calculations and manual-only compliance
 
-Review the actual URA onboarding and accredited connector requirements, then test EFRIS in URA's approved test process before any production fiscalisation. Preserve genuine FDN, verification code, QR and authoritative acceptance/rejection evidence. Separately define a verified mobile-money/bank integration with webhook signatures, idempotency and ledger reconciliation. Recorded payments must never be presented as provider-confirmed.
+Do not build paid URA EFRIS, mobile-money, or payment-gateway integrations. LEXA only records payment method/amount/reference as business records; it never collects or transfers funds, polls provider status, or stores provider credentials. Official fiscal documents are obtained through URA separately and can be added as manual, unverified references in LEXA. The fiscalise endpoint is blocked and the EFRIS config endpoint rejects system-to-system mode.
+
+Local Python/Decimal calculators cover VAT (18% inclusive/exclusive with an owner-selected applicable rule), the October 2026 presumptive-tax bands, resident and non-resident monthly PAYE schedules, and conditional withholding estimates. The server resolves saved effective-dated tax rules at checkout. A standard-rate VAT default is activated only after an owner confirms legal applicability and selects the correct inclusive/exclusive price treatment. Zero-rated and exempt supplies must not be conflated. The October URA FAQ (UGX 300m threshold) and Government of Uganda VAT page (UGX 250m) disagree; LEXA surfaces the conflict and does not infer VAT registration from turnover. See `PHASE3_URA_AND_MOBILE_MONEY_INTEGRATION_GATES.md` for official sources and safeguards.
 
 ## Phase 4 — Better grounded intelligence
 

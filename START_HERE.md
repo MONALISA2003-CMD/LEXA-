@@ -1,13 +1,14 @@
-# LEXA Phase 0/1/2 repair + CI run 40114334149 correction
+# LEXA Phase 0/1/2 repair + Phase 3 local tax and manual-only compliance
 
 **Package date:** 24 October 2026  
 **Repository:** `MONALISA2003-CMD/LEXA-`
 
 ## Important status
 
-This is a canonical-path **source patch**, not a full application archive and not a deployment. It contains the Phase 1 business-grounded assistant source/test corrections plus a Phase 2 cross-module transaction acceptance route and staging-only browser journey. At package root it includes `apps/api/app/main.py`, `apps/web/package.json` and `migrations/` so the repository's **LEXA ZIP Extractor** recognizes it instead of saving it under a nested `source/` folder.
+This is a canonical-path **source patch**, not a full application archive and not a deployment. It contains the Phase 1 business-grounded assistant source/test corrections, a Phase 2 cross-module transaction acceptance route and staging-only browser journey, and Phase 3 local Uganda tax calculators with manual-only payment/EFRIS recordkeeping. At package root it includes `apps/api/app/main.py`, `apps/web/package.json` and `migrations/` so the repository's **LEXA ZIP Extractor** recognizes it instead of saving it under a nested `source/` folder.
 
-The newest inspected red build is `40114334149` on SHA `1e93fc87022bf7d31cae0ae00c537371af148ccb`. API contracts, Docker/HAProxy and web typecheck passed; the web test suite reported 97 passed and 2 failed because the Phase 5 and Phase 7 contract tests still expected the old combined Playwright matcher. This ZIP updates those two assertions to match the actual separate Phase 2 and Phase 5–8 matchers. The production build did not run because `npm test` failed. **This is a targeted corrective patch, not proof of a green rerun.** GitHub access denied direct branch creation (HTTP 403), so a new run can only be confirmed after this ZIP is extracted/committed by the repository workflow.
+The prior corrective ZIP has been uploaded by the owner; the owner reports its GitHub CI is green and Vercel is deployed. The base source inspected before this Phase 3 overlay is `085eee35fdc93d736d2febea7ad9c09967c94e72`. Render was then deployed to that same SHA and `/ready` returned HTTP 200 with database/cache healthy. This new Phase 3 overlay adds local Uganda tax estimates and manual-only payment/EFRIS recordkeeping. **It has not yet been extracted or tested by full GitHub CI and is not yet deployed.** The root package is an overlay, not a full repository archive; extract it at repository root using LEXA ZIP Extractor and require a fresh green Main Build CI before deploying.
+
 
 ## Apply and verify
 
@@ -26,3 +27,7 @@ Production Neon migrations `045`, `046` and `047` have already been applied and 
 ## Phase 2 staging gate
 
 See `PHASE2_STAGING_ACCEPTANCE.md`. The authenticated browser test is skipped unless explicit staging-only write opt-in, HTTPS allow-list, a disposable tenant fixture, QA storage state, and a healthy staging `/api/lexa/ready` check are supplied. The test also rejects known production hostnames. Do not enable it against production.
+
+## Phase 3 policy
+
+The overlay adds Python/Decimal calculations for Uganda VAT, all published presumptive-tax bands, resident/non-resident PAYE and conditional withholding estimates using official sources available by 23 October 2026. Targeted local validation passed: **13 Python tests**, **5 Node tests**, Python compilation and compliance-page TypeScript syntax transpilation. The complete web suite, full typecheck, production build and post-extraction GitHub CI remain unverified. No URA, mobile-money or payment-gateway integration is added. LEXA records payment methods only and blocks EFRIS submission. A standard 18% default VAT rule requires explicit owner confirmation, date-scoped configuration and correct inclusive/exclusive price treatment. The VAT-registration threshold is disclosed as conflicting across two current official pages (URA FAQ UGX 300m vs Government VAT page UGX 250m); LEXA does not infer legal registration status. Review `PHASE3_URA_AND_MOBILE_MONEY_INTEGRATION_GATES.md`.

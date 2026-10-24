@@ -29,3 +29,12 @@ The latest inspected canonical Main Build CI is `40114334149` on SHA `1e93fc8702
 ## Apply
 
 Upload the ZIP at repository root with LEXA ZIP Extractor. Confirm it generates a commit touching canonical `apps/api/...` and `apps/web/...` paths and dispatches the one canonical `LEXA Main Build CI`. Verify all CI jobs on the exact new commit before deployment. Do not enable staging-write acceptance against `lexa-green.vercel.app`, `lexa-n10e.onrender.com`, or any production database. See `START_HERE.md`, `PHASE1_DATABASE_EVIDENCE.md`, `PHASE1_VALIDATION.md`, and `PHASE2_STAGING_ACCEPTANCE.md` for operational details.
+
+## Phase 3: local tax and manual-only compliance
+
+The overlay now also contains local Uganda VAT, presumptive income tax, PAYE and withholding estimates based on public URA updates dated through 23 October 2026. No EFRIS, mobile-money, bank or payment-gateway API integration is added. Payment methods remain recorded business facts; official fiscal identifiers are manually copied from URA and explicitly remain unverified by LEXA. VAT default rules require owner confirmation and an effective date. The VAT threshold conflict between two official pages is displayed instead of guessed. See `PHASE3_URA_AND_MOBILE_MONEY_INTEGRATION_GATES.md`.
+
+
+### Targeted Phase 3 test results
+
+Local Uganda tax and transaction-evidence pytest checks: 13 passed. Focused Node contracts for Phase 2 transaction acceptance, Phase 3 local tax/manual-only behaviour and CI regressions: 5 passed. Python compilation and compliance-page TypeScript syntax transpilation passed. The full repository web suite, full typecheck, Next.js build and post-extraction CI still need to be verified on the canonical commit.
