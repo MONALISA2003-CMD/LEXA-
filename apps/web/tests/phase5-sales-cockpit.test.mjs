@@ -11,7 +11,7 @@ const workflow = fs.readFileSync(new URL("../../.github/workflows/lexa-ci.yml", 
 assert.match(commerce, /type CartLine = \{ id:string; variantId:string; quantity:string; unitPrice:string; discountAmount:string \}/);
 assert.match(commerce, /setCart\(\(current\) =>/);
 assert.match(commerce, /lines: cart\.map\(/);
-assert.match(commerce, /discount_amount: line.discountAmount/);
+assert.match(commerce, /discount_amount: line\.discountAmount/);
 assert.match(commerce, /can_manage_sales/);
 assert.match(commerce, /Manager permission required/);
 assert.match(commerce, /Checkout cart/);
@@ -41,9 +41,15 @@ assert.match(acceptance, /\/api\/lexa\/ready/);
 assert.match(acceptance, /entry_role === 'SALE_RECOGNITION'/);
 assert.match(acceptance, /journal\.lines\.every\(line => line\.currency_code === data\.currency_code\)/);
 assert.match(acceptance, /expect\(debit\)\.toBeCloseTo\(credit, 4\)/);
-assert.match(workflow, /run_phase345_staging_e2e/);
-assert.match(workflow, /LEXA_PHASE345_STAGING_URL/);
-assert.match(workflow, /clean-database-replay/);
-assert.match(workflow, /journal lines/);
 
-console.log("Phase 5 sales cockpit, multi-line checkout, filtered history, idempotent retry and receipt contracts: PASS");
+// Default CI intentionally stays lightweight. Write-enabled, disposable-staging
+// acceptance and clean PostgreSQL replay are separate release gates, not CI defaults.
+assert.match(workflow, /name: LEXA Main Build CI/);
+assert.match(workflow, /api-unit-contracts:/);
+assert.match(workflow, /web-build:/);
+assert.match(workflow, /compose-config:/);
+assert.doesNotMatch(workflow, /run_phase345_staging_e2e/);
+assert.doesNotMatch(workflow, /LEXA_PHASE345_STAGING_URL/);
+assert.doesNotMatch(workflow, /clean-database-replay/);
+
+console.log("Phase 5 sales cockpit, checkout, journal evidence and lightweight CI contracts: PASS");

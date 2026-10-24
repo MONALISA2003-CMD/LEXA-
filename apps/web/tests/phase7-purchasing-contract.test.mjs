@@ -9,11 +9,12 @@ const web = path.resolve(here, '..');
 const page = readFileSync(path.join(web, 'app', 'purchasing', 'page.tsx'), 'utf8');
 const api = readFileSync(path.join(web, 'lib', 'api.ts'), 'utf8');
 const spec = readFileSync(path.join(web, 'e2e', 'phase7-purchasing-acceptance.spec.ts'), 'utf8');
+const globalSetup = readFileSync(path.join(web, 'e2e', 'global-setup.ts'), 'utf8');
 const config = readFileSync(path.join(web, 'playwright.config.ts'), 'utf8');
 const pkg = JSON.parse(readFileSync(path.join(web, 'package.json'), 'utf8'));
 const workflow = readFileSync(path.resolve(web, '..', '..', '.github', 'workflows', 'lexa-ci.yml'), 'utf8');
 
- test('Phase 7 workspace exposes supplier, order, receiving, return, bill and balance modules', () => {
+test('Phase 7 workspace exposes supplier, order, receiving, return, bill and balance modules', () => {
   for (const label of ['Suppliers', 'Purchase orders', 'Receiving', 'Supplier returns', 'Bills & payments', 'Balances']) {
     assert.ok(page.includes(label), `missing purchasing workspace tab ${label}`);
   }
@@ -22,14 +23,14 @@ const workflow = readFileSync(path.resolve(web, '..', '..', '.github', 'workflow
   }
 });
 
-test('supplier terms, effective supplier costs, landed cost and explicit invoice exceptions are visible', () => {
+test('supplier terms, effective costs, landed cost and invoice exceptions are explicit', () => {
   for (const phrase of ['Payment terms (days)', 'Use supplier price', 'landed_costs', 'WAITING_RECEIPT', 'Allow bill before delivery', 'Stock changes when you confirm a delivery.']) {
     assert.ok(page.includes(phrase), `missing workflow/guardrail wording ${phrase}`);
   }
   assert.match(api, /Idempotency-Key/);
 });
 
-test('Phase 7 E2E is enabled in Playwright but fails closed unless explicit staging safeguards are present', () => {
+test('Phase 7 E2E has explicit staging safeguards but is not run by default CI', () => {
   assert.match(pkg.scripts['test:e2e:phase7'], /phase7-purchasing-acceptance\.spec\.ts/);
   assert.match(config, /phase\(5-sales\|6-inventory\|7-purchasing\|7-authorization\|8-reports\)-acceptance/);
   assert.match(config, /LEXA_PHASE7_STORAGE_STATE/);
@@ -40,8 +41,17 @@ test('Phase 7 E2E is enabled in Playwright but fails closed unless explicit stag
   assert.match(spec, /fixture\?\.environment === 'staging'/);
   assert.match(spec, /stagingHosts\.includes\(baseHost\)/);
   assert.match(spec, /test\.skip\(!explicitlySafe/);
-  assert.match(workflow, /run_phase7_staging_e2e/);
-  assert.match(workflow, /reset_strategy !== 'dispose_test_tenant'/);
-  assert.match(workflow, /Known production hostname is forbidden for write-enabled E2E/);
-  assert.match(workflow, /Remove authenticated storage state/);
+  assert.match(globalSetup, /reset_strategy !== 'dispose_test_tenant'/);
+  assert.match(globalSetup, /productionHosts\.has\(host\)/);
+  assert.match(globalSetup, /response\.status !== 200/);
+  assert.match(globalSetup, /readiness\.status !== 'ready'/);
+
+  // Keep credentials and destructive test writes out of ordinary CI. Guards above
+  // remain in the E2E entry points for a separately approved staging run.
+  assert.match(workflow, /name: LEXA Main Build CI/);
+  assert.match(workflow, /web-build:/);
+  assert.match(workflow, /npm test/);
+  assert.doesNotMatch(workflow, /run_phase7_staging_e2e/);
+  assert.doesNotMatch(workflow, /LEXA_PHASE7_STAGING_URL/);
+  assert.doesNotMatch(workflow, /Remove authenticated storage state/);
 });

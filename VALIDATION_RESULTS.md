@@ -1,46 +1,45 @@
-# LEXA CI fixes + Intelligence Phase 1–3 — local validation results
+# LEXA CI + Phase 1–4 validation results
 
 **Date:** 24 October 2026  
-**Scope:** CI root-cause fixes in the bundled source overlay plus Phase 1–3 contract tests and static checks. No live service/provider calls.
+**Target:** `MONALISA2003-CMD/LEXA-`, branch `main`  
+**Purpose:** fix CI contract regressions and add a bounded predictive baseline without modifying live infrastructure or business data.
 
-## Passed
+## Passed in the source-overlay environment
 
 | Check | Result | Scope |
 |---|---:|---|
-| Python contract/policy, daily-brief and document-extraction tests | **45 passed** | `apps/api/tests/test_intelligence_phase1.py`, `test_intelligence_phase2.py`, `test_intelligence_phase3.py` |
-| Provider `.env` settings regression | **1 passed** | `apps/api/tests/test_config_provider_settings.py`; verifies provider values load while external-AI controls stay disabled |
-| Web contract tests | **7 passed** | `apps/web/tests/phase3-document-intelligence.test.mjs` |
-| Python compileall | **PASS** | `apps/api/app` and `apps/api/tests` |
-| Replay manifest JSON parse | **PASS** | `migrations/reconstructed/clean_replay_order.json`; appends 045 then 046 |
-| TypeScript/TSX syntax transpilation | **PASS** | AI assistant, documents page, daily-brief page and two new typed API modules |
-| CI regression source fixes | **PASS (source review)** | Null-safe daily-brief currency; explicit Pydantic provider fields; order-relative assertions for historical migrations 042–044 and appended 045–046 |
-| Extractor package markers | **PASS** | Checked before packaging: `apps/web/package.json`, `apps/api/app/main.py`, and `migrations/` present at ZIP root |
+| Python focused tests | **61 passed** | Intelligence Phase 1/2/3 contracts, provider-settings regression, and the Phase 4 demand-forecast unit/source contracts |
+| Node contract tests | **11 passed** | Seven existing Phase 3 contracts and four new Phase 4 demand-forecast contracts |
+| Python compilation | **PASS** | Overlay API application and tests |
+| Node syntax checks | **PASS** | Revised Phase 5 sales and Phase 7 purchasing contract tests, plus forecast tests |
+| TypeScript/TSX transpilation | **PASS** | New forecast page/client and modified intelligence UI modules; syntax transpilation only, not `tsc --noEmit` |
+| ZIP integrity/layout | **PASS** | Checked at final packaging: required root markers, no unsafe paths, cache files or bytecode |
+| CI test-root-cause correction | **PASS by source review** | Default workflow contracts now check its real API/web/Compose jobs; write-enabled staging safety is checked in Playwright sources, not by expecting absent jobs in ordinary CI |
 
-## CI run root causes addressed
+## Root cause of run 40064896058
 
-The observed run failed because (1) the daily-brief client dereferenced a nullable profile currency, (2) provider values from `.env` had no declared Pydantic fields, causing both the provider settings test and its monkeypatch teardown to fail, and (3) older migration tests incorrectly required migration 044 to remain last after forward-only migrations 045 and 046 were appended. The fixes are in the overlay. The next exact-source GitHub Actions run after extraction is still required to confirm the entire repository suite and Next.js build.
+`Web typecheck, contracts and production build` passed TypeScript and failed the frontend contract stage. `phase5-sales-cockpit.test.mjs` and `phase7-purchasing-contract.test.mjs` were asserting identifiers/details for optional staging E2E and database replay jobs that the canonical `LEXA Main Build CI` does not run. The fix does not disable the guard tests. It asserts the existing lightweight CI structure while retaining checks that the sales/purchasing E2E entry points require a disposable staging environment, reject production hosts, require explicit write opt-in, verify API readiness, and protect authenticated state.
 
-## What the tests exercise
+The earlier run 40063918855 had different root causes (nullable profile currency, provider settings fields absent from Pydantic `Settings`, and outdated migration-order assertions). Those source fixes remain included.
 
-- Fail-closed policy defaults, schema contracts, synthetic event validation and safe insight evidence.
-- Daily-brief prioritization, stale/unavailable data quarantine, currency checks and prevention of automatic business writes.
-- Local document candidate extraction, Uganda day/month/year date normalization, evidence lines, file-type/size checks, content-signature checks, bounded OCR subprocess timeout paths and manual-review fallback.
-- SQL migration source contracts, tenant/branch/RLS/grant markers, replay order, route registration and the external-AI pause gate.
-- Navigation route/search contracts, authenticated raw file upload headers, explicit confirmation/rejection UX, no provider-side OCR calls, and the separate daily-brief data-quality section.
+## Phase 4 forecast validation
+
+The pure forecast logic validates non-negative finite unit values, requires exactly 56 consecutive days, requires at least six days of observed demand, uses only prior observations at each rolling test origin, computes MAE and WAPE safely, compares against last-week-same-weekday, and omits WAPE when holdout actuals are zero. The API requires a successful refresh covering the complete 56-day range and completed within 72 hours before treating missing product-day rows as zero.
+
+Forecast output is advisory and read-only. No model provider is called. The endpoint has no transaction, inventory, purchasing, or finance write path. Stockout-censored demand is not corrected and is explicitly disclosed as a limitation.
 
 ## Not verified here
 
-- Full backend suite or upstream CI after the fixes against the entire LEXA checkout. The CI run inspected here was before these fixes; this bundle is a source overlay, not a complete clone of the repository. Running all included legacy tests against only the overlay fails because their non-overlay source files are intentionally not duplicated in the ZIP.
-- Full Next.js typecheck/production build. The web package requires Node 24.x; this runtime has Node 22.16.0, the overlay intentionally lacks the repository lockfile, and dependencies cannot be installed with `npm ci` against this overlay alone. Only TypeScript/TSX syntax transpilation was run. The source nullable dereference that stopped the CI typecheck is fixed, but a post-fix full `tsc`/build is not claimed.
-- PostgreSQL clean replay, SQL execution, actual forced-RLS behavior or cross-tenant adversarial tests. `psql`, a disposable DB URL and the runtime DB driver are unavailable in this environment. The manifest is prepared to include 045 and 046 in a future disposable replay; neither migration has been applied.
-- Authenticated staging/browser/visual acceptance at mobile widths.
-- OCR on the hosted Render service. The Dockerfile in this overlay installs Poppler/Tesseract for Docker-based runs, but the currently inspected Render configuration uses the Native Python runtime. The service type was not changed. `/api/v1/intelligence/capabilities` reports tool availability, and extraction safely degrades to manual review if tools are missing.
-- Direct GitHub commit/upload or deploy. The connected GitHub integration is read-only for branch writes in this session.
+- Full repository API test suite against all non-overlay source and integration files.
+- Full Node 24 `npm ci`, `npm run typecheck`, complete `npm test`, and Next production build. This overlay is not the full repository checkout with the lockfile and all supporting pages, so the full suite must run in GitHub Actions after extraction.
+- SQL parsing/execution and clean replay against disposable PostgreSQL; actual RLS/cross-tenant and branch-adversarial probes; migrations 045/046 remain candidate only.
+- Actual API endpoint output against live tenant data, and a production `GET /api/v1/intelligence/capabilities` check for deployed OCR binaries.
+- Authenticated staging/mobile acceptance for the new forecasting view, document flow, or write-enabled purchasing/sales flows.
+- Post-upload deployment status for this ZIP's new commit.
 
-See `docs/LEXA_CI_ROOT_CAUSES_AND_PHASE1_3_VALIDATION_2026-10-24.md` for the exact failing job findings and deployment revision comparison.
+## Release safety
 
-## Safety boundary
-
-No provider was called, no AI quota consumed, no secrets/configuration changed, no database SQL applied, and no hosted service deployed by this preparation. AI assistant execution remains blocked until a separately approved policy integration is implemented.
-
-**Release status:** `CI ROOT CAUSES PATCHED IN SOURCE OVERLAY — POST-EXTRACTION CI AND DEPLOYMENT GREEN STATUS NOT YET VERIFIED`. Do not mark Phase 1–3 production accepted until exact-source CI, disposable database/RLS replay and authenticated staging checks pass.
+- External provider execution remains disabled by default; the legacy AI assistant pause remains in place.
+- No production data, migration, runtime configuration, secrets, or deployment were changed as part of preparing this ZIP.
+- The ZIP intentionally does not include `.github/workflows/`; the existing extractor protects that directory.
+- Upload to `main`, then verify CI and the Render/Vercel deployments for the exact new `[lexa-extractor]` source SHA.

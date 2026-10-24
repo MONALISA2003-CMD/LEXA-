@@ -188,14 +188,19 @@ def test_deterministic_replenishment_does_not_need_external_ai():
     assert decision.is_executable is True
 
 
-def test_unimplemented_forecast_is_not_misreported_as_available():
+def test_forecast_routes_to_local_python_without_needing_or_using_an_external_provider():
     decision = plan_route(
-        routing_request(task=TaskType.FORECAST, sensitivity=DataSensitivity.PUBLIC_SYNTHETIC),
-        fully_enabled_policy(),
-        configured_providers={ProviderId.GEMINI},
+        routing_request(task=TaskType.FORECAST, sensitivity=DataSensitivity.CONFIDENTIAL_BUSINESS),
+        RouterPolicy(),
+        configured_providers=set(),
     )
-    assert decision.allowed is False
-    assert decision.reason_code == "CAPABILITY_NOT_IMPLEMENTED"
+    assert decision.allowed is True
+    assert decision.engine == EngineType.PYTHON
+    assert decision.reason_code == "LOCAL_PYTHON_BASELINE"
+    assert decision.selected_provider is None
+    assert decision.external_data_transfer is False
+    assert decision.automatic_fallbacks is False
+    assert decision.is_executable is True
 
 
 def test_event_contract_accepts_versioned_non_free_text_envelope():

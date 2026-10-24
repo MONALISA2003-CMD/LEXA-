@@ -1,33 +1,34 @@
-# LEXA CI fixes + Intelligence — Phase 1 + Phase 2 + Phase 3 source overlay
+# LEXA CI correction + Intelligence Phases 1–4 source overlay
 
-**For the LEXA ZIP Extractor: upload this ZIP to `main`.** It is an overlay ZIP with the required LEXA source markers at the archive root (`apps/web/package.json`, `apps/api/app/main.py`, and `migrations/`). It is not a standalone installer and does not contain secrets.
+**Upload this single ZIP to `main`** using the existing LEXA ZIP Extractor. This is a canonical-path source overlay, not an installer. It includes `apps/web/package.json`, `apps/api/app/main.py`, and `migrations/` at the ZIP root so the extractor can recognize it. It does not include `.github/workflows/`, credentials, or secrets.
 
-## CI root causes fixed
+## CI failure addressed
 
-This bundle also addresses the failures observed in [Actions run 40063918855](https://github.com/MONALISA2003-CMD/LEXA-/actions/runs/40063918855): a nullable daily-brief currency access, provider `.env` fields missing from Pydantic `Settings`, and historical migration tests incorrectly requiring migration 044 to remain the last entry. See `docs/LEXA_CI_ROOT_CAUSES_AND_PHASE1_3_VALIDATION_2026-10-24.md`.
+The latest inspected run, [40064896058](https://github.com/MONALISA2003-CMD/LEXA-/actions/runs/40064896058), had a green TypeScript check and green API/Compose jobs; two frontend source-contract tests failed because they required optional write-enabled staging and database-replay jobs inside the lightweight canonical workflow. The tests now validate the three jobs that really run by default and keep the staging safety checks located in their Playwright E2E files. Default CI remains quick and does not require staging credentials, provider credits, disposable tenants or database replay.
 
-## What this increment contains
+The previous failures in [40063918855](https://github.com/MONALISA2003-CMD/LEXA-/actions/runs/40063918855) are also addressed in the overlay: safe handling of a nullable business profile currency, declared Pydantic provider key/model fields with blank-key defaults, and migration-history tests that preserve the original 042–044 order while allowing forward-only 045–046 candidates.
 
-- **Phase 1 — intelligence foundation:** strict shared contracts, policy-only AI router, default-deny external AI, safe capability reporting, durable job/run provenance migration candidate `045`.
-- **Phase 2 — daily business brief:** deterministic seven-day brief over LEXA's existing saved insight calculations, a dedicated `/daily-brief` workspace, currency-aware metrics, evidence links and a separate data-quality section.
-- **Phase 3 — document intelligence:** branch-scoped PDF/image intake, SHA-256 duplicate detection, bounded local text/OCR extraction, candidate fields with supporting text, editable human confirmation/rejection, append-only review history and a responsive `/documents` workspace.
-- **AI Assistant language polish:** everyday business wording and an explicit paused state while external AI policy execution is not enabled. Provider keys alone do not permit model execution.
+## What is in this increment
 
-## How it is designed to behave
+- **Phase 1 — intelligence foundation:** strict, versioned contracts; central default-deny external-AI policy; explicit local Python forecast routing; safe capability response; event/job/run contracts; candidate migration 045.
+- **Phase 2 — daily brief:** deterministic cross-module summary reusing LEXA's saved business-insight calculations, with evidence links and separate action, information, and data-quality sections.
+- **Phase 3 — document intelligence:** bounded PDF/image intake, local extraction candidates with source evidence, duplicate detection, explicit human review/rejection, and review history. Confirming a document does not create or post a business transaction. Candidate migration 046.
+- **Phase 4 — demand forecast pilot:** read-only weekday-seasonal median forecasts for qualifying product variants, using a complete fresh 56-day history, 14-day rolling-origin holdout, MAE/WAPE compared with a last-week baseline, and explicit exclusions for sparse history.
+- **CI regression fixes:** the stale Phase 5 sales/Phase 7 purchasing workflow assertions now accurately distinguish lightweight CI from opt-in, write-enabled staging tests. The E2E guard checks are retained in their relevant specs/setup.
+- **AI assistant language:** human-readable status and a paused external-provider path until the central provider execution gate is fully implemented and approved.
 
-- Document extraction returns **candidates**, not verified accounting/purchasing values.
-- Every document is saved as `NEEDS_REVIEW`; the UI asks a team member to check the original source and confirms fields only after that explicit review.
-- Confirming a document does not create an invoice, expense, purchase order, payment, journal entry, inventory movement or EFRIS submission. The normal domain workflow remains the only write path.
-- Original files, candidate rows and review history are tenant/branch-scoped in PostgreSQL with forced RLS. Identical file hashes in a branch are treated as duplicates.
-- Local parsing uses `pdftotext`, `pdftoppm` and `tesseract` only when those binaries exist. `/api/v1/intelligence/capabilities` reports tool availability. If they are unavailable, LEXA keeps the file for manual entry/review rather than sending document contents to an external provider.
-- External model calls, durable worker execution, automatic business writes and paid fallbacks stay disabled.
+## Forecasting safety and boundaries
 
-## ZIP behavior
+The forecast endpoint first requires full authorized branch scope and a successful analytics refresh that covers the full 56-day window and finished within the last 72 hours. It does not treat an incomplete/stale projection as zero demand. It sums unit quantities, not money, across currencies. A series needs at least six active demand days. It reports a rolling-origin MAE/WAPE and a simple last-week baseline comparison; WAPE is omitted when test actuals are zero. The seasonal range is historical evidence, not a calibrated prediction interval.
 
-The archive root intentionally contains the canonical `apps/` and `migrations/` paths the existing extractor checks for. The ZIP does not ask the extractor to modify `.github/workflows/` and does not include `.env` or secrets. On successful extraction, inspect the generated `[lexa-extractor]` commit and status checks for the exact resulting SHA.
+This is a baseline pilot, not a trained/independently validated model. Recorded sales can understate demand during stockouts; stockout correction, holiday/promotion features, branch/location forecasting, batch caching and broader out-of-sample evaluation remain future work. Forecast output cannot create orders, change stock or reorder points, reserve inventory, or call an external model.
+
+## Deployment observations before this upload
+
+The most recent inspected Render deployment and Vercel production deployment were both **READY/LIVE on commit `2214dffa81f1d858cdfe51d695bd32758c3a56bd`**. That is the currently observed revision, not this new ZIP. After upload, check the extractor's `[lexa-extractor]` commit, GitHub CI, and both deployment providers for that exact new SHA.
+
+Render is currently configured as Native Python. The included Dockerfile installs Poppler/Tesseract for Docker-based runs, but this bundle does not change the hosted runtime; hosted OCR is operational only if the capability endpoint confirms the local tools exist. Missing tools continue to trigger manual review.
 
 ## Validation boundary
 
-The included synthetic checks validate pure Python contracts, OCR/field extraction behavior, migration/source contracts, and web integration assumptions. They do not prove a full repository CI run, Next.js production build, database migration replay, cross-tenant runtime RLS behavior, or authenticated staging acceptance. Migration files `045` and `046` are forward-only candidates and must be reviewed and clean-replayed on a disposable PostgreSQL database before any production migration decision.
-
-The connected GitHub integration in this session was read-only for branch writes, so this ZIP was not committed directly. No production database, API keys, hosted settings, deployment or provider account was changed.
+The checks below are focused source/unit tests and static checks. They do **not** prove full repository CI, a complete Next.js typecheck/production build, SQL execution, RLS isolation on PostgreSQL, or authenticated staging browser acceptance. The full post-extraction CI run is the release gate. Migrations 045 and 046 remain candidates and must only be clean-replayed on a fresh disposable PostgreSQL database before any production migration decision.

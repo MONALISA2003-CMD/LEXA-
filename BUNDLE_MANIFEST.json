@@ -1,67 +1,68 @@
 {
-  "bundle": "LEXA CI root-cause fixes + Intelligence Phase 1–3 source overlay",
+  "bundle": "LEXA CI root-cause correction + Intelligence Phase 1\u20134 demand forecasting pilot",
   "created_date": "2026-10-24",
   "target_repository": "MONALISA2003-CMD/LEXA-",
   "target_branch": "main",
-  "observed_remote_head_before_fix_upload": "c1a3ef18134404eaf12727f42cda0789034c0b45",
-  "archive_layout": "LEXA ZIP Extractor overlay: apps/web/package.json, apps/api/app/main.py and migrations/ at ZIP root",
-  "status": "SOURCE FIX BUNDLE — NOT UPLOADED, COMMITTED, OR DEPLOYED BY THIS SESSION",
+  "observed_remote_head_before_this_bundle": "2214dffa81f1d858cdfe51d695bd32758c3a56bd",
+  "archive_layout": "LEXA ZIP Extractor overlay with apps/web/package.json, apps/api/app/main.py and migrations/ at archive root",
+  "status": "SOURCE FIX BUNDLE \u2014 not uploaded, committed, or deployed by this session",
   "ci_incident": {
-    "workflow_run": "https://github.com/MONALISA2003-CMD/LEXA-/actions/runs/40063918855",
-    "checked_commit": "c1a3ef18134404eaf12727f42cda0789034c0b45",
-    "prior_run_result": "web TypeScript failure; API suite 262 passed, 3 failed, 1 teardown error; compose/HAProxy job passed",
-    "root_causes_fixed": [
-      "Null-safe daily-brief business-profile currency access",
-      "Explicit provider key/model and fail-closed policy fields in Pydantic Settings",
-      "Order-relative historical migration assertions preserving 042–044 order before new 045–046 migrations"
+    "workflow_run": "https://github.com/MONALISA2003-CMD/LEXA-/actions/runs/40064896058",
+    "checked_commit": "2214dffa81f1d858cdfe51d695bd32758c3a56bd",
+    "observed_result": "TypeScript, API tests and Compose checks passed; two frontend contract assertions failed because they expected optional staging/replay jobs in the lightweight workflow.",
+    "fix": "The sales and purchasing contracts now validate baseline CI jobs while retaining staging safety checks at their Playwright spec/global-setup sources.",
+    "prior_failures_retained_as_fixes": [
+      "Nullable daily-brief profile currency dereference",
+      "Provider key/model Pydantic Settings fields and dotenv regression",
+      "Order-relative migration checks for 042\u2013044 with candidate 045/046 appended"
     ]
   },
   "implemented_phases": {
-    "phase1": "Versioned contracts, default-deny policy routing, safe provenance candidate migration 045; external provider execution remains paused until the central gate is wired.",
-    "phase2": "Deterministic source-linked daily brief with separate action, information and data-quality items; no AI or business writes.",
-    "phase3": "Bounded document intake, local extraction candidates with evidence, duplicate detection, branch scoping, explicit human review and review history; confirmation does not create business transactions."
+    "phase1": "Versioned intelligence contracts, default-deny external routing, local Python routing, safe provenance/job/event contracts, candidate migration 045; external provider execution remains paused.",
+    "phase2": "Deterministic source-linked daily brief with action/information/data-quality separation; no external AI or business writes.",
+    "phase3": "Bounded PDF/image intake, local extraction candidates and evidence, duplicate detection, tenant/branch scope, explicit human review and history; candidate migration 046; confirmation does not create business transactions.",
+    "phase4": "Read-only weekday-seasonal median demand baseline with full/fresh 56-day analytics coverage gate, rolling 14-day backtest, MAE/WAPE comparison and visible stockout/uncertainty limitations."
   },
-  "deployment_observation": {
-    "vercel_latest_at_inspection": "ERROR on c1a3ef because Next.js TypeScript validation hit the fixed nullable profile-currency dereference",
-    "vercel_previous_ready_deployment": "READY on prior ZIP-upload commit efb0c75207e70d99f260727cae1c57c5ced32511; not same source revision",
-    "render": "Live service state not verified; Render connector requires explicit workspace confirmation before service/deployment inspection.",
-    "hosted_ocr": "Not confirmed. render.yaml uses Native Python runtime while the extraction path depends on local Poppler/Tesseract binaries installed by the Dockerfile only."
+  "deployment_observation_before_bundle_upload": {
+    "render": "Latest inspected deploy was live/succeeded on 2214dffa81f1d858cdfe51d695bd32758c3a56bd; /ready returned HTTP 200.",
+    "vercel": "Latest inspected production deployment was READY on 2214dffa81f1d858cdfe51d695bd32758c3a56bd.",
+    "warning": "These observations predate this ZIP; verify the new extracted SHA after uploading.",
+    "hosted_ocr": "Render uses Native Python while the Dockerfile installs Poppler/Tesseract only for Docker-based runs; verify capability endpoint before claiming hosted OCR is operational."
   },
   "validation": {
-    "phase1_phase2_phase3_python_tests": "46 passed, including new provider-dotenv fail-closed regression",
-    "web_contract_tests": "7 passed",
-    "python_compileall": "PASS",
-    "replay_manifest_json_and_042_to_046_order": "PASS",
-    "typescript_tsx_syntax_transpile": "PASS for five affected pages/modules; this is not full type checking",
-    "full_repository_pytest_after_fix": "NOT VERIFIED. Overlay ZIP intentionally excludes the surrounding repository; full legacy tests require other baseline files and must be rerun in GitHub Actions after extraction.",
-    "full_next_typecheck_and_production_build_after_fix": "NOT RUN locally: runtime Node is 22.16, project requires 24.x, dependencies/lockfile are not included in this overlay and outbound package registry access is unavailable.",
-    "postgres_clean_replay_rls_adversarial_checks": "NOT RUN; migrations 045/046 remain candidates and were not applied.",
-    "authenticated_staging_e2e": "NOT RUN"
+    "python_focused_tests": "61 passed across Phase 1/2/3, provider-settings regression and Phase 4 forecast logic/API contract fixtures.",
+    "node_contract_tests": "11 passed: 7 Phase 3 tests + 4 Phase 4 forecast contracts.",
+    "node_syntax": "PASS for revised Phase 5 and Phase 7 source-contract tests plus Phase 3/4 tests.",
+    "python_compileall": "PASS for overlay app and tests.",
+    "typescript_tsx_transpile": "PASS for demand forecast page/client and affected AI assistant, document and daily brief modules; syntax transpilation only, not full typecheck.",
+    "manifest_json": "PASS; 045 and 046 remain appended in replay order.",
+    "full_repository_ci_and_next_build": "NOT run in this overlay-only environment; must pass after extraction on the exact new commit.",
+    "database_clean_replay_rls": "NOT run; no production database was touched; migrations 045/046 remain candidates.",
+    "authenticated_staging_e2e": "NOT run."
   },
-  "release_safety": {
+  "safety": {
     "external_provider_execution_enabled": false,
-    "migration_045_applied": false,
-    "migration_046_applied": false,
+    "production_migrations_applied": false,
     "production_data_changed": false,
-    "secrets_changed": false,
-    "render_runtime_changed": false,
-    "deployment_triggered_by_this_session": false
+    "secrets_or_hosted_settings_changed": false,
+    "deployment_triggered_by_this_session": false,
+    "github_workflows_included": false
   },
   "files": [
     {
       "path": "PHASE1_REMAINING_WORK.md",
-      "size_bytes": 4100,
-      "sha256": "bb610c788a4e3ae4eb64c30bc52a37bfc292035d3a398a738591c1349f4ef44a"
+      "size_bytes": 4514,
+      "sha256": "2358ae4e8958287ef54cde086c4e3e9a93105e2d331920d66af73253d7d868f6"
     },
     {
       "path": "README.md",
-      "size_bytes": 3874,
-      "sha256": "e0d85e918e6f2c648e2ef145da4c2d61ece1dc6be68c1743a405cb8060575035"
+      "size_bytes": 4993,
+      "sha256": "10b94d85af6b4dbe23818bed48c19b5d28308117ac723692bef91468bd5c64f5"
     },
     {
       "path": "VALIDATION_RESULTS.md",
-      "size_bytes": 5178,
-      "sha256": "3a93d2f425f9b23ff8e4d20c944e8979f2bcc8724d9f86f7331f54ef27f6d9a0"
+      "size_bytes": 4320,
+      "sha256": "c6e453e45cd4a09710f5eb5005b4423246b93a81698fb911999dc904031d1680"
     },
     {
       "path": "apps/api/Dockerfile",
@@ -104,14 +105,19 @@
       "sha256": "358df9b27143dba44a6714f741976844708012f81970f3cc9918f8cb4b2d334e"
     },
     {
+      "path": "apps/api/app/intelligence/forecasting.py",
+      "size_bytes": 8226,
+      "sha256": "be264f2dfdfcfca8446a8bfb6a04a65c508fab4b3c5ee9b606a1ddc527742c0a"
+    },
+    {
       "path": "apps/api/app/intelligence/policy.py",
-      "size_bytes": 8944,
-      "sha256": "7668927c6fa48535d77fad0b91efed751d58e9dc6c7b112e846b429d6872f10a"
+      "size_bytes": 9579,
+      "sha256": "c6493ca72b1fb3cfbad1f555bf4dbf3300540f6d2ea3495909cdf9c766f6794e"
     },
     {
       "path": "apps/api/app/intelligence/routes.py",
-      "size_bytes": 4469,
-      "sha256": "139570b8403a55ff6a7eedf8b97718c3bffd68e7f85e67ddd8e5f578e12a966a"
+      "size_bytes": 13209,
+      "sha256": "59d0935f1351f769341b5209286e2616172f29840c4fa75aa1e2a2aa49c2804f"
     },
     {
       "path": "apps/api/app/main.py",
@@ -124,9 +130,14 @@
       "sha256": "e7d5f280cd4bc26931c21b95930a8662fd453f72a33d40f33593aef3c8e1755e"
     },
     {
+      "path": "apps/api/tests/test_demand_forecast.py",
+      "size_bytes": 10822,
+      "sha256": "4f7fed872b7586c7f7b31e369162a756561bdb446193b19b008679212192ffb3"
+    },
+    {
       "path": "apps/api/tests/test_intelligence_phase1.py",
-      "size_bytes": 11105,
-      "sha256": "d5355c81555cf7a2aec5be5460df7c24f6100ff448c8d08db7d522718863715c"
+      "size_bytes": 11342,
+      "sha256": "0779ddba60cab43f6254e8724b67bf92f4bacab64819edb244e725c9e8c14aff"
     },
     {
       "path": "apps/api/tests/test_intelligence_phase2.py",
@@ -164,6 +175,16 @@
       "sha256": "4888da8486d00b7f1cef2913aa31b33e475defb83d0282ef6bdbfa4246bd6190"
     },
     {
+      "path": "apps/web/app/demand-forecast/page.module.css",
+      "size_bytes": 4227,
+      "sha256": "9c1c9a4604606dec9273763c14529b8cd32b139f817eed0de86c0fdcfc6e11df"
+    },
+    {
+      "path": "apps/web/app/demand-forecast/page.tsx",
+      "size_bytes": 8343,
+      "sha256": "c455140b1a63b5a8054bac9952418aed84977c0152991b7dac1757cbccc6ae36"
+    },
+    {
       "path": "apps/web/app/documents/page.module.css",
       "size_bytes": 3781,
       "sha256": "0e162801d7da40672510b4932a0e10ed3c6675f3bd697cd39f927463317508dd"
@@ -179,14 +200,19 @@
       "sha256": "42f03a76163a782fa3248c27d9cbc9d5c4b11bef818a5cc97e042b3569754626"
     },
     {
+      "path": "apps/web/lib/demand-forecast-api.ts",
+      "size_bytes": 3227,
+      "sha256": "ba263c6c6fd5179ff8fdea9af7bf51d5b9f1153c2f83991ed73cf81b47d400cc"
+    },
+    {
       "path": "apps/web/lib/document-intelligence-api.ts",
       "size_bytes": 6166,
       "sha256": "bf8a2269525ff473c0e31fdec83d17cd1c7e64c980faa6f6503c569c65558a59"
     },
     {
       "path": "apps/web/lib/navigation.mjs",
-      "size_bytes": 6235,
-      "sha256": "3e739c35c6af6fa729558c837439a1113870ac120174bf09d240365594ddd259"
+      "size_bytes": 6499,
+      "sha256": "becc90f7b7c10ba5a34a5b819c1641bdb8644355889816437d3c2a6772d97ee6"
     },
     {
       "path": "apps/web/package.json",
@@ -199,9 +225,29 @@
       "sha256": "6ce2abecd78de60f24ab3969d8abcdc13c1d5c691dc35b3c1a2322288c5a848a"
     },
     {
+      "path": "apps/web/tests/phase4-demand-forecast.test.mjs",
+      "size_bytes": 2643,
+      "sha256": "f524b6ef8b3b47f18956f3b226d6eaf3295828c670855d65e280ba78ef2bd5a9"
+    },
+    {
+      "path": "apps/web/tests/phase5-sales-cockpit.test.mjs",
+      "size_bytes": 3286,
+      "sha256": "78a0c3e3c00190ccfb8bc49a55363a3aa752273870ca5ee107988cd7c9941064"
+    },
+    {
+      "path": "apps/web/tests/phase7-purchasing-contract.test.mjs",
+      "size_bytes": 3534,
+      "sha256": "d67ca7db21abbe5d602df64206cf82359e7cfc52344352956520d2a3024e9d4d"
+    },
+    {
+      "path": "docs/LEXA_CI_40064896058_ROOT_CAUSE_AND_PHASE4_2026-10-24.md",
+      "size_bytes": 4257,
+      "sha256": "008105e556806fe98fce01829a75f111a3dd4a9a78cbafc779aa11a2764d281d"
+    },
+    {
       "path": "docs/LEXA_CI_ROOT_CAUSES_AND_PHASE1_3_VALIDATION_2026-10-24.md",
-      "size_bytes": 5662,
-      "sha256": "374b5f0d5d0decf830dba1609f70936176f405b43149889da21f253ef2658fa3"
+      "size_bytes": 5647,
+      "sha256": "74877c1d4dcd01868f6c5bb982717402c24b290f4d1f1e773f66a6fac0f5bbcb"
     },
     {
       "path": "docs/LEXA_INTELLIGENCE_PHASE1_IMPLEMENTATION.md",
@@ -217,6 +263,11 @@
       "path": "docs/LEXA_INTELLIGENCE_PHASE3_DOCUMENT_INTELLIGENCE.md",
       "size_bytes": 6538,
       "sha256": "b68cac2af2963b1bf723d60b6e9d90472a57919605583ac334ef0fe88bf6537a"
+    },
+    {
+      "path": "docs/LEXA_PHASE4_DEMAND_FORECASTING_PILOT.md",
+      "size_bytes": 3603,
+      "sha256": "7467d58c8e8b7d97868bfb2a3ec28286c9be205cee602555377ca80e09fd653a"
     },
     {
       "path": "migrations/045_intelligence_foundation.sql",

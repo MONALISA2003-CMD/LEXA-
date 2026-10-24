@@ -34,12 +34,11 @@ Two older tests required migration `044_phase3_password_reset_security.sql` to b
 
 These features are implemented at source level in this overlay. They are not yet certified for production acceptance: CI after applying this fix, SQL clean replay/RLS tests on a disposable PostgreSQL instance, and authenticated staging acceptance remain release gates.
 
-## Deployment alignment observed during this inspection
+## Deployment alignment observed in the later inspection
 
-- The latest Vercel production attempt on revision `c1a3ef1` was **ERROR** and failed during TypeScript checking on the same nullable currency issue.
-- The previous READY production deployment pointed at the ZIP-upload commit `efb0c75207e70d99f260727cae1c57c5ced32511`, not the current extracted source revision. It is therefore not proof that the Phase 1–3 source or the failing revision is deployed green.
-- This overlay does not trigger a deployment itself. After upload to `main`, verify the follow-on `[lexa-extractor]` commit, its CI run, and the Vercel deployment for that exact source SHA.
-- Render has not yet been validated live in this handoff. Its tool requires explicit confirmation of the workspace before listing services or deployments.
+- The earlier Vercel attempt on `c1a3ef1` was **ERROR** because of the nullable daily-brief currency check; that incident is historical and superseded by later source revisions.
+- Render and Vercel were subsequently inspected with workspace authorization. Both were **LIVE/READY on `2214dffa81f1d858cdfe51d695bd32758c3a56bd`**, and Render `/ready` returned HTTP 200. This is the revision before the next ZIP in this bundle, not proof of a green deploy for the new changes.
+- After upload to `main`, verify the follow-on `[lexa-extractor]` commit, CI run and both deployment providers for that exact new SHA. The current CI root-cause details for run 40064896058 are documented in `LEXA_CI_40064896058_ROOT_CAUSE_AND_PHASE4_2026-10-24.md`.
 
 ## Phase 3 hosted OCR blocker
 

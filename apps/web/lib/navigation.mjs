@@ -15,6 +15,7 @@ export const primaryNavigation = [
   ["/documents", "Documents", "receipt"],
   ["/reports", "Reports", "chart"],
   ["/daily-brief", "Daily brief", "chart"],
+  ["/demand-forecast", "Demand forecast", "chart"],
   ["/team-chat", "Team chat", "chat"],
   ["/ai-assistant", "AI assistant", "brain"],
 ];
@@ -43,6 +44,7 @@ export const workspaceSearchSuggestions = [
   ["Money, expenses and accounting", "/accounting"],
   ["Business reports and graphs", "/reports"],
   ["Today’s business brief", "/daily-brief"],
+  ["Product demand forecast", "/demand-forecast"],
   ["Business intelligence", "/intelligence"],
   ["AI business assistant", "/ai-assistant"],
   ["Tax and official receipts", "/compliance"],
@@ -73,6 +75,7 @@ export function resolveBusinessSearchDestination(query) {
   if (/\b(invoice scan|scan invoice|supplier invoice|expense receipt|document upload|business documents|document intake)\b/.test(lower)) return `/documents?q=${encoded}`;
   if (/\b(ura|efris|tax|fiscal|compliance|tax receipt|official receipt)\b/.test(lower)) return `/compliance?q=${encoded}`;
   if (/\b(daily brief|business brief|what needs attention|today\x27s brief)\b/.test(lower)) return `/daily-brief?q=${encoded}`;
+  if (/\b(demand forecast|product forecast|forecast stock demand|forecasting demand)\b/.test(lower)) return `/demand-forecast?q=${encoded}`;
   if (/\b(intelligence|forecast|forecasting|trend|anomaly|insight|insights|business health)\b/.test(lower)) return `/intelligence?q=${encoded}`;
   if (/\b(team|member|members|permission|role|invite|access control)\b/.test(lower)) return `/administration/members?q=${encoded}`;
   if (/\b(setup|onboarding|setup progress)\b/.test(lower)) return "/onboarding";
@@ -93,7 +96,7 @@ export function resolveBusinessSearchDestination(query) {
 /** Real page routes used by the internal-link integrity tests. */
 export const applicationRoutes = [
   "/", "/accounting", "/administration", "/administration/members", "/commerce",
-  "/compliance", "/customers", "/daily-brief", "/documents", "/intelligence", "/inventory", "/invite", "/login",
+  "/compliance", "/customers", "/daily-brief", "/demand-forecast", "/documents", "/intelligence", "/inventory", "/invite", "/login",
   "/onboarding", "/products", "/purchasing", "/register", "/reports", "/sales",
   "/settings", "/settings/security", "/forgot-password", "/reset-password", "/team-chat", "/workspace", "/ai-assistant",
 ];

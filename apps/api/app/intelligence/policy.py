@@ -42,7 +42,9 @@ TASK_PROVIDER_PROFILES: dict[TaskType, tuple[ProviderId, ...]] = {
     TaskType.DAILY_BRIEF: (ProviderId.GEMINI, ProviderId.GROQ, ProviderId.OPENAI, ProviderId.CEREBRAS, ProviderId.OPENROUTER, ProviderId.HUGGINGFACE),
 }
 DETERMINISTIC_TASKS = frozenset({TaskType.BUSINESS_INSIGHT, TaskType.REPLENISHMENT})
-NOT_IMPLEMENTED_TASKS = frozenset({TaskType.FORECAST})
+# Forecasting is a local Python baseline. It does not require an external provider.
+PYTHON_TASKS = frozenset({TaskType.FORECAST})
+NOT_IMPLEMENTED_TASKS: frozenset[TaskType] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,6 +143,21 @@ def plan_route(
             allowed=True,
             engine=EngineType.DETERMINISTIC,
             reason_code="DETERMINISTIC_PATH",
+            sensitivity=request.sensitivity,
+            selected_provider=None,
+            fallback_provider=None,
+            automatic_fallbacks=False,
+            external_data_transfer=False,
+            is_executable=True,
+        )
+
+    if request.task in PYTHON_TASKS:
+        return RouterDecision(
+            policy_version=policy.policy_version,
+            task=request.task,
+            allowed=True,
+            engine=EngineType.PYTHON,
+            reason_code="LOCAL_PYTHON_BASELINE",
             sensitivity=request.sensitivity,
             selected_provider=None,
             fallback_provider=None,
