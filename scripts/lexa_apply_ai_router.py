@@ -71,6 +71,22 @@ def main() -> int:
         else:
             print(f"WOULD INSTALL {target_path.relative_to(root)} from {asset_path.relative_to(root)}")
 
+    # If an earlier version already installed the registry tests, append only the
+    # new offline regression block. The marker makes this safe to rerun.
+    test_asset_path, test_target_path = install_assets[1]
+    test_extension_marker = "# LEXA_MOCK_TEST_EXTENSIONS_V2"
+    if test_target_path.is_file() and test_asset_path.is_file():
+        installed_tests = test_target_path.read_text(encoding="utf-8")
+        asset_tests = test_asset_path.read_text(encoding="utf-8")
+        if test_extension_marker not in installed_tests and test_extension_marker in asset_tests:
+            extension = asset_tests[asset_tests.index(test_extension_marker):].lstrip()
+            updated_tests = installed_tests.rstrip() + "\n\n" + extension.rstrip() + "\n"
+            if args.apply:
+                test_target_path.write_text(updated_tests, encoding="utf-8", newline="\n")
+                print(f"UPDATED {test_target_path.relative_to(root)} with offline regression tests")
+            else:
+                print(f"WOULD UPDATE {test_target_path.relative_to(root)} with offline regression tests")
+
     # This script is packaged as a source overlay; when installed from ZIP, files
     # are extracted at repository root, while this script lives under scripts/.
     # Re-resolve source paths from the selected checkout root.
@@ -186,6 +202,11 @@ def main() -> int:
             'optional exact registered model ID',
         ),
         (
+            '        "Give concise, practical answers and separate verified supplied facts from assumptions. "\n        "Never invent saved LEXA data or claim an action was completed. You cannot execute SQL, "',
+            '        "Give concise, practical answers in clear English and separate verified supplied facts from assumptions. "\n        "Preserve the currency and amounts provided by the business (for example UGX 250,000); never invent "\n        "exchange rates, totals, missing values, or saved LEXA data. Missing, stale, or unavailable information "\n        "must be labelled as missing, not silently treated as zero; ask a brief follow-up when a critical fact is absent. "\n        "Never claim an action was completed. For accounting, VAT, tax, profit, reconciliation, or statutory matters, "\n        "state assumptions and recommend human review against original records. You cannot execute SQL, "',
+            'clear English, missing-data and accounting caution prompt guardrails',
+        ),
+        (
             'async def _generate(provider_id: ProviderId, prompt: str, system_instruction: str) -> tuple[str, str]:\n',
             'async def _generate(provider_id: ProviderId, prompt: str, system_instruction: str, *, model_override: str | None = None) -> tuple[str, str]:\n',
             'model override in provider adapter',
@@ -202,8 +223,8 @@ def main() -> int:
         ),
         (
             '    await _enforce_rate_limit(tenant_id, user_id)\n    full_prompt = f"Business area: {body.area}\\nUser question (untrusted input):\\n{question}"',
-            '    # Registry, provider allowlist, model allowlist, data sensitivity, and paid-use\n    # policy all have to agree before any external adapter is called. There is no\n    # trusted input-classification/redaction stage wired into this endpoint yet, so\n    # this first router build deliberately fails closed for user free text. The main\n    # middleware adds a second fail-closed gate for the public legacy endpoint.\n    try:\n        registry = load_model_registry(settings=settings)\n        selected_model_id = (body.model_id or _model_for(spec)).strip()\n        model = resolve_model(body.provider, selected_model_id, registry)\n        if model is None:\n            raise HTTPException(status_code=503, detail={"code": "AI_MODEL_NOT_REGISTERED", "message": "This assistant model is not available. Your question was not sent to an external AI service."})\n        routing_request = RoutingRequest(\n            task=TaskType.EXPLAIN,\n            sensitivity=DataSensitivity.CONFIDENTIAL_BUSINESS,\n            provider_preference=RouterProviderId(body.provider),\n            includes_business_summary=body.include_business_summary,\n            input_safety_checked=False,\n            purpose_code="business_assistant",\n        )\n        decision = plan_model_route(\n            routing_request,\n            policy_from_settings(settings),\n            configured_provider_ids(settings=settings),\n            model,\n            registry,\n            allowed_model_ids(settings=settings),\n        )\n    except ValueError as exc:\n        logger.warning("ai_model_registry_invalid exception_type=%s", type(exc).__name__)\n        raise HTTPException(status_code=503, detail={"code": "AI_MODEL_REGISTRY_UNAVAILABLE", "message": "The assistant is not available right now. Your question was not sent to an external AI service."}) from exc\n    if not decision.allowed:\n        logger.info("ai_route_blocked reason=%s provider=%s", decision.reason_code, body.provider)\n        raise HTTPException(status_code=503, detail={"code": "AI_POLICY_BLOCKED", "message": "The assistant is not available for this request. Your question was not sent to an external AI service."})\n\n    await _enforce_rate_limit(tenant_id, user_id)\n    full_prompt = f"Business area: {body.area}\\nUser question (untrusted input):\\n{question}"',
-            'model registry + policy decision before rate limit, DB summary or provider execution',
+            '    # Consume the existing request budget even when policy later blocks the\n    # attempt. This prevents repeated blocked requests from bypassing rate controls.\n    await _enforce_rate_limit(tenant_id, user_id)\n    # Registry, provider allowlist, model allowlist, data sensitivity, and paid-use\n    # policy all have to agree before any external adapter is called. There is no\n    # trusted input-classification/redaction stage wired into this endpoint yet, so\n    # this first router build deliberately fails closed for user free text. The main\n    # middleware adds a second fail-closed gate for the public legacy endpoint.\n    try:\n        registry = load_model_registry(settings=settings)\n        selected_model_id = (body.model_id or _model_for(spec)).strip()\n        model = resolve_model(body.provider, selected_model_id, registry)\n        if model is None:\n            raise HTTPException(status_code=503, detail={"code": "AI_MODEL_NOT_REGISTERED", "message": "This assistant model is not available. Your question was not sent to an external AI service."})\n        routing_request = RoutingRequest(\n            task=TaskType.EXPLAIN,\n            sensitivity=DataSensitivity.CONFIDENTIAL_BUSINESS,\n            provider_preference=RouterProviderId(body.provider),\n            includes_business_summary=body.include_business_summary,\n            input_safety_checked=False,\n            purpose_code="business_assistant",\n        )\n        decision = plan_model_route(\n            routing_request,\n            policy_from_settings(settings),\n            configured_provider_ids(settings=settings),\n            model,\n            registry,\n            allowed_model_ids(settings=settings),\n        )\n    except ValueError as exc:\n        logger.warning("ai_model_registry_invalid exception_type=%s", type(exc).__name__)\n        raise HTTPException(status_code=503, detail={"code": "AI_MODEL_REGISTRY_UNAVAILABLE", "message": "The assistant is not available right now. Your question was not sent to an external AI service."}) from exc\n    if not decision.allowed:\n        logger.info("ai_route_blocked reason=%s provider=%s", decision.reason_code, body.provider)\n        raise HTTPException(status_code=503, detail={"code": "AI_POLICY_BLOCKED", "message": "The assistant is not available for this request. Your question was not sent to an external AI service."})\n\n    full_prompt = f"Business area: {body.area}\\nUser question (untrusted input):\\n{question}"',
+            'rate limit and central model policy before DB summary or provider execution',
         ),
         (
             '    model, answer = await _generate(body.provider, full_prompt, _system_instruction(body.area))',
@@ -212,6 +233,16 @@ def main() -> int:
         ),
     ]
     total += patch(assistant_path, assistant_replacements, write=args.apply)
+
+    # Missing aggregate values must remain NULL/missing, not be rewritten as zero.
+    total += patch(assistant_path, [
+        (f'COALESCE(SUM({field}), 0) AS {field}', f'SUM({field}) AS {field}', f'preserve missing {field} aggregate')
+        for field in (
+            'sales_total', 'net_sales', 'returns_total', 'payments_collected',
+            'expenses_total', 'expense_reversals_total', 'net_cash_movement',
+            'sale_count', 'return_count',
+        )
+    ], write=args.apply)
 
     # Fix only stale CI assertions; the UI copy itself is not changed in this build.
     web_fixes = {

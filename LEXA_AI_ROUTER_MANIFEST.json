@@ -1,8 +1,8 @@
 {
-  "name": "LEXA Model Registry and Central AI Router",
+  "name": "LEXA Central Policy Execution Guard Build",
   "target_repository": "MONALISA2003-CMD/LEXA-",
   "target_branch": "main",
-  "baseline_commit": "92cde279faeda3f379bcb83b6c0d219710c146d7",
+  "baseline_commit": "1958b27ba3b54bb5930c0b79b119a4951188379b",
   "max_registry_models": 20,
   "max_enabled_allowlisted_potentially_billable_models": 4,
   "provider_execution_enabled_by_default": false,
@@ -13,6 +13,8 @@
   "workflows_directory_requires_manual_install": true,
   "contents": [
     "README_AI_ROUTER.md",
+    "PHONE_UPLOAD_GUIDE.md",
+    "API_KEYS_FOR_RENDER.md",
     "VALIDATION_RESULTS.md",
     "LEXA_AI_ROUTER_MANIFEST.json",
     "SHA256SUMS.txt",
@@ -20,10 +22,26 @@
     "apps/web/package.json",
     "docs/LEXA_AI_MODEL_REGISTRY_SOURCE.py",
     "docs/LEXA_AI_MODEL_REGISTRY_TESTS.py",
-    "scripts/lexa_apply_ai_router.py",
     "docs/LEXA_AI_MODEL_ROUTER.md",
+    "docs/LEXA_AI_SYNTHETIC_TEST_PLAN.md",
     "docs/LEXA_AI_ROUTER_WORKFLOW.yml",
     "migrations/.lexa-ai-router-marker",
+    "scripts/lexa_apply_ai_router.py",
     "DELETE.txt"
+  ],
+  "external_execution_enabled_by_default": false,
+  "synthetic_scenarios": [
+    "Kampala kiosk sales",
+    "Wakiso grocery stock",
+    "Mbarara salon accounting",
+    "Jinja hardware receivables"
+  ],
+  "offline_mock_test_coverage": [
+    "provider quota exhaustion",
+    "provider server failures",
+    "LEXA per-minute rate limit",
+    "privacy gate bypass attempts",
+    "missing aggregate values",
+    "UGX preservation and accounting caution"
   ]
 }

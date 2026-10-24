@@ -2,7 +2,7 @@
 
 **Target repository:** `MONALISA2003-CMD/LEXA-`  
 **Target branch:** `main`  
-**Current main commit inspected:** `92cde279faeda3f379bcb83b6c0d219710c146d7`
+**Current main commit inspected for this package:** `1958b27ba3b54bb5930c0b79b119a4951188379b`
 
 This is a guarded source-overlay package for the existing LEXA ZIP Extractor. It carries the reviewed model-registry source and mock-only test as documentation assets, materializes them into active paths only when the guarded build runs, then applies controlled edits to the current source and stale CI assertions using `scripts/lexa_apply_ai_router.py`.
 
@@ -21,7 +21,7 @@ This is a guarded source-overlay package for the existing LEXA ZIP Extractor. It
 
 The public `POST /api/v1/ai/assist` is still intercepted by LEXA's existing fail-closed middleware. The route handler itself also rejects requests until a trusted input-screening/redaction stage is wired and marks the request safe. That is intentional: this build supplies the central registry and policy layer, not the missing trusted input classifier. It must not be enabled by simply adding a provider key or changing an environment flag.
 
-No provider is contacted during the build or CI. The mock tests replace the HTTP adapter. No provider secrets, provider settings on hosted services, production data, database schema, accounting rules or permissions are changed by this package.
+No provider is contacted during the build or CI. The mock tests replace the HTTP adapter and Redis rate-limit dependency. No provider secrets, hosted Render settings, production data, database schema, accounting transactions or business permissions are changed by this package. A synthetic prompt scenario validates the safety contract and prompt guidance; it is not a live model-quality evaluation.
 
 ## Installation steps
 
@@ -32,3 +32,10 @@ No provider is contacted during the build or CI. The mock tests replace the HTTP
 5. Inspect the resulting source commit and the subsequent standard **LEXA Main Build CI** run. Confirm Vercel and Render are on the intended commit before any production gate is considered satisfied.
 
 The package does not directly change the active workflow directory. The separate workflow installation is a required repository step, not an application-code limitation.
+
+
+## Render API key names
+
+See [`API_KEYS_FOR_RENDER.md`](API_KEYS_FOR_RENDER.md) for the exact supported key environment-variable names and the official provider pages where each can be created. During this integration, do **not** enable external execution: keep `LEXA_AI_EXTERNAL_PROVIDERS_ENABLED=false`, `LEXA_AI_ALLOWED_PROVIDERS` and `LEXA_AI_ALLOWED_MODELS` empty, and paid/aggregate/confidential approvals false. Keys are not needed by CI and should not be added merely to make tests pass.
+
+The additional synthetic regression cases and expected behavior are listed in [`docs/LEXA_AI_SYNTHETIC_TEST_PLAN.md`](docs/LEXA_AI_SYNTHETIC_TEST_PLAN.md).

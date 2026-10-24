@@ -23,6 +23,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && inputs.confirm_main_update == true
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    # This job uses synthetic inputs and mock providers only. Never add provider
+    # secrets here and do not enable external execution for CI.
     env:
       APP_ENV: development
       DATABASE_URL: postgresql+psycopg://lexa:lexa@localhost:5432/lexa

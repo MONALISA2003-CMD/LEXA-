@@ -1,28 +1,28 @@
-# Validation record — LEXA AI router build
+# Validation record — LEXA central AI policy integration package
 
-**Target:** `MONALISA2003-CMD/LEXA-`, `main`  
-**Main commit inspected:** `92cde279faeda3f379bcb83b6c0d219710c146d7`
+**Target repository:** `MONALISA2003-CMD/LEXA-`  
+**Branch:** `main`  
+**Current branch head inspected for this package:** `1958b27ba3b54bb5930c0b79b119a4951188379b`
 
-## Checks completed in this session
+## Checks completed during package preparation
 
-- The current main commit and relevant source files were re-read through the GitHub connection.
-- The source-overlay `apps/api/app/main.py` marker matches the current Git blob SHA `6ebd746b06a05d257ce2f266a94d463a4b1411cf`.
-- The `apps/web/package.json` marker matches the current Git blob SHA `a28a43c9e435f4838c85fb124d194f8b51326b3c`.
-- Python syntax compilation passed for the model-registry source asset, the installer script, and the mock-only test asset.
-- A synthetic checkout fixture applied the script successfully and a second application made no further changes (idempotency check).
-- The isolated registry smoke test was rerun against the current source and passed for built-in model records, exact provider/model matching, cost classification, allowlist parsing, JSON size limits, duplicate-ID rejection, OpenRouter dynamic-alias restrictions, and secret-free status output.
-- The guarded workflow template parsed as YAML. The installer fixture passed a second-application idempotency check after materializing the registry and mock-test assets.
-- The script's CI patch map reflects stale assertions observed in the current main CI log: navigation labels, assistant-disabled wording, daily overview data-quality wording and demand-forecast search copy.
-- The guarded installer materializes the registry/test into active paths only when the workflow runs, avoiding a partially applied app commit, and bumps the central policy version to `phase2-model-registry-v1`. The model registry design restricts free/trial/unknown-cost models to synthetic public input; blocks personal data to every external model; requires a provider allowlist + model allowlist; and caps potentially billable enabled model IDs at four.
+- Read current central policy, routing contracts, API assistant route, settings, tests and current branch head using the GitHub repository connection.
+- Confirmed that the checked-out Git blob IDs for `apps/api/app/main.py` (`6ebd746b06a05d257ce2f266a94d463a4b1411cf`) and `apps/web/package.json` (`a28a43c9e435f4838c85fb124d194f8b51326b3c`) match the source-marker files shipped with the overlay.
+- Python syntax compilation passed for `scripts/lexa_apply_ai_router.py`, `docs/LEXA_AI_MODEL_REGISTRY_SOURCE.py`, and the expanded mock-only test asset `docs/LEXA_AI_MODEL_REGISTRY_TESTS.py` after this turn's edits.
+- Added a central model-level policy gate that requires exact provider/model registration and allowlists, task support, server-side key configuration, model cost classification, paid-use approval where required, and approved sensitivity. No request-supplied safety status is trusted.
+- Kept `input_safety_checked=False` in the legacy user free-text route and retained the separate middleware gate. Provider execution remains unavailable while trusted input classification/redaction is not wired.
+- Added offline synthetic examples for small businesses in Kampala, Wakiso, Mbarara and Jinja, including UGX amounts, missing values and accounting caution. Added mock-only tests for Redis rate-limit exhaustion, provider 429/quota exhaustion, provider 5xx errors, and privacy-gate bypass attempts.
+- Adjusted the aggregate-only summary query to preserve NULL/missing values rather than coalescing them to numeric zero. Added a regression test for this contract.
+- Provider/Redis tests are written with fakes/mocks and do not require production keys, live provider credits or a running Redis server.
 
-## Not yet verified
+## Not yet verified / deployment boundary
 
-- The complete LEXA API test suite has not been run against a full checkout with these edits.
-- The complete frontend typecheck, test suite and production build have not been run locally against the full repository.
-- The updated CI and source changes have not been committed to GitHub from this session; the GitHub write integration previously returned `403 Resource not accessible by integration`.
-- No live model/provider request has been made, and no hosted secrets, Neon schema, production data or deployments were changed.
-- Full main CI and deployment status must be checked after the workflow is installed and run in GitHub. Zero bugs cannot be guaranteed before those full checks pass.
+- The full API pytest suite has **not** been run against the complete current repository after these latest edits.
+- The complete frontend typecheck, frontend test suite, production build, Compose validation and HAProxy validation have **not** been run against the current package after these latest edits.
+- GitHub write integration remains unavailable (earlier repository write attempts were rejected with HTTP 403), so this package has not been committed or run in GitHub Actions by this session.
+- No provider keys or environment variables were added to Render. No production data, DB schema, accounting transactions or deployment settings were changed.
+- No live provider request was made.
 
 ## Release gate
 
-Keep external model execution disabled. Treat the CI workflow as the final source gate. Do not remove the legacy assistant middleware or enable a provider until a trusted classification/redaction stage, privacy approval, paid-use controls and full CI are complete.
+Keep external provider execution disabled. In Render keep `LEXA_AI_EXTERNAL_PROVIDERS_ENABLED=false`; leave provider and model allowlists empty, and keep paid-use, aggregate-data and confidential-data approval flags false. Do not open the legacy assistant middleware or set `input_safety_checked=True` until trusted input classification/redaction, privacy review and the full CI gate are complete. The provider-key guide is provided for later setup only; keys do not by themselves authorize execution.
