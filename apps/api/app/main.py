@@ -19,6 +19,7 @@ from .routes import (
 from .kernel import router as kernel_router
 from .intelligence.routes import router as intelligence_router
 from .intelligence.document_routes import router as intelligence_documents_router
+from .routes.transaction_evidence import router as transaction_evidence_router
 from .workers.analytics_outbox import run_embedded_worker
 
 logger = logging.getLogger("lexa.api")
@@ -144,6 +145,7 @@ app.include_router(catalog.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(kernel_router, prefix="/api/v1")
 app.include_router(commerce.router, prefix="/api/v1")
+app.include_router(transaction_evidence_router, prefix="/api/v1")
 app.include_router(finance.router, prefix="/api/v1")
 app.include_router(finance.compliance, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")

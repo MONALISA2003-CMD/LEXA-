@@ -1,13 +1,15 @@
 import { defineConfig } from '@playwright/test';
 
 const baseURL = process.env.LEXA_BROWSER_BASE_URL || 'http://127.0.0.1:3000';
-const storageState = process.env.LEXA_PHASE8_STORAGE_STATE
+const storageState = process.env.LEXA_PHASE2_STORAGE_STATE
+  || process.env.LEXA_PHASE8_STORAGE_STATE
   || process.env.LEXA_PHASE7_STORAGE_STATE
   || process.env.LEXA_PHASE6_STORAGE_STATE
   || process.env.LEXA_PHASE5_STORAGE_STATE
   || process.env.LEXA_PHASE4_STORAGE_STATE
   || { cookies: [], origins: [] };
 const stagingWritesEnabled = [
+  'LEXA_PHASE2_ALLOW_STAGING_WRITES',
   'LEXA_PHASE5_ALLOW_STAGING_WRITES',
   'LEXA_PHASE6_ALLOW_STAGING_WRITES',
   'LEXA_PHASE7_ALLOW_STAGING_WRITES',
@@ -16,12 +18,12 @@ const stagingWritesEnabled = [
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /phase(5-sales|6-inventory|7-purchasing|7-authorization|8-reports)-acceptance\.spec\.ts$/,
+  testMatch: /phase(2-transaction|5-sales|6-inventory|7-purchasing|7-authorization|8-reports)-acceptance\.spec\.ts$/,
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   workers: 1,
   // Write-enabled financial/inventory E2E can partially mutate disposable fixtures;
-  // auto-retrying such a test can replay the lifecycle, so it is always single-attempt.
+  // auto-retrying such a test can replay a lifecycle, so it is always single-attempt.
   retries: stagingWritesEnabled ? 0 : (process.env.CI ? 1 : 0),
   reporter: 'list',
   timeout: 60_000,

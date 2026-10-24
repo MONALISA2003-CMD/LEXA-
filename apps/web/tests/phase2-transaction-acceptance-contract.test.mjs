@@ -1,0 +1,37 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+
+const web = new URL('../', import.meta.url);
+const readWeb = (path) => fs.readFileSync(new URL(path, web), 'utf8');
+const spec = readWeb('e2e/phase2-transaction-acceptance.spec.ts');
+const setup = readWeb('e2e/global-setup.ts');
+const playwright = readWeb('playwright.config.ts');
+const backend = fs.readFileSync(new URL('../api/app/routes/transaction_evidence.py', web), 'utf8');
+const main = fs.readFileSync(new URL('../api/app/main.py', web), 'utf8');
+
+assert.match(spec, /LEXA_PHASE2_ALLOW_STAGING_WRITES === '1'/);
+assert.match(spec, /LEXA_PHASE2_STAGING_HOSTS/);
+assert.match(spec, /LEXA_PHASE2_ACCEPTANCE_FIXTURE_JSON/);
+assert.match(spec, /LEXA_PHASE2_STORAGE_STATE/);
+assert.match(spec, /productionHosts\.has\(host\)/);
+assert.match(spec, /test\.skip\(!explicitlySafe/);
+assert.match(spec, /post\('\/commerce\/sales'/);
+assert.match(spec, /same key returns the same sale/);
+assert.match(spec, /\/inventory\/ledger/);
+assert.match(spec, /\/commerce\/receivables\//);
+assert.match(spec, /\/commerce\/sales\//);
+assert.match(spec, /\/analytics\/refresh/);
+assert.match(spec, /SALE_COMPLETED/);
+assert.match(spec, /RECEIVABLE_CREATED/);
+assert.match(setup, /LEXA_PHASE2_ALLOW_STAGING_WRITES/);
+assert.match(setup, /https:/);
+assert.match(setup, /known production hosts are forbidden/);
+assert.match(setup, /\/api\/lexa\/ready/);
+assert.match(setup, /dependencies\?\.database !== 'ok'/);
+assert.match(playwright, /phase\(2-transaction\|5-sales/);
+assert.match(playwright, /LEXA_PHASE2_ALLOW_STAGING_WRITES/);
+assert.match(backend, /FROM outbox_events/);
+assert.match(backend, /FROM audit_logs/);
+assert.match(backend, /ensure_branch_access/);
+assert.match(main, /app\.include_router\(transaction_evidence_router, prefix="\/api\/v1"\)/);
+console.log('Phase 2 transaction chain acceptance contract: PASS');
