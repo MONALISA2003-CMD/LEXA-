@@ -26,7 +26,8 @@ def test_provider_status_marks_unconfigured_provider(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     item = next(item for item in provider_status() if item["id"] == "openai")
     assert item["configured"] is False
-    assert item["model"] == "gpt-6-astra"
+    # Must match the current supported server default, not the removed placeholder model.
+    assert item["model"] == "gpt-5-mini"
 
 
 def test_openai_responses_api_text_extraction():
@@ -54,7 +55,6 @@ def test_output_token_setting_is_bounded(monkeypatch):
     assert _bounded_int("LEXA_AI_MAX_OUTPUT_TOKENS", 500, 64, 1200) == 1200
     monkeypatch.setenv("LEXA_AI_MAX_OUTPUT_TOKENS", "invalid")
     assert _bounded_int("LEXA_AI_MAX_OUTPUT_TOKENS", 500, 64, 1200) == 500
-
 
 
 def test_openai_provider_uses_responses_api_with_storage_disabled(monkeypatch):

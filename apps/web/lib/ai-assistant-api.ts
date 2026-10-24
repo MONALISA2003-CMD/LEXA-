@@ -20,12 +20,25 @@ export type AssistantProvidersResponse = {
   message: string;
 };
 
+export type AssistantEvidence = {
+  label: string;
+  href: string;
+  source_table: string;
+  from_date: string | null;
+  to_date: string | null;
+  refreshed_at: string | null;
+  status: "available" | "unavailable" | "stale" | string;
+};
+
 export type AssistantReply = {
   provider: string;
   model: string;
   answer: string;
   used_business_summary: false;
   advisory_only: true;
+  source_mode: "local_guidance" | "local_business_data" | "external_question_only";
+  response_time_ms: number | null;
+  evidence: AssistantEvidence | null;
 };
 
 async function authToken(): Promise<string> {

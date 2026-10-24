@@ -1,9 +1,10 @@
 """LEXA's tenant-scoped, policy-routed business assistant.
 
-The assistant receives only the current authenticated user's question by default.
-It has no tools or write paths, does not persist conversations, and never accepts
-client-supplied tenant/user identifiers. External execution is always decided by
-LEXA's central intelligence policy and has no automatic provider fallback.
+Factual metric requests are answered from permission-checked LEXA projections in a
+read-only local path. General guidance may use an approved external provider, which
+receives only the screened question. The assistant does not persist conversations,
+has no business-write path, and never accepts client-supplied tenant/user identifiers.
+External execution is decided by LEXA's central policy and has no provider fallback.
 """
 from __future__ import annotations
 
@@ -12,7 +13,9 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+import time
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 from urllib.parse import quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -24,6 +27,7 @@ from sqlalchemy import text
 
 from ..config import settings
 from ..dependencies import require_permission
+from ..branch_access import require_full_branch_scope
 from ..intelligence.contracts import (
     DataSensitivity,
     ProviderId as PolicyProviderId,
@@ -82,6 +86,9 @@ class AssistResponse(BaseModel):
     answer: str
     used_business_summary: bool = False
     advisory_only: Literal[True] = True
+    source_mode: Literal["local_guidance", "local_business_data", "external_question_only"] = "local_guidance"
+    response_time_ms: int | None = None
+    evidence: dict[str, str | int | None] | None = None
 
 
 def _configured_value(env_name: str, default: str = "") -> str:
@@ -172,6 +179,288 @@ def _system_instruction(area: str, business_time: str = "business local time una
         "tax submissions or other business writes. For tax, legal and consequential financial matters, recommend human review. "
         f"Business-local date and time: {business_time}. {area_guidance}"
     )
+
+
+def _business_fact_intent(question: str) -> tuple[str, str] | None:
+    """Identify narrow read-only questions that can be answered from saved LEXA metrics.
+
+    Advice wording is deliberately excluded even if it mentions a metric and period;
+    only requests for reported facts are served from the saved projections.
+    """
+    normalized = re.sub(r"\s+", " ", question.casefold()).strip()
+    advice_request = re.search(
+        r"\b(?:how (?:can|should|could|would) (?:i|we|my business|the business)?|"
+        r"what should (?:i|we|my business|the business) do|ways to|tips to|"
+        r"recommendations? to|help me)\b.*\b(?:improve|increase|grow|reduce|lower|boost|"
+        r"manage|review|plan|fix|avoid|negotiate|optimise|optimize|prevent|choose|decide|"
+        r"handle|control|prepare|forecast|budget|prioriti[sz]e)\b",
+        normalized,
+    )
+    if advice_request:
+        return None
+
+    metric_term = re.search(
+        r"\b(?:gross margin|margin rate|payments?(?: were)? collected|money received|collections?|"
+        r"expenses?|money spent|spend|spent|net sales|sales|revenue|sold|what stock needs attention|low stock|"
+        r"out of stock|stockouts?|stock at risk|stock levels?|stock needing attention|"
+        r"restocking|reorder|replenishment)\b",
+        normalized,
+    )
+    if not metric_term:
+        return None
+
+    fact_request = re.search(
+        r"\b(?:what (?:payments?|expenses?|sales|revenue|gross margin|are|were|is|was|did|do|have|has|stock)|how much|how many|which (?:products?|items?)|"
+        r"show(?: me)?|give me|tell me|list|count|total|sum up|report on|my (?:net sales|sales|revenue|"
+        r"payments collected|expenses|gross margin|stock levels?))\b",
+        normalized,
+    )
+    if not fact_request:
+        # Phrases like "sales this week" are only fact requests when phrased as
+        # a report/query, not when embedded in broad planning advice.
+        return None
+
+    if re.search(r"\b(?:gross margin|margin rate)\b", normalized):
+        return ("gross_margin", _business_period_intent(normalized))
+    if re.search(r"\b(?:payments?(?: were)? collected|money received|collections?)\b", normalized):
+        return ("payments_collected", _business_period_intent(normalized))
+    if re.search(r"\b(?:expenses?|money spent|spend|spent)\b", normalized):
+        return ("expenses_total", _business_period_intent(normalized))
+    if re.search(r"\b(?:net sales|sales|revenue|sold)\b", normalized):
+        return ("net_sales", _business_period_intent(normalized))
+    if re.search(r"\b(?:what stock needs attention|low stock|out of stock|stockouts?|stock at risk|stock levels?|stock needing attention|restocking|reorder|replenishment)\b", normalized):
+        return ("stock_risk", "latest_snapshot")
+    return None
+
+
+def _business_period_intent(question: str) -> str:
+    for period in ("yesterday", "today", "last week", "this week", "last month", "this month", "last 7 days"):
+        if re.search(rf"\b{re.escape(period)}\b", question):
+            return period
+    return "last 7 days"
+
+
+def _period_dates(as_of: date, period: str) -> tuple[date, date, str]:
+    if period == "today":
+        return as_of, as_of, "today"
+    if period == "yesterday":
+        day = as_of - timedelta(days=1)
+        return day, day, "yesterday"
+    if period == "this week":
+        return as_of - timedelta(days=as_of.weekday()), as_of, "this week"
+    if period == "last week":
+        start = as_of - timedelta(days=as_of.weekday() + 7)
+        return start, start + timedelta(days=6), "last week"
+    if period == "this month":
+        return as_of.replace(day=1), as_of, "this month"
+    if period == "last month":
+        end = as_of.replace(day=1) - timedelta(days=1)
+        return end.replace(day=1), end, "last month"
+    return as_of - timedelta(days=6), as_of, "the last 7 days"
+
+
+def _format_amount(value: object) -> str:
+    if value is None:
+        raise ValueError("A missing saved amount cannot be formatted as a numeric zero")
+    amount = Decimal(str(value))
+    if not amount.is_finite():
+        raise ValueError("A non-finite saved amount cannot be shown to the user")
+    amount = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return f"{amount:,.2f}"
+
+
+def _unavailable_fact_answer(
+    *, label: str, from_date: date | None = None, to_date: date | None = None,
+    source_table: str, evidence_href: str, reason: str,
+) -> AssistResponse:
+    period = f" for {from_date.isoformat()} to {to_date.isoformat()}" if from_date and to_date else ""
+    return _local_response(
+        f"**I can’t verify that figure yet.** {reason}\n\n"
+        f"**Next step**\nOpen the relevant LEXA page and refresh or review the saved records. I have not treated missing data as zero.",
+        "saved business data unavailable",
+        source_mode="local_business_data",
+        evidence={
+            "label": label, "href": evidence_href, "source_table": source_table,
+            "from_date": from_date.isoformat() if from_date else None,
+            "to_date": to_date.isoformat() if to_date else None,
+            "refreshed_at": None, "status": "unavailable", "period": period.strip(),
+        },
+    )
+
+
+def _business_fact_answer(db, *, user_id: object, tenant_id: object, question: str, request_started: float) -> AssistResponse | None:
+    """Answer a narrow metric question using authorized, fresh, tenant-owned projections only."""
+    intent = _business_fact_intent(question)
+    if intent is None:
+        return None
+    metric, period = intent
+    require_full_branch_scope(db, tenant_id=tenant_id, user_id=user_id)
+    try:
+        as_of = db.execute(
+            text("SELECT public.lexa_business_date(now(), CAST(:tenant_id AS uuid))"),
+            {"tenant_id": str(tenant_id)},
+        ).scalar_one_or_none()
+        if isinstance(as_of, datetime):
+            as_of = as_of.date()
+        if not isinstance(as_of, date):
+            return _unavailable_fact_answer(
+                label="Business date unavailable", source_table="analytics_daily_business_metrics",
+                evidence_href="/reports", reason="LEXA could not confirm this workspace’s business date.",
+            )
+
+        if metric == "stock_risk":
+            row = db.execute(text("""
+                SELECT snapshot_date, MAX(refreshed_at) AS refreshed_at, COUNT(*) AS record_count,
+                       COUNT(*) FILTER (WHERE available <= 0) AS out_of_stock_count,
+                       COUNT(*) FILTER (WHERE available > 0 AND days_cover IS NOT NULL AND days_cover <= 7) AS low_cover_count
+                FROM public.analytics_inventory_health_metrics
+                WHERE tenant_id = :tenant_id
+                  AND snapshot_date = (SELECT MAX(snapshot_date) FROM public.analytics_inventory_health_metrics WHERE tenant_id = :tenant_id)
+                GROUP BY snapshot_date
+            """), {"tenant_id": str(tenant_id)}).mappings().one_or_none()
+            db.rollback()
+            if not row:
+                return _unavailable_fact_answer(
+                    label="Stock health", source_table="analytics_inventory_health_metrics",
+                    evidence_href="/inventory", reason="there is no saved stock-health snapshot for this workspace yet.",
+                )
+            snapshot_date = row["snapshot_date"]
+            refreshed_at = row["refreshed_at"]
+            fresh = bool(refreshed_at and refreshed_at >= datetime.now(timezone.utc) - timedelta(hours=72) and snapshot_date >= as_of - timedelta(days=2))
+            if not fresh:
+                return _unavailable_fact_answer(
+                    label="Stock health", from_date=snapshot_date, to_date=snapshot_date,
+                    source_table="analytics_inventory_health_metrics", evidence_href="/inventory",
+                    reason="the latest stock-health snapshot is too old to support a current recommendation.",
+                )
+            records = int(row["record_count"] or 0)
+            if records == 0:
+                return _unavailable_fact_answer(
+                    label="Stock health", from_date=snapshot_date, to_date=snapshot_date,
+                    source_table="analytics_inventory_health_metrics", evidence_href="/inventory",
+                    reason="the saved stock-health snapshot contains no usable product rows.",
+                )
+            out_count = int(row["out_of_stock_count"] or 0)
+            low_count = int(row["low_cover_count"] or 0)
+            answer = (
+                "**Stock needing attention**\n\n"
+                f"The latest verified snapshot covers {records} product-location records. "
+                f"{out_count} are recorded as out of stock, and {low_count} have seven days or less of cover.\n\n"
+                "**Recommended next step**\nReview the affected products and confirm delivery lead times before placing orders. This is an advisory summary; it does not create a purchase order."
+            )
+            return _local_response(answer, "saved stock-health metrics", source_mode="local_business_data",
+                response_time_ms=round((time.monotonic()-request_started)*1000), evidence={
+                    "label":"Stock health", "href":"/inventory", "source_table":"analytics_inventory_health_metrics",
+                    "from_date":snapshot_date.isoformat(), "to_date":snapshot_date.isoformat(),
+                    "refreshed_at":refreshed_at.isoformat() if refreshed_at else None, "status":"available",
+                })
+
+        start_date, end_date, period_label = _period_dates(as_of, period)
+        currency = db.execute(text("SELECT upper(currency_code) FROM public.business_profiles WHERE tenant_id=:tenant_id LIMIT 1"),
+                              {"tenant_id": str(tenant_id)}).scalar_one_or_none()
+        if not isinstance(currency, str) or not re.fullmatch(r"[A-Z]{3}", currency):
+            db.rollback()
+            return _unavailable_fact_answer(label="Business currency unavailable", from_date=start_date, to_date=end_date,
+                source_table="business_profiles", evidence_href="/settings",
+                reason="the business currency has not been confirmed in Business settings.")
+
+        source_table = "analytics_product_daily_metrics" if metric == "gross_margin" else "analytics_daily_business_metrics"
+        refreshed = db.execute(text("""
+            SELECT completed_at FROM public.analytics_refresh_runs
+            WHERE tenant_id=:tenant_id AND status='SUCCEEDED'
+              AND from_date <= :from_date AND to_date >= :to_date
+              AND completed_at >= now() - INTERVAL '72 hours'
+            ORDER BY completed_at DESC LIMIT 1
+        """), {"tenant_id": str(tenant_id), "from_date": start_date, "to_date": end_date}).scalar_one_or_none()
+        if not refreshed:
+            db.rollback()
+            return _unavailable_fact_answer(label=period_label, from_date=start_date, to_date=end_date,
+                source_table=source_table, evidence_href="/reports",
+                reason=f"there is no recent successful analytics refresh covering {start_date.isoformat()} to {end_date.isoformat()}.")
+
+        if metric == "gross_margin":
+            row = db.execute(text("""
+                SELECT COUNT(*) AS record_count, SUM(net_sales) AS net_sales, SUM(cogs) AS cogs,
+                       SUM(gross_margin) AS gross_margin, SUM(units_sold) AS units_sold,
+                       MAX(business_date) AS latest_business_date, MAX(refreshed_at) AS refreshed_at
+                FROM public.analytics_product_daily_metrics
+                WHERE tenant_id=:tenant_id AND business_date BETWEEN :from_date AND :to_date AND currency_code=:currency
+            """), {"tenant_id": str(tenant_id), "from_date": start_date, "to_date": end_date, "currency": currency}).mappings().one()
+            db.rollback()
+            count = int(row["record_count"] or 0)
+            if count <= 0 or row["net_sales"] is None or row["cogs"] is None or row["gross_margin"] is None:
+                return _unavailable_fact_answer(label=period_label, from_date=start_date, to_date=end_date,
+                    source_table=source_table, evidence_href="/reports",
+                    reason=f"saved product-margin rows for {period_label} are missing one or more required amounts; an empty or incomplete projection does not prove that margin was zero.")
+            sales = Decimal(str(row["net_sales"]))
+            margin = Decimal(str(row["gross_margin"]))
+            cogs = Decimal(str(row["cogs"]))
+            if not sales.is_finite() or not margin.is_finite() or not cogs.is_finite():
+                return _unavailable_fact_answer(label=period_label, from_date=start_date, to_date=end_date,
+                    source_table=source_table, evidence_href="/reports",
+                    reason=f"one or more saved product-margin amounts for {period_label} are not valid finite numbers.")
+            if sales <= 0:
+                return _unavailable_fact_answer(label=period_label, from_date=start_date, to_date=end_date,
+                    source_table=source_table, evidence_href="/reports",
+                    reason=f"recorded net sales for {period_label} are not positive, so a gross-margin rate cannot be calculated reliably.")
+            rate = (margin / sales * Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) if sales else None
+            rate_text = f"{rate:.2f}%" if rate is not None else "unavailable"
+            answer = (
+                f"**Saved gross-margin summary**\n\nFor {period_label} ({start_date.isoformat()} to {end_date.isoformat()}), "
+                f"recorded net sales were {currency} {_format_amount(sales)}, cost of goods sold was {currency} {_format_amount(cogs)}, "
+                f"and gross margin was {currency} {_format_amount(margin)} ({rate_text} of net sales).\n\n"
+                "**Important**\nGross margin is not net profit; operating expenses and other income or costs are not deducted here."
+            )
+        else:
+            column = {"net_sales": "net_sales", "payments_collected": "payments_collected", "expenses_total": "expenses_total"}[metric]
+            count_column = {"net_sales": "sale_count", "payments_collected": "payment_count", "expenses_total": "expense_count"}[metric]
+            row = db.execute(text(f"""
+                SELECT COUNT(*) AS record_count, SUM({column}) AS metric_total, SUM({count_column}) AS activity_count,
+                       MAX(business_date) AS latest_business_date, MAX(refreshed_at) AS refreshed_at
+                FROM public.analytics_daily_business_metrics
+                WHERE tenant_id=:tenant_id AND business_date BETWEEN :from_date AND :to_date AND currency_code=:currency
+            """), {"tenant_id": str(tenant_id), "from_date": start_date, "to_date": end_date, "currency": currency}).mappings().one()
+            db.rollback()
+            count = int(row["record_count"] or 0)
+            if count <= 0 or row["metric_total"] is None or row["activity_count"] is None:
+                return _unavailable_fact_answer(label=period_label, from_date=start_date, to_date=end_date,
+                    source_table=source_table, evidence_href="/reports",
+                    reason=f"no complete saved {metric.replace('_', ' ')} metrics were found for {period_label}; LEXA has not assumed that the value was zero.")
+            total = Decimal(str(row["metric_total"]))
+            if not total.is_finite():
+                return _unavailable_fact_answer(label=period_label, from_date=start_date, to_date=end_date,
+                    source_table=source_table, evidence_href="/reports",
+                    reason=f"the saved {metric.replace('_', ' ')} value for {period_label} is not a valid number.")
+            activity = int(row["activity_count"])
+            if metric == "net_sales":
+                title, amount_label, activity_label = "Saved sales summary", "Net sales", "completed sales"
+            elif metric == "payments_collected":
+                title, amount_label, activity_label = "Recorded payments summary", "Payments recorded as received", "recorded payments"
+            else:
+                title, amount_label, activity_label = "Recorded expenses summary", "Expenses recorded", "expense records"
+            answer = (
+                f"**{title}**\n\nFor {period_label} ({start_date.isoformat()} to {end_date.isoformat()}), "
+                f"{amount_label.lower()} were {currency} {_format_amount(total)} across {activity} {activity_label}.\n\n"
+                "**Source and limitation**\nThis figure comes from LEXA’s saved daily business metrics. It is not a bank-confirmed settlement and may be limited by the last successful data refresh."
+            )
+
+        evidence = {
+            "label": period_label, "href": "/reports", "source_table": source_table,
+            "from_date": start_date.isoformat(), "to_date": end_date.isoformat(),
+            "refreshed_at": refreshed.isoformat() if refreshed else None, "status": "available",
+        }
+        return _local_response(answer, "saved business metrics", source_mode="local_business_data",
+            response_time_ms=round((time.monotonic()-request_started)*1000), evidence=evidence)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning("ai_business_fact_lookup_unavailable metric=%s error_type=%s", metric, type(exc).__name__)
+        return _unavailable_fact_answer(label=metric.replace("_", " "), source_table="analytics_daily_business_metrics",
+            evidence_href="/reports", reason="the saved figures could not be checked safely just now. Please refresh Reports and try again.")
 
 
 def _business_time_context(db, tenant_id: object) -> str:
@@ -297,8 +586,18 @@ def _sensitive_input_kind(question: str) -> str | None:
     return None
 
 
-def _local_response(answer: str, reason: str = "LEXA local guidance") -> AssistResponse:
-    return AssistResponse(provider="lexa-local", model=reason, answer=answer, used_business_summary=False)
+def _local_response(
+    answer: str,
+    reason: str = "LEXA local guidance",
+    *,
+    source_mode: Literal["local_guidance", "local_business_data", "external_question_only"] = "local_guidance",
+    response_time_ms: int | None = None,
+    evidence: dict[str, str | int | None] | None = None,
+) -> AssistResponse:
+    return AssistResponse(
+        provider="lexa-local", model=reason, answer=answer, used_business_summary=False,
+        source_mode=source_mode, response_time_ms=response_time_ms, evidence=evidence,
+    )
 
 
 async def _enforce_rate_limit(tenant_id: object, user_id: object) -> None:
@@ -555,8 +854,9 @@ def _list_ai_providers(ctx=Depends(require_permission("analytics.read"))):
 
 @router.post("/assistant", response_model=AssistResponse)
 async def assistant(body: AssistRequest, ctx=Depends(require_permission("analytics.read"))):
-    """Answer one LEXA-scoped question after local checks and central policy approval."""
+    """Answer a supported fact locally, or route general guidance through central policy."""
     db, user_id, tenant_id, _session_id = ctx
+    request_started = time.monotonic()
     question = body.prompt.strip()
     if not question:
         raise HTTPException(status_code=422, detail={"code": "AI_PROMPT_REQUIRED", "message": "Enter a question about your LEXA business workspace."})
@@ -592,9 +892,19 @@ async def assistant(body: AssistRequest, ctx=Depends(require_permission("analyti
             "**Try again** using the business question only, without names or identifiers. You can review individual records safely inside the relevant LEXA page.",
             "privacy guard",
         )
+    # Limit all on-topic business requests before either a local projection query or
+    # an external model call. This prevents the read-only data path from bypassing
+    # the shared per-user/per-tenant request budget.
+    await _enforce_rate_limit(tenant_id, user_id)
+
+    # Exact figures are retrieved locally from permission-checked projections and are never
+    # sent to Gemini, Groq, or any other external provider.
+    fact_answer = _business_fact_answer(db, user_id=user_id, tenant_id=tenant_id, question=question, request_started=request_started)
+    if fact_answer is not None:
+        return fact_answer
+
     sensitivity = DataSensitivity.AGGREGATED_BUSINESS if sensitivity_name == "aggregated_business" else DataSensitivity.PUBLIC_SYNTHETIC
 
-    await _enforce_rate_limit(tenant_id, user_id)
     # Do not keep a DB transaction open during external model latency. The only
     # optional tenant-specific value used below is the business timezone.
     if not business_time:
@@ -652,7 +962,12 @@ async def assistant(body: AssistRequest, ctx=Depends(require_permission("analyti
         }) from exc
     answer = _plain_markdown_answer(answer)
     logger.info("ai_assist_completed provider=%s model=%s area=%s", provider_id, model, body.area)
-    return AssistResponse(provider=provider_id, model=model, answer=answer, used_business_summary=False)
+    return AssistResponse(
+        provider=provider_id, model=model, answer=answer, used_business_summary=False,
+        source_mode="external_question_only",
+        response_time_ms=round((time.monotonic() - request_started) * 1000),
+        evidence=None,
+    )
 
 
 # Kept for older same-origin clients. The application middleware deliberately

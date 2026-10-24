@@ -31,6 +31,9 @@
 .markdown ul, .markdown ol { margin: 4px 0 12px; padding-left: 22px; }
 .markdown li { margin: 3px 0; }
 .markdown strong { color: #1b3530; font-weight: 750; }
+.responseMeta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 9px; border-top: 1px solid #e7edeb; color: #687a77; font-size: 11px; line-height: 1.4; }
+.responseMeta a { color: #216c59; font-weight: 700; text-decoration: none; }
+.responseMeta a:hover { text-decoration: underline; }
 .composer { padding: 20px 24px 16px; border-top: 1px solid var(--border, #e5eaed); background: #fff; }
 .composer > label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #3d514f; }
 .composer textarea { display: block; width: 100%; min-height: 86px; padding: 12px 14px; resize: vertical; border: 1px solid #d5dfe1; border-radius: 12px; outline: none; color: #25363d; background: #fff; font: inherit; font-size: 14px; line-height: 1.5; }

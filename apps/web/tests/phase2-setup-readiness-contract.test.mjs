@@ -32,6 +32,7 @@ assert.match(compliance, /Add a tax rate/);
 assert.match(compliance, /Configure a default tax rule/);
 assert.match(compliance, /scope_type: "DEFAULT"/);
 assert.match(compliance, /Choose a saved rate/);
-assert.match(compliance, /tax rate end date cannot be before its start date/);
-assert.match(compliance, /tax rule end date cannot be before its start date/);
+// User-facing labels may sentence-case the validation copy. Keep the semantic assertion case-insensitive.
+assert.match(compliance, /tax rate end date cannot be before its start date/i);
+assert.match(compliance, /tax rule end date cannot be before its start date/i);
 assert.match(compliance, /does not determine what tax rate your business is legally required to use/);

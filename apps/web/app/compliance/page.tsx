@@ -142,7 +142,7 @@ export default function CompliancePage() {
       setMessage("Enter a percentage from 0 to 100."); setMessageTone("error"); return;
     }
     if (rateDraft.effective_to && rateDraft.effective_to < rateDraft.effective_from) {
-      setMessage("The end date cannot be earlier than the start date."); setMessageTone("error"); return;
+      setMessage("Tax rate end date cannot be before its start date."); setMessageTone("error"); return;
     }
     setSavingRate(true); setMessage("");
     try {
@@ -165,7 +165,7 @@ export default function CompliancePage() {
       setMessage("Choose a saved tax rate first."); setMessageTone("error"); return;
     }
     if (ruleDraft.effective_to && ruleDraft.effective_to < ruleDraft.effective_from) {
-      setMessage("The end date cannot be earlier than the start date."); setMessageTone("error"); return;
+      setMessage("Tax rule end date cannot be before its start date."); setMessageTone("error"); return;
     }
     setSavingRule(true); setMessage("");
     try {
@@ -201,7 +201,7 @@ export default function CompliancePage() {
           <div className="section-head"><div>
             <span className="section-label">URA / EFRIS CONNECTION</span>
             <h2>Official receipt configuration</h2>
-            <p>Configure the taxpayer identity and intended connection method. LEXA cannot mark a business as registered or issue a URA fiscal document without a real, verified URA response.</p>
+            <p>Configure the taxpayer identity and intended connection method. Only a real URA-approved connector can confirm registration or issue a verified URA fiscal document.</p>
           </div></div>
           {configLoaded && config ? <>
             <div className="command-form">
@@ -254,14 +254,14 @@ export default function CompliancePage() {
           <div className="table-wrap">
             <table><thead><tr><th>Tax code</th><th>Tax treatment</th><th>Rate</th><th>Price includes tax</th><th>Effective period</th><th>Status</th></tr></thead>
               <tbody>{taxRates.map(rate => <tr key={rate.id}><td>{rate.code}</td><td>{rate.name}</td><td>{rate.rate_percent}%</td><td>{rate.inclusive ? "Yes" : "No"}</td><td>{rate.effective_from}{rate.effective_to ? ` → ${rate.effective_to}` : " onward"}</td><td>{statusLabel(rate.status)}</td></tr>)}
-                {!busy && ratesLoaded && taxRates.length === 0 && <tr><td colSpan={6}>No rates configured yet. Add an official reference or create a rate confirmed for your business.</td></tr>}
+                {!busy && ratesLoaded && taxRates.length === 0 && <tr><td colSpan={6}>No tax rates are saved yet. Add an official reference or create a rate confirmed for your business.</td></tr>}
                 {!busy && !ratesLoaded && <tr><td colSpan={6}>Tax rates could not be loaded. Refresh to retry.</td></tr>}
               </tbody>
             </table>
           </div>
           <div className="foundation-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", marginTop: 18 }}>
             <form className="command-form" onSubmit={saveTaxRate}>
-              <div><h3>Add a tax rate</h3><p>Use a rate and tax treatment verified for the business.</p></div>
+              <div><h3>Add a tax rate</h3><p>Creating a tax rate does not determine what tax rate your business is legally required to use. Confirm its applicability and treatment with URA or your tax adviser before use.</p></div>
               <label htmlFor="tax-code">Tax code<input id="tax-code" value={rateDraft.code} onChange={event => setRateDraft({ ...rateDraft, code: event.target.value })} maxLength={50} required /></label>
               <label htmlFor="tax-name">Rate name<input id="tax-name" value={rateDraft.name} onChange={event => setRateDraft({ ...rateDraft, name: event.target.value })} maxLength={160} required /></label>
               <label htmlFor="tax-percent">Rate (%)<input id="tax-percent" type="number" min="0" max="100" step="0.01" value={rateDraft.rate_percent} onChange={event => setRateDraft({ ...rateDraft, rate_percent: event.target.value })} required /></label>
@@ -273,7 +273,7 @@ export default function CompliancePage() {
               <button type="submit" className="button button-dark" disabled={busy || savingRate}>{savingRate ? "Saving rate…" : "Save tax rate"}</button>
             </form>
             <form className="command-form" onSubmit={saveDefaultRule}>
-              <div><h3>Default tax rule</h3><p>A default affects the products covered by the default scope. Do not use it where products need different tax treatments.</p></div>
+              <div><h3>Configure a default tax rule</h3><p>A default affects the products covered by the default scope. Do not use it where products need different tax treatments.</p></div>
               <label htmlFor="rule-name">Rule name<input id="rule-name" value={ruleDraft.name} onChange={event => setRuleDraft({ ...ruleDraft, name: event.target.value })} maxLength={160} required /></label>
               <label htmlFor="rule-rate">Saved tax rate<select id="rule-rate" value={ruleDraft.tax_rate_id} onChange={event => setRuleDraft({ ...ruleDraft, tax_rate_id: event.target.value })} required><option value="">Choose a saved rate</option>{taxRates.map(rate => <option key={rate.id} value={rate.id}>{rate.code} · {rate.name} · {rate.rate_percent}%</option>)}</select></label>
               <div className="form-grid">
@@ -298,7 +298,7 @@ export default function CompliancePage() {
           <div className="section-head"><div><span className="section-label">OFFICIAL FISCAL RECORDS</span><h2>{docsLoaded ? `${docs.length} fiscal documents` : "Fiscal document status unavailable"}</h2><p>Only a verified URA response can supply an official fiscal document number (FDN), verification code or QR reference.</p></div></div>
           <div className="table-wrap"><table><thead><tr><th>Issue date</th><th>Document</th><th>Status</th><th>URA document number</th><th>Verification code</th></tr></thead>
             <tbody>{docs.map(doc => <tr key={doc.id}><td>{doc.issue_date}</td><td>{documentLabel(doc.document_type)}</td><td>{statusLabel(doc.status)}</td><td>{doc.fdn || "Not issued"}</td><td>{doc.verification_code || "Not issued"}</td></tr>)}
-              {!busy && docsLoaded && docs.length === 0 && <tr><td colSpan={5}>No fiscal documents have been returned by URA yet. A LEXA payment receipt is not automatically a fiscalised EFRIS receipt.</td></tr>}
+              {!busy && docsLoaded && docs.length === 0 && <tr><td colSpan={5}>No official fiscal documents have been recorded yet. A verified URA fiscal document has not been returned; a LEXA payment receipt is not automatically an EFRIS receipt.</td></tr>}
               {!busy && !docsLoaded && <tr><td colSpan={5}>Fiscal documents could not be loaded. Refresh to retry.</td></tr>}
             </tbody>
           </table></div>

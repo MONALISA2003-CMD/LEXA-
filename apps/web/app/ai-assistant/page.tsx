@@ -7,7 +7,7 @@ import { AppShell } from "../../components/app-shell";
 import { askLexaAssistant, getAssistantProviders, type AssistantProvidersResponse } from "../../lib/ai-assistant-api";
 import styles from "./page.module.css";
 
-type ChatMessage = { id: string; role: "user" | "assistant"; text: string };
+type ChatMessage = { id: string; role: "user" | "assistant"; text: string; meta?: string; evidenceHref?: string; evidenceLabel?: string };
 type Area = "general" | "sales" | "stock" | "purchasing" | "finance" | "customers";
 
 function inlineMarkdown(text: string): ReactNode[] {
@@ -138,9 +138,21 @@ export default function AiAssistantPage() {
     setSending(true);
     const userMessage: ChatMessage = { id: makeId(), role: "user", text: prompt };
     setMessages(previous => [...previous, userMessage]);
+    const requestStartedAt = performance.now();
     try {
       const reply = await askLexaAssistant({ prompt, area });
-      setMessages(previous => [...previous, { id: makeId(), role: "assistant", text: reply.answer }]);
+      const sourceLabel = reply.source_mode === "local_business_data"
+        ? reply.evidence?.status === "available" ? "Based on saved LEXA business records" : "Saved figures could not be verified"
+        : reply.source_mode === "external_question_only"
+          ? "General guidance · screened question only"
+          : "LEXA guidance";
+      const elapsedLabel = ` · ${(Math.max(0, performance.now() - requestStartedAt) / 1000).toFixed(1)}s`;
+      setMessages(previous => [...previous, {
+        id: makeId(), role: "assistant", text: reply.answer,
+        meta: `${sourceLabel}${elapsedLabel}`,
+        evidenceHref: reply.evidence?.href,
+        evidenceLabel: reply.evidence?.status === "available" ? "View source" : "Open related page",
+      }]);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "LEXA couldn't respond just now. Please try again.";
       setError(message);
@@ -177,7 +189,7 @@ export default function AiAssistantPage() {
         <span className={styles.privacyIcon} aria-hidden="true">✦</span>
         <div>
           <strong>Private to your signed-in workspace</strong>
-          <p>LEXA does not share saved customer, stock, sales or finance records with the assistant. Each request is checked against your signed-in account. This chat stays in this page and is not saved as conversation history.</p>
+          <p>When you ask for figures, LEXA checks permission-approved saved business summaries inside your workspace and shows when the data was refreshed. Those records are not shared with external services. For general guidance, LEXA may share the question you type with an approved service. This chat is not saved as conversation history.</p>
         </div>
       </section>
 
@@ -202,7 +214,13 @@ export default function AiAssistantPage() {
         </div> : <div className={styles.messages} role="log" aria-live="polite" aria-relevant="additions text">
           {messages.map(message => <article key={message.id} className={`${styles.message} ${message.role === "user" ? styles.userMessage : styles.assistantMessage}`}>
             <div className={styles.messageLabel}>{message.role === "user" ? "YOU" : "LEXA"}</div>
-            {message.role === "assistant" ? <MarkdownAnswer text={message.text} /> : <p className={styles.userText}>{message.text}</p>}
+            {message.role === "assistant" ? <>
+              <MarkdownAnswer text={message.text} />
+              {message.meta && <div className={styles.responseMeta}>
+                <span>{message.meta}</span>
+                {message.evidenceHref && <Link href={message.evidenceHref}>{message.evidenceLabel || "View source"}</Link>}
+              </div>}
+            </> : <p className={styles.userText}>{message.text}</p>}
           </article>)}
           {sending && <article className={`${styles.message} ${styles.assistantMessage}`} role="status"><div className={styles.messageLabel}>LEXA</div><div className={styles.thinking}><span></span><span></span><span></span><span className={styles.thinkingText}>Preparing guidance…</span></div></article>}
           <div ref={endRef} />
@@ -220,8 +238,8 @@ export default function AiAssistantPage() {
             </div>
             <button type="submit" className="button button-dark" disabled={sending || loadingProviders || !question.trim()}>{sending ? "Thinking…" : "Ask LEXA"}<span aria-hidden="true"> →</span></button>
           </div>
-          {!loadingProviders && !providers?.enabled && <p className={styles.disabledNote}>LEXA's private guidance is available, but extended answers are not enabled under the current safety settings. Business Insights, Daily Brief and Reports remain available for your saved records.</p>}
-          <p className={styles.disclaimer}>LEXA only answers questions in its business-support scope. Do not enter names, phone numbers, private customer details, payment credentials or account identifiers. For exact saved figures, use Business Insights or Reports.</p>
+          {!loadingProviders && !providers?.enabled && <p className={styles.disabledNote}>Private LEXA guidance remains available, but external business advice is disabled by the current safety settings. Business Insights, Daily Brief and Reports remain available for your saved records.</p>}
+          <p className={styles.disclaimer}>LEXA only answers questions in its business-support scope. Do not enter names, phone numbers, private customer details, payment credentials or account identifiers. For supported figures, LEXA checks saved metrics locally and clearly says when the data is missing or out of date.</p>
         </form>
       </section>
       <div className={styles.quickLinks}><Link href="/daily-brief">Daily Brief</Link><Link href="/demand-forecast">Demand Forecast</Link><Link href="/documents">Business documents</Link><Link href="/reports">Reports</Link></div>

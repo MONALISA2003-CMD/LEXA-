@@ -64,6 +64,13 @@ def intelligence_capabilities(ctx=Depends(require_permission("analytics.read")))
             "external_model_document_extraction": False,
             "automatic_business_writes": False,
         },
+        "business_tool_execution": {
+            # External question-only replies and local read-only metric lookups are
+            # distinct from tools that mutate business transactions.
+            "execution_available": False,
+            "automatic_business_writes": False,
+            "reason": "LEXA can explain saved metrics but cannot post sales, stock, payments, journals or tax submissions through the assistant.",
+        },
         "external_ai": {
             "enabled": bool(policy.external_providers_enabled),
             "execution_available": external_question_route_ready,
