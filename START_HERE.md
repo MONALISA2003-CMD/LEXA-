@@ -1,4 +1,4 @@
-# LEXA Phase 1 repair + Phase 2 acceptance patch
+# LEXA Phase 0/1/2 repair + CI run 40114334149 correction
 
 **Package date:** 24 October 2026  
 **Repository:** `MONALISA2003-CMD/LEXA-`
@@ -7,7 +7,7 @@
 
 This is a canonical-path **source patch**, not a full application archive and not a deployment. It contains the Phase 1 business-grounded assistant source/test corrections plus a Phase 2 cross-module transaction acceptance route and staging-only browser journey. At package root it includes `apps/api/app/main.py`, `apps/web/package.json` and `migrations/` so the repository's **LEXA ZIP Extractor** recognizes it instead of saving it under a nested `source/` folder.
 
-The previously inspected red build `40100560783` was on old SHA `d5be996d8cf45c93200351c6a21251c4d3a6c934` and had three stale frontend contract assertions plus two stale API expectations. The current canonical source includes corrections for those five known failures. I could not confirm a new green run on the latest source SHA, so **CI is not yet declared green**. The previous extractor run `40104642951` skipped unrelated archives because they lacked root-level marker paths and did not dispatch Main Build CI; this ZIP is structured to address that recognition issue.
+The newest inspected red build is `40114334149` on SHA `1e93fc87022bf7d31cae0ae00c537371af148ccb`. API contracts, Docker/HAProxy and web typecheck passed; the web test suite reported 97 passed and 2 failed because the Phase 5 and Phase 7 contract tests still expected the old combined Playwright matcher. This ZIP updates those two assertions to match the actual separate Phase 2 and Phase 5–8 matchers. The production build did not run because `npm test` failed. **This is a targeted corrective patch, not proof of a green rerun.** GitHub access denied direct branch creation (HTTP 403), so a new run can only be confirmed after this ZIP is extracted/committed by the repository workflow.
 
 ## Apply and verify
 

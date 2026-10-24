@@ -17,8 +17,10 @@ test('Phase 5 authenticated acceptance has a pinned Playwright runner and lockfi
   assert.equal(lock.packages['node_modules/playwright'].version, '1.64.1');
   assert.equal(lock.packages['node_modules/playwright-core'].version, '1.64.1');
   assert.match(pkg.scripts['test:e2e:phase5'], /playwright test/);
-  // Phase 2 adds a separately guarded transaction-chain suite to the original Phase 5–8 set.
-  assert.match(config, /phase\(2-transaction\|5-sales\|6-inventory\|7-purchasing\|7-authorization\|8-reports\)-acceptance/);
+  // Keep this contract aligned with Playwright's explicit Phase 2 and Phase 5–8 matchers.
+  assert.ok(config.includes('const phase5Through8AcceptancePattern = /phase(5-sales|6-inventory|7-purchasing|7-authorization|8-reports)-acceptance\\.spec\\.ts$/;'));
+  assert.ok(config.includes('const phase2TransactionAcceptancePattern = /phase2-transaction-acceptance\\.spec\\.ts$/;'));
+  assert.ok(config.includes('testMatch: [phase5Through8AcceptancePattern, phase2TransactionAcceptancePattern]'));
   assert.match(config, /LEXA_PHASE7_STORAGE_STATE/);
 });
 

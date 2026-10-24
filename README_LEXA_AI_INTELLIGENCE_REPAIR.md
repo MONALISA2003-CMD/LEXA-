@@ -1,4 +1,4 @@
-# LEXA Phase 1 repair + Phase 2 acceptance source patch
+# LEXA Phase 0/1/2 repair + CI run 40114334149 correction
 
 This ZIP contains selected changed files at canonical repository paths for `MONALISA2003-CMD/LEXA-` and is intended for the existing **LEXA ZIP Extractor**. It is not a full source archive, installer or deployment. Root marker files (`apps/web/package.json`, `apps/api/app/main.py`, `migrations/`) allow the extractor to recognize and commit the real source tree. The archive includes no provider credentials or secrets and does not modify workflow files.
 
@@ -24,7 +24,7 @@ Neon `lexa-live` has migrations `045_intelligence_foundation`, `046_intelligence
 
 ## CI status and validation
 
-The latest historical failed canonical Main Build CI inspected in this repair was `40100560783` on the old SHA `d5be996d8cf45c93200351c6a21251c4d3a6c934`. Source fixes for those five known contract failures are present in the current main files, but a fresh green run on the resulting source SHA was not confirmed. Local validation for this patch passed Python compilation, 2/2 API static contracts, 5/5 focused Node checks, and TypeScript syntax transpilation for the new Playwright spec/setup/config (zero syntax diagnostics). The full API suite, full Node 24 suite, typecheck, production build and authenticated staging E2E remain release gates.
+The latest inspected canonical Main Build CI is `40114334149` on SHA `1e93fc87022bf7d31cae0ae00c537371af148ccb`. API unit/contracts, Docker/HAProxy and web typecheck passed, but Node contracts reported 97/99 because two older tests still asserted the former combined Playwright matcher. This bundle updates exactly those assertions to match the configured Phase 2 and Phase 5–8 patterns. The failure prevented the GitHub workflow Next production build step from running. A source-only regression probe against the current origin verified 13/13 Phase 5/7 contract conditions, and a matcher probe confirmed all six intended Phase 2/5/6/7/7-auth/8 specs are covered; that is not a rerun of `npm test`. The full CI run, production build and authenticated staging transaction acceptance remain release gates. GitHub branch creation was denied to the connected integration (403), so **CI is not yet declared green**.
 
 ## Apply
 

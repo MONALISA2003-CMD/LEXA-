@@ -32,8 +32,10 @@ test('supplier terms, effective costs, landed cost and invoice exceptions are ex
 
 test('Phase 7 E2E has explicit staging safeguards but is not run by default CI', () => {
   assert.match(pkg.scripts['test:e2e:phase7'], /phase7-purchasing-acceptance\.spec\.ts/);
-  // Phase 2 adds a separately guarded transaction-chain suite to the original Phase 5–8 set.
-  assert.match(config, /phase\(2-transaction\|5-sales\|6-inventory\|7-purchasing\|7-authorization\|8-reports\)-acceptance/);
+  // Keep this contract aligned with Playwright's explicit Phase 2 and Phase 5–8 matchers.
+  assert.ok(config.includes('const phase5Through8AcceptancePattern = /phase(5-sales|6-inventory|7-purchasing|7-authorization|8-reports)-acceptance\\.spec\\.ts$/;'));
+  assert.ok(config.includes('const phase2TransactionAcceptancePattern = /phase2-transaction-acceptance\\.spec\\.ts$/;'));
+  assert.ok(config.includes('testMatch: [phase5Through8AcceptancePattern, phase2TransactionAcceptancePattern]'));
   assert.match(config, /LEXA_PHASE7_STORAGE_STATE/);
   assert.match(spec, /LEXA_PHASE7_ALLOW_STAGING_WRITES/);
   assert.match(spec, /disposable_scope === true/);

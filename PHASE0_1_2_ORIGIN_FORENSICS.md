@@ -64,3 +64,10 @@ Render service/deploy metadata has **not** been read in this audit because the R
 3. Provision and execute the authenticated Phase 2 journey against an isolated staging tenant; capture the deployed SHA plus transaction/journal/stock/outbox/analytics assertions.
 4. Compare Render API and Vercel web deployed SHAs and smoke-test readiness/login/assistant; do not describe either service as bug-free based only on `LIVE`/`READY`.
 5. Only after Phase 2 passes, complete official URA EFRIS test onboarding and a named payment-provider sandbox integration, including idempotency, signed callbacks, transaction status verification and reconciliation. Production enablement requires explicit approval and real provider evidence.
+
+
+## Latest CI follow-up — run 40114334149
+
+After the prior audit, the next Main Build CI run checked out commit `1e93fc87022bf7d31cae0ae00c537371af148ccb`. API contracts and Docker/HAProxy passed, and web typecheck passed. The web test run reported 97 passed and 2 failed of 99; both failures were stale expectations in the Phase 5 and Phase 7 test contracts for a former combined Playwright matcher. The source config now has separate Phase 2 and Phase 5–8 matchers. Those two assertions are corrected in this bundle. This failure stopped the Next production build from running. See `RUN_40114334149_FORENSICS.md` for the exact root cause, changes and current deployment evidence.
+
+The patch has not yet been applied to GitHub main by this assistant: the connected GitHub integration returned HTTP 403 when attempting to create a branch. The verified ZIP is therefore an upload/extractor patch. A new GitHub CI run is still required to certify that the resulting commit has no failures.
