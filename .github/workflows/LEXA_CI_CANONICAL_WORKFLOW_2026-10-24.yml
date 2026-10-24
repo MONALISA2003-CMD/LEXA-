@@ -1,0 +1,114 @@
+name: LEXA Main Build CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'apps/web/**'
+      - 'docker-compose.yml'
+      - 'deploy/docker/**'
+      - '.env.example'
+      - 'migrations/**'
+      - '.github/workflows/lexa-ci.yml'
+      - '.github/workflows/lexa-zip-extract.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'apps/web/**'
+      - 'docker-compose.yml'
+      - 'deploy/docker/**'
+      - '.env.example'
+      - 'migrations/**'
+      - '.github/workflows/lexa-ci.yml'
+      - '.github/workflows/lexa-zip-extract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lexa-main-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-unit-contracts:
+    name: API unit and contract tests (no staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: apps/api
+    env:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://lexa:lexa@localhost:5432/lexa
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: local-ci-only-secret-at-least-32-characters-long
+      DATABASE_APP_ROLE: ''
+      DATABASE_LOGIN_ROLE: lexa
+      PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: apps/api/pyproject.toml
+      - name: Install API and test dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Compile API source
+        run: python -m compileall -q app
+      - name: Run API unit and contract tests
+        run: python -m pytest tests -q
+
+  web-build:
+    name: Web typecheck, contracts and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Frontend contract tests
+        run: npm test
+      - name: Build production frontend
+        run: npm run build
+
+  compose-config:
+    name: Docker Compose and HAProxy configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Verify load-balancer pools and HAProxy syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s deploy/docker/haproxy.cfg
+          grep -Fq 'balance roundrobin' deploy/docker/haproxy.cfg
+          grep -Fq 'balance leastconn' deploy/docker/haproxy.cfg
+          grep -Fq 'server web1 web:3000 check' deploy/docker/haproxy.cfg
+          grep -Fq 'server web2 web-2:3000 check' deploy/docker/haproxy.cfg
+          grep -Fq 'server api1 api:8000 check' deploy/docker/haproxy.cfg
+          grep -Fq 'server api2 api-2:8000 check' deploy/docker/haproxy.cfg
+          docker run --rm \
+            --volume "$PWD/deploy/docker/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro" \
+            haproxy:3.2-alpine haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg
