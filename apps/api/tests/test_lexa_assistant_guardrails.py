@@ -15,6 +15,7 @@ def test_assistant_only_routes_lexa_business_questions():
     assert _scope_result("How can I reduce stockouts in LEXA?") == ""
     assert _scope_result("Where do I update the business currency in LEXA?") == ""
     assert _scope_result("Please help me review supplier payments") == ""
+    assert _scope_result("How do I set up EFRIS in LEXA?") == ""
     assert _scope_result("What is the weather today?")
     assert _scope_result("Write a Python script for me")
     assert _scope_result("Tell me about LEXA")
@@ -42,7 +43,7 @@ def test_model_json_shaped_output_is_rendered_as_markdown_prose():
     assert result.startswith("**Summary**")
     assert not result.startswith("{")
     list_result = _plain_markdown_answer('["Review Reports", "Check stock"]')
-    assert list_result == "**Recommended guidance**\n\n- Review Reports\n- Check stock"
+    assert list_result == "- Review Reports\n- Check stock"
     assert "clear answer" in _plain_markdown_answer('{invalid json}')
 
 
@@ -59,5 +60,7 @@ def test_assistant_instruction_requires_professional_markdown_and_tenant_local_t
     assert "never like a software engineer" in instruction
     assert "Do not provide JSON" in instruction
     assert "Business-local date and time" in instruction
+    assert "commercially fluent language" in instruction
+    assert "under 15 seconds" in instruction
     assert "another client, workspace" in instruction
     assert "Saturday, 24 October 2026 at 16:00" in instruction

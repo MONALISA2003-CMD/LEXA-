@@ -9,8 +9,10 @@ This source package is prepared for the repository's **LEXA ZIP Extractor** work
 - Calls LEXA's central `intelligence.policy` router before a provider is selected. There is no automatic provider fallback.
 - Restricts questions to supported LEXA/business workflows, gives greetings a local answer, rejects common off-topic and prompt-injection requests locally, screens personal identifiers, blocks numeric business details from external transfer by default, and never loads or sends another tenant's saved business data.
 - Limits rate counting by authenticated `tenant_id` and `user_id`; rejects client-supplied tenant/user/workspace identifiers; reads only the authenticated tenant's `tenant_settings.timezone` for current business-local date/time/daypart; does not persist prompts or conversation history. The UI clears its in-memory conversation if the active workspace changes.
-- Shortens provider timeout and default output budget to improve responsiveness. Assistant responses are normalized to Markdown prose rather than JSON.
-- Uses a supported, lightweight OpenAI fallback model (`gpt-5-mini`) and keeps provider/model choice out of the business-user interface. Provider calls remain server-side and subject to policy allowlists.
+- Enables approved question-only external responses by default, with the central allowlist limited to Gemini and Groq. Actual external execution still requires the provider key on the server, and an explicitly configured `LEXA_AI_EXTERNAL_PROVIDERS_ENABLED=false` continues to disable it. Paid providers and external business-data sharing remain off.
+- Adds a hard 12-second server-side model deadline, 11-second provider HTTP timeout, a 14.5-second frontend deadline, and a smaller output budget to target a response within 15 seconds. Provider/model choice stays server-side; the system does not send saved business summaries, tenant identifiers, customer records, or unscreened figures.
+- Improves business tone across the assistant and intelligence capability/forecast messages: concise, commercially fluent wording, useful headings when needed, and no repetitive canned heading or software-engineering language. The intelligence capability endpoint now distinguishes question-only assistant routing from future confidential-data/document extraction capabilities.
+- Expands the compliance page with Uganda-specific URA/EFRIS setup: TIN, registered legal name, effective date, read-only URA registration status, official URA guidance links, and quick-create tax-rate references for 18% standard-rated and 0% eligible zero-rated supplies. These rates are not assigned as defaults; no supply is classified automatically.
 - Extends the existing analytics worker to call a new optional backfill function from migration 047. The worker now schedules a complete 56-day projection refresh for tenants lacking a recent successful refresh, at most one tenant per poll, with a retry cooldown on failures.
 - Adds regression tests for scope/privacy guardrails and the analytics worker's optional 56-day backfill path.
 
@@ -20,11 +22,11 @@ This source package is prepared for the repository's **LEXA ZIP Extractor** work
 2. Wait for **LEXA ZIP Extractor** to extract the files and commit the extracted source. Then inspect the extracted commit, GitHub Actions checks, Render deploy, and Vercel production deployment.
 3. Do not upload the ZIP into `.github/workflows/`. The extractor deliberately protects that path.
 
-This package is not committed to the repository by the assistant. Upload it at the repository root through the existing extractor workflow so the full repository tests can run.
+This package is not committed to the repository by the assistant. It is a changed-files overlay, not a complete source repository. Upload it at the repository root through the existing extractor workflow so the full repository tests can run.
 
 ## Render environment values for question-only AI
 
-Once the new code is present on `main`, set these on the **Render API service** (not on Vercel browser-visible variables):
+The API defaults to allowing the Gemini/Groq route, but an environment override can turn it off. On the **Render API service**, verify these values and add a valid provider key as a secret; never put provider keys in Vercel browser-visible variables:
 
 ```env
 LEXA_AI_EXTERNAL_PROVIDERS_ENABLED=true
@@ -32,11 +34,19 @@ LEXA_AI_ALLOWED_PROVIDERS=gemini,groq
 LEXA_AI_PAID_PROVIDERS_ENABLED=false
 LEXA_AI_AGGREGATES_EXTERNAL_ENABLED=false
 LEXA_AI_CONFIDENTIAL_EXTERNAL_ENABLED=false
-LEXA_AI_MAX_OUTPUT_TOKENS=350
+LEXA_AI_MAX_OUTPUT_TOKENS=300
 LEXA_AI_REQUESTS_PER_MINUTE=10
+GEMINI_API_KEY=<set as a Render secret>
+GROQ_API_KEY=<set as a Render secret>
 ```
 
-This enables only the configured Gemini/Groq question-only route. Paid providers remain disabled. The assistant does not send saved business summaries, customer/employee records, numeric business figures, or tenant identifiers to external models. A question containing business numbers is answered locally with a privacy explanation until a separate aggregate-sharing decision is made. Keep all provider secrets on Render only.
+Use at least one actual key. Key values must be added through Render's secret/environment UI; no key is included in this ZIP. Requests containing personal identifiers or business figures remain local/blocked by default. External providers receive only the screened text question and the business-style system instruction, not saved business summaries, tenant identifiers, customer/employee records, or workspace data. The 15-second target is a hard response budget, not a guarantee during provider outages or severe latency; timeouts return a useful business-language message rather than waiting indefinitely.
+
+## Uganda URA / EFRIS configuration
+
+The compliance page stores the available business-specific EFRIS fields, shows the registration status as read-only, and links to official URA registration guidance. The reference-rate actions create tax-rate records only: 18% for standard-rated supplies and 0% for supplies legally eligible for zero-rating. They do not create a default tax rule because product tax treatment depends on the applicable law and the business's supply mix.
+
+Official guidance: [URA EFRIS registration](https://ura.go.ug/en/efris/efris-registration/), [URA EFRIS overview](https://ura.go.ug/en/efris/), and [URA VAT guidance](https://ura.go.ug/en/value-added-tax-vat/). Actual system-to-system fiscalisation still requires the taxpayer's URA registration/approval and a real approved connector with credentials. This package intentionally does not invent URA endpoints, credentials, FDNs, verification codes, or an ACTIVE status. A payment receipt is not labelled as an accepted EFRIS document unless genuine URA-returned details exist.
 
 ## Intelligence migrations and data readiness
 

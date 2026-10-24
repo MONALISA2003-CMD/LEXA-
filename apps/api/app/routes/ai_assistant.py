@@ -150,6 +150,10 @@ def _system_instruction(area: str, business_time: str = "business local time una
     }[area]
     return (
         "You are LEXA, a polished, practical business assistant inside the LEXA business workspace. "
+        "Use polished, commercially fluent language with a natural, human business-adviser voice. Lead with the decision or implication, "
+        "then give practical next steps. Avoid canned filler such as 'Certainly!', 'As an AI', 'Here is a comprehensive overview', "
+        "and repetitive generic headings. Use specific business terms, concise sentences, and bold headings only when they aid scanning. "
+        "Keep a simple question to a short answer and target a response in under 15 seconds. "
         "Answer only questions about LEXA usage and business operations that LEXA supports: sales, stock, "
         "purchasing, expenses, finance workflows, customers, products, reporting, business insights, "
         "documents and demand planning. If the user asks about unrelated topics, politely redirect to a LEXA task. "
@@ -200,6 +204,19 @@ def _business_time_context(db, tenant_id: object) -> str:
 def _scope_result(question: str, business_time: str = "") -> str:
     """Return a local-only response for greetings or requests outside LEXA's scope."""
     normalized = question.casefold().strip()
+    lexa_about = re.fullmatch(
+        r"(?:what is lexa|tell me about lexa|what can lexa do|what does lexa do|what can i do with lexa|how do i use lexa)[?!. ]*",
+        normalized,
+    )
+    if lexa_about:
+        return (
+            "**LEXA business workspace**\n\n"
+            "LEXA brings day-to-day business work into one place, including sales, stock control, purchasing, customer follow-up, "
+            "finance records, official-document review, business reporting and demand planning. It helps you review what is recorded "
+            "and decide what to check next; it does not invent figures or make financial changes on your behalf.\n\n"
+            "**What would you like to work on?**\nAsk about a sales report, stock availability, a supplier order, a finance workflow, "
+            "a document, or a business insight in your workspace."
+        )
     greeting = re.fullmatch(r"(?:hi|hello|hey|good morning|good afternoon|good evening|how are you|thank you|thanks)[!. ]*", normalized)
     if greeting:
         daypart_match = re.search(r"\bit is (morning|afternoon|evening|night)\b", business_time, re.IGNORECASE)
@@ -234,7 +251,8 @@ def _scope_result(question: str, business_time: str = "") -> str:
         r"purchase|purchasing|supplier|vendor|expense|cash flow|cash|finance|accounting|profit|margin|"
         r"customer|customers|invoice|receipt|product|products|branch|warehouse|report|reports|dashboard|"
         r"insights?|forecast|demand|daily brief|document|refund|return|payment|balance|receivable|payable|"
-        r"checkout|business records|currency|workspace|permission|user access|settings|setup|stock count)\b",
+        r"checkout|business records|currency|workspace|permission|user access|settings|setup|stock count|"
+        r"tax|vat|ura|efris|fiscal|compliance|fiscalisation|fiscalization|tax rate|tax rule)\b",
         re.IGNORECASE,
     )
     safe_help_pattern = re.compile(r"\b(how do i|how can i|help me|where can i|what should i do|what does|why is|why did)\b", re.IGNORECASE)
@@ -320,7 +338,7 @@ async def _enforce_rate_limit(tenant_id: object, user_id: object) -> None:
 
 async def _post_json(provider_id: str, url: str, headers: dict[str, str], payload: dict[str, object]) -> dict[str, object]:
     try:
-        timeout = httpx.Timeout(16.0, connect=3.0)
+        timeout = httpx.Timeout(11.0, connect=2.5)
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(url, headers=headers, json=payload)
     except httpx.TimeoutException as exc:
@@ -452,8 +470,8 @@ def _plain_markdown_answer(answer: str) -> str:
             answer = ""
     if not answer:
         return "**I couldn't prepare a clear answer just now.** Please try rephrasing your LEXA business question."
-    if not re.search(r"\*\*[^*]+\*\*|^#{1,3}\s", answer, re.MULTILINE):
-        answer = "**Recommended guidance**\n\n" + answer
+    # Keep useful model prose natural; do not prepend a repetitive, robotic heading.
+    answer = re.sub(r"\n{3,}", "\n\n", answer).strip()
     return answer[:12_000]
 
 
@@ -467,7 +485,7 @@ async def _generate(provider_id: str, prompt: str, system_instruction: str) -> t
         })
     model = _model_for(spec)
     headers = {"Content-Type": "application/json"}
-    max_output_tokens = _bounded_int("LEXA_AI_MAX_OUTPUT_TOKENS", 350, 64, 700)
+    max_output_tokens = _bounded_int("LEXA_AI_MAX_OUTPUT_TOKENS", 300, 64, 500)
     if spec.api_style == "gemini":
         url = f"{spec.endpoint}/{quote(model, safe='')}:generateContent"
         headers["x-goog-api-key"] = api_key
@@ -601,8 +619,8 @@ async def assistant(body: AssistRequest, ctx=Depends(require_permission("analyti
         reason = decision.reason_code
         if reason in {"EXTERNAL_PROVIDERS_DISABLED", "NO_ELIGIBLE_CONFIGURED_PROVIDER", "PROVIDER_NOT_CONFIGURED", "PROVIDER_NOT_ALLOWLISTED", "PAID_PROVIDER_OPT_IN_REQUIRED"}:
             answer = (
-                "**The assistant is not enabled for external responses yet.** Your LEXA workspace is online, but no provider has passed the current safety settings.\n\n"
-                "**What you can do now**\nUse **Business Insights**, **Daily Brief**, **Demand Forecast** and **Reports** for answers based on your saved LEXA records. The assistant will not bypass these safeguards or send your data to an unapproved provider."
+                "**External assistance is not available at the moment.** LEXA could not find an approved, configured provider for this request.\n\n"
+                "**Next step**\nPlease try again shortly or review Business Insights and Reports. LEXA will not bypass its privacy safeguards to produce an answer."
             )
         elif reason == "AGGREGATE_EXTERNAL_NOT_APPROVED":
             answer = (
@@ -620,7 +638,18 @@ async def assistant(body: AssistRequest, ctx=Depends(require_permission("analyti
     system_instruction = _system_instruction(body.area, business_time)
     # Only the screened question is sent. Tenant IDs, user IDs, saved records and
     # client summaries are not included in the provider request.
-    model, answer = await _generate(provider_id, question, system_instruction)
+    try:
+        # A hard server-side deadline reserves a little time for auth, policy checks
+        # and response serialization so the whole interaction fits the 15-second UX.
+        model, answer = await asyncio.wait_for(
+            _generate(provider_id, question, system_instruction), timeout=12.0
+        )
+    except asyncio.TimeoutError as exc:
+        logger.warning("ai_provider_deadline_exceeded provider=%s", provider_id)
+        raise HTTPException(status_code=504, detail={
+            "code": "AI_RESPONSE_DEADLINE",
+            "message": "LEXA could not complete this answer within 15 seconds. Please try a shorter business question.",
+        }) from exc
     answer = _plain_markdown_answer(answer)
     logger.info("ai_assist_completed provider=%s model=%s area=%s", provider_id, model, body.area)
     return AssistResponse(provider=provider_id, model=model, answer=answer, used_business_summary=False)

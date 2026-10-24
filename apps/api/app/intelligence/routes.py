@@ -1,6 +1,7 @@
 """LEXA-owned intelligence API: safe capability discovery and rules-first daily brief."""
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from decimal import Decimal
@@ -14,7 +15,7 @@ from ..branch_access import require_full_branch_scope
 from . import CONTRACT_VERSION, POLICY_VERSION
 from .daily_brief import build_daily_brief
 from .forecasting import HISTORY_DAYS, FORECAST_VERSION, seasonal_weekday_forecast
-from .policy import configured_provider_ids, policy_from_settings
+from .policy import PROVIDER_KEY_ENV, configured_provider_ids, policy_from_settings
 
 router = APIRouter(prefix="/intelligence", tags=["intelligence"])
 
@@ -24,15 +25,27 @@ def intelligence_capabilities(ctx=Depends(require_permission("analytics.read")))
     """Describe available intelligence without returning secrets or business data."""
     del ctx
     policy = policy_from_settings(settings)
-    configured = configured_provider_ids()
+    # Include secrets loaded by Settings/.env without ever returning their values.
+    configured_env = dict(os.environ)
+    for env_name in PROVIDER_KEY_ENV.values():
+        setting_value = getattr(settings, env_name.lower(), "")
+        if str(setting_value or "").strip():
+            configured_env[env_name] = str(setting_value)
+    configured = configured_provider_ids(configured_env)
     from .policy import PAID_PROVIDER_IDS
 
-    eligible = sorted(
+    question_only_providers = sorted(
+        item.value for item in configured.intersection(policy.allowed_providers)
+        if policy.external_providers_enabled
+        and (item not in PAID_PROVIDER_IDS or policy.paid_providers_enabled)
+    )
+    later_phase_providers = sorted(
         item.value for item in configured.intersection(policy.allowed_providers)
         if policy.external_providers_enabled
         and policy.confidential_external_enabled
         and (item not in PAID_PROVIDER_IDS or policy.paid_providers_enabled)
     )
+    external_question_route_ready = bool(question_only_providers)
     return {
         "contract_version": CONTRACT_VERSION,
         "policy_version": POLICY_VERSION,
@@ -47,18 +60,21 @@ def intelligence_capabilities(ctx=Depends(require_permission("analytics.read")))
             "python_forecasting": True,
             "seasonal_demand_forecast": True,
             "rolling_origin_backtest": True,
+            "external_business_assistant": external_question_route_ready,
             "external_model_document_extraction": False,
             "automatic_business_writes": False,
         },
         "external_ai": {
-            "enabled": False,
-            "execution_available": False,
-            "eligible_provider_ids_for_a_later_phase": eligible,
+            "enabled": bool(policy.external_providers_enabled),
+            "execution_available": external_question_route_ready,
+            "eligible_provider_ids_for_question_only": question_only_providers,
+            "eligible_provider_ids_for_a_later_phase": later_phase_providers,
             "paid_provider_opt_in": policy.paid_providers_enabled,
             "aggregated_business_data_approved": policy.aggregate_external_enabled,
             "confidential_business_data_approved": policy.confidential_external_enabled,
             "personal_data_external_allowed": False,
             "automatic_fallbacks": False,
+            "data_transfer_boundary": "screened question only; no saved business records or tenant identifiers",
         },
         "local_document_tools": {
             "pdf_text": bool(shutil.which("pdftotext")),
@@ -180,7 +196,7 @@ def intelligence_demand_forecast(
             **base,
             "status": "unavailable",
             "reason_code": "FRESH_COMPLETE_HISTORY_REQUIRED",
-            "message": "A successful analytics refresh covering all 56 days and completed in the last 72 hours is required. LEXA has not inferred missing history as zero demand.",
+            "message": "To prepare a demand forecast, LEXA needs a successful analytics refresh covering the full 56-day window, completed in the last 72 hours. Missing dates are not treated as zero demand.",
             "items": [],
             "excluded_items": [],
         }
@@ -228,7 +244,7 @@ def intelligence_demand_forecast(
             **base,
             "status": "unavailable",
             "reason_code": "NO_RECORDED_DEMAND_HISTORY",
-            "message": "No product demand rows were found in the fully refreshed window. LEXA has not generated zero forecasts for items without evidence of recorded demand.",
+            "message": "The full history window is refreshed, but LEXA has no recorded product-demand rows to support a forecast yet. Record real sales first; LEXA will not invent demand.",
             "items": [],
             "excluded_items": [],
         }
@@ -268,7 +284,7 @@ def intelligence_demand_forecast(
                 "variant_name": str(item["variant_name"]),
                 "sku": str(item["sku"]) if item["sku"] is not None else None,
                 "reason_code": str(model.get("reason_code") or "INSUFFICIENT_HISTORY"),
-                "message": str(model.get("message") or "Not enough history for a reliable baseline."),
+                "message": str(model.get("message") or "There is not enough recorded history for a reliable baseline."),
             })
             continue
         items.append({
@@ -285,7 +301,7 @@ def intelligence_demand_forecast(
             **base,
             "status": "unavailable",
             "reason_code": "NO_ELIGIBLE_DEMAND_SERIES",
-            "message": "The refreshed history did not contain enough active demand for any of the selected variants.",
+            "message": "No selected product currently has enough recorded demand for a reliable forecast. Continue recording sales and review the excluded items below.",
             "items": [],
             "excluded_items": excluded_items[:30],
         }
@@ -293,7 +309,7 @@ def intelligence_demand_forecast(
         **base,
         "status": "partial" if excluded_items or any(item.get("status") == "partial" for item in items) else "available",
         "reason_code": None,
-        "message": "Forecasts are planning evidence only. Compare the rolling-origin metrics with the last-week baseline before relying on a series.",
+        "message": "Use these forecasts as planning guidance, not a purchase order. Compare each model's backtest with the last-week baseline and account for any stockouts before acting.",
         "items": items,
         "excluded_items": excluded_items[:30],
     }

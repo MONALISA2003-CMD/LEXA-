@@ -16,15 +16,12 @@ class Settings(BaseSettings):
     jwt_audience: str = "lexa-web"
     access_token_minutes: int = 30
     refresh_token_days: int = 30
-    # Password reset email is optional for booting older deployments, but reset endpoints stay disabled until configured.
     resend_api_key: str = ""
     email_from: str = ""
     lexa_proxy_shared_secret: str = ""
     public_app_url: str = "https://lexa-green.vercel.app"
     password_reset_minutes: int = Field(default=20, ge=5, le=60)
     email_timeout_seconds: int = Field(default=8, ge=2, le=20)
-    # Per-process limits. The application uses Neon pooling, so these values
-    # must be sized across all Render instances/workers, not per user account.
     database_pool_size: int = Field(default=5, ge=1, le=30)
     database_max_overflow: int = Field(default=5, ge=0, le=30)
     database_pool_timeout_seconds: int = Field(default=10, ge=1, le=60)
@@ -33,9 +30,7 @@ class Settings(BaseSettings):
     lexa_neon_project_id: str = "wispy-mud-75323042"
     lexa_neon_branch_id: str = "br-soft-star-b1dj2m2w"
 
-    # Provider settings are explicit model fields so Pydantic Settings can load
-    # them from .env or the process environment. Keys are never exposed by API
-    # responses; blank defaults preserve fail-closed behavior.
+    # Provider credentials are server-side only. Empty keys never route.
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.8-flash"
     groq_api_key: str = ""
@@ -47,18 +42,19 @@ class Settings(BaseSettings):
     huggingface_api_key: str = ""
     huggingface_model: str = "Qwen/Qwen3-32B"
     openai_api_key: str = ""
-    openai_model: str = "gpt-6-astra"
+    openai_model: str = "gpt-5-mini"
 
-    # Central intelligence policy is default-deny. These are configuration
-    # inputs only; adding a key never enables external model execution by itself.
-    lexa_ai_external_providers_enabled: bool = False
-    lexa_ai_allowed_providers: str = ""
+    # External answers are enabled for approved, question-only assistance by
+    # default. The allowlist stays limited to Gemini/Groq; keys must be supplied
+    # separately on the API service. Paid providers and business-data sharing stay off.
+    lexa_ai_external_providers_enabled: bool = True
+    lexa_ai_allowed_providers: str = "gemini,groq"
     lexa_ai_paid_providers_enabled: bool = False
     lexa_ai_aggregates_external_enabled: bool = False
     lexa_ai_confidential_external_enabled: bool = False
-    lexa_ai_requests_per_minute: int = 10
-    lexa_ai_max_output_tokens: int = 500
-    lexa_ai_max_input_chars: int = 8000
+    lexa_ai_requests_per_minute: int = Field(default=10, ge=1, le=60)
+    lexa_ai_max_output_tokens: int = Field(default=300, ge=64, le=500)
+    lexa_ai_max_input_chars: int = Field(default=2400, ge=100, le=2400)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -66,11 +62,11 @@ class Settings(BaseSettings):
     def sqlalchemy_database_url(self) -> str:
         url = self.database_url.strip()
         if url.startswith("postgres://"):
-            url = "postgresql://" + url[len("postgres://"): ]
+            url = "postgresql://" + url[len("postgres://"):]
         if url.startswith("postgresql+psycopg2://"):
-            url = "postgresql+psycopg://" + url[len("postgresql+psycopg2://"): ]
+            url = "postgresql+psycopg://" + url[len("postgresql+psycopg2://"):]
         elif url.startswith("postgresql://"):
-            url = "postgresql+psycopg://" + url[len("postgresql://"): ]
+            url = "postgresql+psycopg://" + url[len("postgresql://"):]
         return url
 
     @property
@@ -78,7 +74,13 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
-def validate_production_settings(*, app_env: str, database_app_role: str, jwt_secret: str, cors_origins: list[str], database_url: str | None = None, database_login_role: str = "lexa_runtime_login_p3", public_app_url: str | None = None, lexa_proxy_shared_secret: str | None = None) -> bool:
+def validate_production_settings(
+    *, app_env: str, database_app_role: str, jwt_secret: str,
+    cors_origins: list[str], database_url: str | None = None,
+    database_login_role: str = "lexa_runtime_login_p3",
+    public_app_url: str | None = None,
+    lexa_proxy_shared_secret: str | None = None,
+) -> bool:
     if app_env.strip().lower() != "production":
         return True
     if database_app_role != "lexa_app":

@@ -98,7 +98,7 @@ export async function askLexaAssistant(input: {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ prompt: input.prompt, area: input.area, include_business_summary: false }),
-      signal: AbortSignal.timeout(22_000),
+      signal: AbortSignal.timeout(14_500),
     });
   } catch (cause) {
     throw friendlyNetworkError(cause, "answer");
