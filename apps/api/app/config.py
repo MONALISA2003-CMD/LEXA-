@@ -32,6 +32,34 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     lexa_neon_project_id: str = "wispy-mud-75323042"
     lexa_neon_branch_id: str = "br-soft-star-b1dj2m2w"
+
+    # Provider settings are explicit model fields so Pydantic Settings can load
+    # them from .env or the process environment. Keys are never exposed by API
+    # responses; blank defaults preserve fail-closed behavior.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.8-flash"
+    groq_api_key: str = ""
+    groq_model: str = "openai/gpt-oss-20b"
+    cerebras_api_key: str = ""
+    cerebras_model: str = "zai-glm-4.7"
+    openrouter_api_key: str = ""
+    openrouter_model: str = "openrouter/free"
+    huggingface_api_key: str = ""
+    huggingface_model: str = "Qwen/Qwen3-32B"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-6-astra"
+
+    # Central intelligence policy is default-deny. These are configuration
+    # inputs only; adding a key never enables external model execution by itself.
+    lexa_ai_external_providers_enabled: bool = False
+    lexa_ai_allowed_providers: str = ""
+    lexa_ai_paid_providers_enabled: bool = False
+    lexa_ai_aggregates_external_enabled: bool = False
+    lexa_ai_confidential_external_enabled: bool = False
+    lexa_ai_requests_per_minute: int = 10
+    lexa_ai_max_output_tokens: int = 500
+    lexa_ai_max_input_chars: int = 8000
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property

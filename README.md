@@ -1,6 +1,10 @@
-# LEXA Intelligence — Phase 1 + Phase 2 + Phase 3 source overlay
+# LEXA CI fixes + Intelligence — Phase 1 + Phase 2 + Phase 3 source overlay
 
 **For the LEXA ZIP Extractor: upload this ZIP to `main`.** It is an overlay ZIP with the required LEXA source markers at the archive root (`apps/web/package.json`, `apps/api/app/main.py`, and `migrations/`). It is not a standalone installer and does not contain secrets.
+
+## CI root causes fixed
+
+This bundle also addresses the failures observed in [Actions run 40063918855](https://github.com/MONALISA2003-CMD/LEXA-/actions/runs/40063918855): a nullable daily-brief currency access, provider `.env` fields missing from Pydantic `Settings`, and historical migration tests incorrectly requiring migration 044 to remain the last entry. See `docs/LEXA_CI_ROOT_CAUSES_AND_PHASE1_3_VALIDATION_2026-10-24.md`.
 
 ## What this increment contains
 

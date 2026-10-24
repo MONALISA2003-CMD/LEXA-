@@ -53,8 +53,14 @@ async function authToken() {
 }
 
 export async function getDailyBrief(currencyCode?: string): Promise<DailyBrief> {
-  const currency = currencyCode || (await getBusinessProfile()).currency_code;
-  if (!currency || !/^[A-Z]{3}$/i.test(currency)) throw new Error("Set your business currency before opening the daily brief.");
+  let currency = currencyCode;
+  if (!currency) {
+    const profile = await getBusinessProfile();
+    currency = profile?.currency_code;
+  }
+  if (!currency || !/^[A-Z]{3}$/i.test(currency)) {
+    throw new Error("Set up your business profile and currency before opening the daily brief.");
+  }
   const token = await authToken();
   const response = await fetch(`/api/lexa/api/v1/intelligence/daily-brief?currency_code=${encodeURIComponent(currency.toUpperCase())}`, {
     headers: { Accept: "application/json", Authorization: `Bearer ${token}` },

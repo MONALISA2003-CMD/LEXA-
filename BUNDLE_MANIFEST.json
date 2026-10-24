@@ -1,35 +1,50 @@
 {
-  "bundle": "LEXA Intelligence Phase 1\u20133 canonical source overlay",
+  "bundle": "LEXA CI root-cause fixes + Intelligence Phase 1–3 source overlay",
   "created_date": "2026-10-24",
   "target_repository": "MONALISA2003-CMD/LEXA-",
   "target_branch": "main",
-  "observed_remote_head_before_this_upload": "ade02df5eaa179a9b8cb958dde4a9800b9b90727",
-  "archive_layout": "LEXA ZIP Extractor overlay with apps/web/package.json, apps/api/app/main.py and migration files at ZIP root",
-  "status": "IMPLEMENTATION CANDIDATE \u2014 NOT COMMITTED OR DEPLOYED BY THIS SESSION",
+  "observed_remote_head_before_fix_upload": "c1a3ef18134404eaf12727f42cda0789034c0b45",
+  "archive_layout": "LEXA ZIP Extractor overlay: apps/web/package.json, apps/api/app/main.py and migrations/ at ZIP root",
+  "status": "SOURCE FIX BUNDLE — NOT UPLOADED, COMMITTED, OR DEPLOYED BY THIS SESSION",
+  "ci_incident": {
+    "workflow_run": "https://github.com/MONALISA2003-CMD/LEXA-/actions/runs/40063918855",
+    "checked_commit": "c1a3ef18134404eaf12727f42cda0789034c0b45",
+    "prior_run_result": "web TypeScript failure; API suite 262 passed, 3 failed, 1 teardown error; compose/HAProxy job passed",
+    "root_causes_fixed": [
+      "Null-safe daily-brief business-profile currency access",
+      "Explicit provider key/model and fail-closed policy fields in Pydantic Settings",
+      "Order-relative historical migration assertions preserving 042–044 order before new 045–046 migrations"
+    ]
+  },
   "implemented_phases": {
-    "phase1": "Policy/contracts/API registration and migration 045; external provider execution stays disabled.",
-    "phase2": "Rules-first daily-brief API and responsive /daily-brief workspace.",
-    "phase3": "Local document intake/extraction, duplicate detection, explicit human review, review history, /documents workspace and navigation."
+    "phase1": "Versioned contracts, default-deny policy routing, safe provenance candidate migration 045; external provider execution remains paused until the central gate is wired.",
+    "phase2": "Deterministic source-linked daily brief with separate action, information and data-quality items; no AI or business writes.",
+    "phase3": "Bounded document intake, local extraction candidates with evidence, duplicate detection, branch scoping, explicit human review and review history; confirmation does not create business transactions."
+  },
+  "deployment_observation": {
+    "vercel_latest_at_inspection": "ERROR on c1a3ef because Next.js TypeScript validation hit the fixed nullable profile-currency dereference",
+    "vercel_previous_ready_deployment": "READY on prior ZIP-upload commit efb0c75207e70d99f260727cae1c57c5ced32511; not same source revision",
+    "render": "Live service state not verified; Render connector requires explicit workspace confirmation before service/deployment inspection.",
+    "hosted_ocr": "Not confirmed. render.yaml uses Native Python runtime while the extraction path depends on local Poppler/Tesseract binaries installed by the Dockerfile only."
   },
   "validation": {
-    "python_synthetic_tests_passed": 45,
-    "web_contract_tests_passed": 7,
+    "phase1_phase2_phase3_python_tests": "46 passed, including new provider-dotenv fail-closed regression",
+    "web_contract_tests": "7 passed",
     "python_compileall": "PASS",
-    "replay_manifest_json": "PASS",
-    "typescript_transpile_syntax": "PASS",
-    "full_repository_ci": "NOT RUN",
-    "next_typecheck_build": "NOT RUN (current runtime is Node 22.16.0; the project requires Node 24.x and dependencies are not installed)",
-    "postgres_replay": "NOT RUN (no disposable DB or psql available)",
-    "authenticated_staging_e2e": "NOT RUN",
-    "hosted_ocr_availability": "NOT CONFIRMED: the current Render service is configured for Native Python; Dockerfile package additions only affect Docker builds."
+    "replay_manifest_json_and_042_to_046_order": "PASS",
+    "typescript_tsx_syntax_transpile": "PASS for five affected pages/modules; this is not full type checking",
+    "full_repository_pytest_after_fix": "NOT VERIFIED. Overlay ZIP intentionally excludes the surrounding repository; full legacy tests require other baseline files and must be rerun in GitHub Actions after extraction.",
+    "full_next_typecheck_and_production_build_after_fix": "NOT RUN locally: runtime Node is 22.16, project requires 24.x, dependencies/lockfile are not included in this overlay and outbound package registry access is unavailable.",
+    "postgres_clean_replay_rls_adversarial_checks": "NOT RUN; migrations 045/046 remain candidates and were not applied.",
+    "authenticated_staging_e2e": "NOT RUN"
   },
   "release_safety": {
-    "provider_execution_enabled": false,
+    "external_provider_execution_enabled": false,
     "migration_045_applied": false,
     "migration_046_applied": false,
     "production_data_changed": false,
     "secrets_changed": false,
-    "hosted_runtime_changed": false,
+    "render_runtime_changed": false,
     "deployment_triggered_by_this_session": false
   },
   "files": [
@@ -40,18 +55,23 @@
     },
     {
       "path": "README.md",
-      "size_bytes": 3430,
-      "sha256": "f8c31b4e3fc0b15fe71445921b09b7fe9bf5118fc003061184b7c0fc46947622"
+      "size_bytes": 3874,
+      "sha256": "e0d85e918e6f2c648e2ef145da4c2d61ece1dc6be68c1743a405cb8060575035"
     },
     {
       "path": "VALIDATION_RESULTS.md",
-      "size_bytes": 3549,
-      "sha256": "7cda3417cb5c6c24f591ed571587ed1695448af6a32a67d042cf54522e33b657"
+      "size_bytes": 5178,
+      "sha256": "3a93d2f425f9b23ff8e4d20c944e8979f2bcc8724d9f86f7331f54ef27f6d9a0"
     },
     {
       "path": "apps/api/Dockerfile",
       "size_bytes": 1308,
       "sha256": "2bb854724016d09b45d6bf18385174e0daccc579d41d83601c4ce772364fb9d3"
+    },
+    {
+      "path": "apps/api/app/config.py",
+      "size_bytes": 6353,
+      "sha256": "49202911db77c96c020a7ad23b8af51159c636fe4f422f2b060157d699f65c81"
     },
     {
       "path": "apps/api/app/intelligence/__init__.py",
@@ -99,6 +119,11 @@
       "sha256": "6c15ea916fa449edf1fca6e09b7c2f5bfdf2f33c589b4e96e0ffc50d298a2c06"
     },
     {
+      "path": "apps/api/tests/test_config_provider_settings.py",
+      "size_bytes": 2002,
+      "sha256": "e7d5f280cd4bc26931c21b95930a8662fd453f72a33d40f33593aef3c8e1755e"
+    },
+    {
       "path": "apps/api/tests/test_intelligence_phase1.py",
       "size_bytes": 11105,
       "sha256": "d5355c81555cf7a2aec5be5460df7c24f6100ff448c8d08db7d522718863715c"
@@ -112,6 +137,16 @@
       "path": "apps/api/tests/test_intelligence_phase3.py",
       "size_bytes": 9003,
       "sha256": "c5a85ac3d7776d5c510cc80dbefcd3924ba637635ebb99d0f172dc9e87abbf1f"
+    },
+    {
+      "path": "apps/api/tests/test_phase3_password_reset_security.py",
+      "size_bytes": 5120,
+      "sha256": "9a6c4c29b5fe2348426d5ccf00afb1a25fa0e839d1abc357af571e0ca8f25346"
+    },
+    {
+      "path": "apps/api/tests/test_stage4_reporting_acceptance.py",
+      "size_bytes": 3990,
+      "sha256": "8008ffca343c04467e33e37a9fa3ef63c21b45697c86376d0ec71a338fba0e2a"
     },
     {
       "path": "apps/web/app/ai-assistant/page.tsx",
@@ -140,8 +175,8 @@
     },
     {
       "path": "apps/web/lib/daily-brief-api.ts",
-      "size_bytes": 2954,
-      "sha256": "7cdf6e20fdfa3a650adf2fe9d987d255df756e3d2b8bcd698cf2fefcfcdb26e7"
+      "size_bytes": 3041,
+      "sha256": "42f03a76163a782fa3248c27d9cbc9d5c4b11bef818a5cc97e042b3569754626"
     },
     {
       "path": "apps/web/lib/document-intelligence-api.ts",
@@ -162,6 +197,11 @@
       "path": "apps/web/tests/phase3-document-intelligence.test.mjs",
       "size_bytes": 3343,
       "sha256": "6ce2abecd78de60f24ab3969d8abcdc13c1d5c691dc35b3c1a2322288c5a848a"
+    },
+    {
+      "path": "docs/LEXA_CI_ROOT_CAUSES_AND_PHASE1_3_VALIDATION_2026-10-24.md",
+      "size_bytes": 5662,
+      "sha256": "374b5f0d5d0decf830dba1609f70936176f405b43149889da21f253ef2658fa3"
     },
     {
       "path": "docs/LEXA_INTELLIGENCE_PHASE1_IMPLEMENTATION.md",
