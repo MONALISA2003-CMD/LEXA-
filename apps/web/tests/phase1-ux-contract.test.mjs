@@ -22,7 +22,7 @@ assert.match(css, /prefers-reduced-motion/);
 assert.match(css, /\.workspace \.table-wrap \{ width: 100%/);
 assert.match(css, /\.workspace-header \.header-actions > \* \{ flex: 1 1 140px/);
 assert.match(navigation, /\["\/sales", "Sales"/);
-assert.match(navigation, /Business settings/);
+assert.match(navigation, /Business details/);
 assert.match(shell, /aria-label="Quick navigation"/);
 assert.match(shell, /getReadiness\(\)/);
 assert.match(shell, /Checking that everything is ready/);

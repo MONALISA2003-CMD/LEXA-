@@ -24,7 +24,7 @@ assert.match(inventory, /Transfers/);
 assert.match(inventory, /Locations/);
 assert.match(shell, /Business reports/);
 assert.match(navigation, /\["\/sales", "Sales"/);
-assert.match(navigation, /Business settings/);
+assert.match(navigation, /Business details/);
 assert.match(shell, /aria-label="Quick navigation"/);
 assert.match(navigation, /Purchases/);
 assert.match(shell, /Ctrl|Meta|key\.toLowerCase/);

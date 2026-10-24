@@ -34,12 +34,13 @@ test('document workspace exposes review rather than automatic invoice or purchas
   assert.doesNotMatch(page, /postPurchaseReceipt\(|postExpense\(|createPurchaseOrder\(/);
 });
 
-test('AI assistant language is polished and clearly pauses external requests', async () => {
+test('AI assistant remains unavailable until privacy and execution gates are approved', async () => {
   const page = await read('app/ai-assistant/page.tsx');
-  assert.match(page, /Guidance that fits your business/);
-  assert.match(page, /AI responses are temporarily paused/);
-  assert.match(page, /Your question will not be sent to a provider/);
-  assert.match(page, /executionAvailable &&/);
+  assert.match(page, /Guidance for your business/);
+  assert.match(page, /The assistant isn’t available right now/);
+  assert.match(page, /This page will not generate or pretend to generate an answer/);
+  assert.doesNotMatch(page, /executionAvailable\s*&&/);
+  assert.doesNotMatch(page, /fetch\s*\(|api\.openai\.com|generativelanguage\.googleapis\.com|api\.groq\.com/);
 });
 
 test('document review API uses no browser-side secrets or model endpoints', async () => {
@@ -52,8 +53,8 @@ test('daily brief page displays rule-based findings and keeps data-quality separ
   const api = await read('lib/daily-brief-api.ts');
   assert.match(page, /Your business, at a glance/);
   assert.match(page, /What to check first/);
-  assert.match(page, /Information that needs a refresh/);
-  assert.match(page, /Missing data is never presented as zero/);
+  assert.match(page, /Information to check or update/);
+  assert.match(page, /Missing information is never treated as zero/);
   assert.match(api, /\/api\/v1\/intelligence\/daily-brief/);
   assert.match(api, /Authorization: `Bearer \$\{token\}`/);
   assert.match(api, /business_writes_performed/);

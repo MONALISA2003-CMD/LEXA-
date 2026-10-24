@@ -13,8 +13,8 @@ const apiRoutes = readFileSync(path.resolve(web, '..', 'api', 'app', 'intelligen
 const forecast = readFileSync(path.resolve(web, '..', 'api', 'app', 'intelligence', 'forecasting.py'), 'utf8');
 
 test('demand forecast is discoverable from navigation and natural-language search', () => {
-  assert.match(nav, /\["\/demand-forecast", "Demand forecast", "chart"\]/);
-  assert.match(nav, /Product demand forecast/);
+  assert.match(nav, /\["\/demand-forecast", "Sales forecast", "chart"\]/);
+  assert.match(nav, /Expected demand and sales forecast/);
   assert.match(nav, /"\/demand-forecast"/);
 });
 

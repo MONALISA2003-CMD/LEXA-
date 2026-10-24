@@ -19,7 +19,7 @@ assert.match(shell, /setupProgressChecked/);
 assert.match(shell, /NavGlyph name="menu"/);
 assert.match(shell, /NavGlyph name="search"/);
 assert.match(shell, /setup-welcome-card/);
-for (const label of ["Home", "Sales", "Stock", "Products", "Customers", "Purchases", "Finance", "Reports"]) assert.ok(navigation.includes(`"${label}"`));
+for (const label of ["Home", "Sales", "Stock", "Products", "Customers", "Purchases", "Money & records", "Reports"]) assert.ok(navigation.includes(`"${label}"`));
 assert.doesNotMatch(shell, /\["\/intelligence"/);
 assert.match(shell, /getSetupProgress\(\)/);
 assert.match(shell, /getSetupProgress\(\)/);

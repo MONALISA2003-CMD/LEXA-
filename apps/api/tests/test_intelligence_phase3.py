@@ -145,8 +145,13 @@ def test_phase3_api_ui_and_policy_keep_review_separate_from_business_writes():
     assert "poppler-utils" in dockerfile and "tesseract-ocr" in dockerfile
     assert "AI_POLICY_GATE_REQUIRED" in main
     assert "No business transaction was created" in ui
-    assert "executionAvailable &&" in ai_ui
-    assert "Your question will not be sent to a provider" in ai_ui
+    # This deployment deliberately exposes no AI submission control while policy
+    # and privacy checks are incomplete. Keep the fail-closed UI rather than
+    # changing product behavior to satisfy obsolete execution-enabled assertions.
+    assert "The assistant isn’t available right now." in ai_ui
+    assert "This page will not generate or pretend to generate an answer" in ai_ui
+    assert "executionAvailable" not in ai_ui
+    assert "fetch(" not in ai_ui
 
 
 def test_replay_manifest_appends_candidate_migrations_in_order_without_production_opt_in():
