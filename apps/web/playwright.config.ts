@@ -16,9 +16,14 @@ const stagingWritesEnabled = [
   'LEXA_PHASE8_ALLOW_STAGING_WRITES',
 ].some((key) => process.env[key] === '1');
 
+const phase5Through8AcceptancePattern = /phase(5-sales|6-inventory|7-purchasing|7-authorization|8-reports)-acceptance\.spec\.ts$/;
+const phase2TransactionAcceptancePattern = /phase2-transaction-acceptance\.spec\.ts$/;
+
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /phase(2-transaction|5-sales|6-inventory|7-purchasing|7-authorization|8-reports)-acceptance\.spec\.ts$/,
+  // Explicit per-phase patterns make it clear which acceptance suites are matched.
+  // Write-enabled suites remain opt-in and fail closed in globalSetup and each spec.
+  testMatch: [phase5Through8AcceptancePattern, phase2TransactionAcceptancePattern],
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   workers: 1,

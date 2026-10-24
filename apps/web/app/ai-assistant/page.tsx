@@ -189,7 +189,7 @@ export default function AiAssistantPage() {
         <span className={styles.privacyIcon} aria-hidden="true">✦</span>
         <div>
           <strong>Private to your signed-in workspace</strong>
-          <p>When you ask for figures, LEXA checks permission-approved saved business summaries inside your workspace and shows when the data was refreshed. Those records are not shared with external services. For general guidance, LEXA may share the question you type with an approved service. This chat is not saved as conversation history.</p>
+          <p>When you ask for figures, LEXA checks permission-approved saved business summaries inside your workspace and shows when the data was refreshed. Those records are not shared with external services. For general guidance, LEXA may share the question you type with an approved service. This chat stays in this page and is not saved as conversation history.</p>
         </div>
       </section>
 

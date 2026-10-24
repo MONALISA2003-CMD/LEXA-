@@ -15,7 +15,8 @@ test('write-enabled staging guard requires explicit HTTPS host allow-list and de
   assert.match(guard, /restricted_purchase_order_id/);
   assert.match(guard, /target\.protocol !== 'https:'/);
   assert.match(guard, /productionHosts\.has\(host\)/);
-  assert.match(guard, /allowedHosts\.includes\(host\)/);
+  // The shared guard names this per-suite resolved allow-list `allowed`.
+  assert.match(guard, /allowed(?:Hosts)?\.includes\(host\)/);
   assert.match(guard, /redirect: 'error'/);
 });
 
@@ -45,12 +46,14 @@ test('Phase 7 acceptance explicitly probes cross-branch list, detail and mutatio
   assert.match(phase7, /purchase-orders\?limit=500/);
 });
 
-test('Playwright config includes both new suites and disables retry of write-enabled flows', () => {
+test('Playwright config includes Phase 2, Phase 6/7 and disables retries of write-enabled flows', () => {
+  assert.match(config, /2-transaction/);
   assert.match(config, /6-inventory/);
   assert.match(config, /7-authorization/);
   assert.match(config, /globalSetup/);
   assert.match(config, /retries: stagingWritesEnabled \? 0/);
   assert.equal(pkg.engines.node, '24.x');
+  assert.ok(pkg.scripts['test:e2e:phase2']);
   assert.ok(pkg.scripts['test:e2e:phase6']);
   assert.ok(pkg.scripts['test:e2e:phase7:security']);
 });

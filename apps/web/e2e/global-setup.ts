@@ -56,9 +56,9 @@ export default async function globalSetup(): Promise<void> {
       failClosed(`${guard.name}: target must be a plain HTTPS origin without credentials, query, fragment, or path.`);
     }
     const host = target.hostname.toLowerCase();
-    const allowed = guard.allowList.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+    const allowedHosts = guard.allowList.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
     if (productionHosts.has(host)) failClosed(`${guard.name}: known production hosts are forbidden for write-enabled tests.`);
-    if (!allowed.includes(host)) failClosed(`${guard.name}: hostname is not in the explicit staging allow-list.`);
+    if (!allowedHosts.includes(host)) failClosed(`${guard.name}: hostname is not in the explicit staging allow-list.`);
     if (!guard.fixtureJson) failClosed(`${guard.name}: disposable fixture JSON is required.`);
     let fixture: Record<string, unknown>;
     try { fixture = JSON.parse(guard.fixtureJson) as Record<string, unknown>; }

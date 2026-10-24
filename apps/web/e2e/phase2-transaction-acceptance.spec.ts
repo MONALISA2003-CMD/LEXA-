@@ -137,6 +137,7 @@ test.describe('Phase 2 completed sale → inventory → receivable → accountin
     expect(numeric(movement!.quantity_delta)).toBeCloseTo(-numeric(d.quantity), 4);
     expect(numeric(movement!.unit_cost)).toBeCloseTo(averageCost, 4);
     expect(numeric(movement!.total_cost)).toBeGreaterThan(0);
+    expect(numeric(movement!.total_cost)).toBeCloseTo(numeric(movement!.unit_cost) * numeric(d.quantity), 4);
 
     const openReceivables = await get('/commerce/receivables');
     expect(openReceivables.response.status()).toBe(200);
@@ -162,6 +163,28 @@ test.describe('Phase 2 completed sale → inventory → receivable → accountin
     expect(numeric(finalDetail.amount_due)).toBe(0);
     expect(numeric(finalDetail.amount_paid)).toBeCloseTo(numeric(d.expected_total), 4);
     expect(finalDetail.payments.filter(x => x.status === 'RECORDED').reduce((sum, x) => sum + numeric(x.allocated_amount), 0)).toBeCloseTo(numeric(d.expected_total), 4);
+
+    // Verify the actual journal lines, not only the headers attached to a sale.
+    const postedEntries = finalDetail.accounting_entries.filter(entry =>
+      (entry.source_type === 'SALE' && entry.source_id === sale.id) || entry.source_type === 'PAYMENT'
+    );
+    expect(postedEntries.some(entry => entry.source_type === 'SALE' && entry.source_id === sale.id && entry.entry_role === 'SALE_RECOGNITION')).toBe(true);
+    expect(postedEntries.some(entry => entry.source_type === 'SALE' && entry.source_id === sale.id && entry.entry_role === 'COGS')).toBe(true);
+    expect(postedEntries.filter(entry => entry.source_type === 'PAYMENT' && entry.entry_role === 'PAYMENT_RECEIPT').length).toBeGreaterThanOrEqual(2);
+    for (const header of postedEntries) {
+      expect(header.status).toBe('POSTED');
+      expect(header.currency_code).toBe(d.currency_code);
+      const journalResult = await get(`/accounting/journal-entries/${encodeURIComponent(header.id)}`);
+      expect(journalResult.response.status(), `journal ${header.id} can be read in staging`).toBe(200);
+      const journal = journalResult.body as { entry: { status: string; currency_code: string }; lines: Array<{ debit: string; credit: string; currency_code: string }> };
+      expect(journal.entry.status).toBe('POSTED');
+      expect(journal.entry.currency_code).toBe(d.currency_code);
+      expect(journal.lines.length).toBeGreaterThanOrEqual(2);
+      expect(journal.lines.every(line => line.currency_code === d.currency_code)).toBe(true);
+      const debits = journal.lines.reduce((sum, line) => sum + numeric(line.debit), 0);
+      const credits = journal.lines.reduce((sum, line) => sum + numeric(line.credit), 0);
+      expect(debits).toBeCloseTo(credits, 4);
+    }
 
     const finalBalance = await get(balPath);
     expect(finalBalance.response.status()).toBe(200);

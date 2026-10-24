@@ -65,7 +65,7 @@ WITH sale_scope AS (
     )
     WHERE je.tenant_id = CAST(:tenant_id AS uuid)
 ), related_event_ids(id) AS (
-    SELECT e.aggregate_id
+    SELECT e.id
     FROM outbox_events e
     WHERE e.tenant_id = CAST(:tenant_id AS uuid)
       AND (e.aggregate_id IN (SELECT id FROM related_ids) OR e.payload->>'sale_id' = :sale_id)
