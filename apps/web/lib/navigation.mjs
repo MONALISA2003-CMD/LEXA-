@@ -14,6 +14,7 @@ export const primaryNavigation = [
   ["/accounting", "Finance", "wallet"],
   ["/reports", "Reports", "chart"],
   ["/team-chat", "Team chat", "chat"],
+  ["/ai-assistant", "AI assistant", "brain"],
 ];
 
 // The mobile dock intentionally keeps the four most frequently used routes.
@@ -39,6 +40,7 @@ export const workspaceSearchSuggestions = [
   ["Money, expenses and accounting", "/accounting"],
   ["Business reports and graphs", "/reports"],
   ["Business intelligence", "/intelligence"],
+  ["AI business assistant", "/ai-assistant"],
   ["Tax and official receipts", "/compliance"],
   ["Team messages", "/team-chat"],
   ["Team roles and access", "/administration/members"],
@@ -63,6 +65,7 @@ export function resolveBusinessSearchDestination(query) {
   if (!q) return "/";
   const lower = q.toLowerCase();
   const encoded = encodeURIComponent(q);
+  if (/\b(ai assistant|ask lexa|artificial intelligence|ai help)\b/.test(lower)) return `/ai-assistant?q=${encoded}`;
   if (/\b(ura|efris|tax|fiscal|compliance|tax receipt|official receipt)\b/.test(lower)) return `/compliance?q=${encoded}`;
   if (/\b(intelligence|forecast|forecasting|trend|anomaly|insight|insights|business health)\b/.test(lower)) return `/intelligence?q=${encoded}`;
   if (/\b(team|member|members|permission|role|invite|access control)\b/.test(lower)) return `/administration/members?q=${encoded}`;
@@ -86,7 +89,7 @@ export const applicationRoutes = [
   "/", "/accounting", "/administration", "/administration/members", "/commerce",
   "/compliance", "/customers", "/intelligence", "/inventory", "/invite", "/login",
   "/onboarding", "/products", "/purchasing", "/register", "/reports", "/sales",
-  "/settings", "/settings/security", "/forgot-password", "/reset-password", "/team-chat", "/workspace",
+  "/settings", "/settings/security", "/forgot-password", "/reset-password", "/team-chat", "/workspace", "/ai-assistant",
 ];
 
 /**

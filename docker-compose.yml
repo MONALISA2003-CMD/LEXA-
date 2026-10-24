@@ -1,5 +1,68 @@
 name: lexa-local
 
+x-api-common: &api-common
+  image: lexa-api:local
+  build:
+    context: ./apps/api
+    dockerfile: Dockerfile
+  environment: &api-environment
+    APP_ENV: development
+    PORT: "8000"
+    DATABASE_URL: ${LEXA_LOCAL_DATABASE_URL:-postgresql+psycopg://lexa:lexa@postgres:5432/lexa}
+    REDIS_URL: ${LEXA_LOCAL_REDIS_URL:-redis://redis:6379/0}
+    JWT_SECRET: ${JWT_SECRET:-local-development-only-secret-change-before-use-1234567890}
+    JWT_ISSUER: lexa
+    JWT_AUDIENCE: lexa-web
+    DATABASE_APP_ROLE: ""
+    DATABASE_LOGIN_ROLE: lexa
+    CORS_ORIGINS: http://localhost:3000
+    PUBLIC_APP_URL: http://localhost:3000
+    ANALYTICS_REFRESH_WORKER_ENABLED: "false"
+    GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+    OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-astra}
+    GROQ_API_KEY: ${GROQ_API_KEY:-}
+    GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+    CEREBRAS_API_KEY: ${CEREBRAS_API_KEY:-}
+    CEREBRAS_MODEL: ${CEREBRAS_MODEL:-zai-glm-4.7}
+    OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openrouter/free}
+    HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY:-}
+    HUGGINGFACE_MODEL: ${HUGGINGFACE_MODEL:-Qwen/Qwen3-32B}
+    LEXA_AI_REQUESTS_PER_MINUTE: ${LEXA_AI_REQUESTS_PER_MINUTE:-10}
+    LEXA_AI_MAX_INPUT_CHARS: ${LEXA_AI_MAX_INPUT_CHARS:-8000}
+    LEXA_AI_MAX_OUTPUT_TOKENS: ${LEXA_AI_MAX_OUTPUT_TOKENS:-500}
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+    interval: 15s
+    timeout: 3s
+    retries: 5
+    start_period: 20s
+  restart: unless-stopped
+
+x-web-common: &web-common
+  image: lexa-web:local
+  build:
+    context: ./apps/web
+    dockerfile: Dockerfile
+  environment:
+    NODE_ENV: production
+    PORT: "3000"
+    LEXA_API_URL: http://edge-lb:8000
+  healthcheck:
+    test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+    interval: 15s
+    timeout: 3s
+    retries: 5
+    start_period: 30s
+  restart: unless-stopped
+
 services:
   postgres:
     image: pgvector/pgvector:pg17
@@ -16,6 +79,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -26,39 +90,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
 
   api:
-    image: lexa-api:local
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
-    environment:
-      APP_ENV: development
-      PORT: "8000"
-      DATABASE_URL: ${LEXA_LOCAL_DATABASE_URL:-postgresql+psycopg://lexa:lexa@postgres:5432/lexa}
-      REDIS_URL: ${LEXA_LOCAL_REDIS_URL:-redis://redis:6379/0}
-      JWT_SECRET: ${JWT_SECRET:-local-development-only-secret-change-before-use-1234567890}
-      JWT_ISSUER: lexa
-      JWT_AUDIENCE: lexa-web
-      DATABASE_APP_ROLE: ""
-      DATABASE_LOGIN_ROLE: lexa
-      CORS_ORIGINS: http://localhost:3000
-      PUBLIC_APP_URL: http://localhost:3000
-      ANALYTICS_REFRESH_WORKER_ENABLED: "false"
-    ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
-      interval: 15s
-      timeout: 3s
-      retries: 5
-      start_period: 20s
-    restart: unless-stopped
+    <<: *api-common
+
+  api-2:
+    <<: *api-common
 
   analytics-worker:
     image: lexa-api:local
@@ -78,32 +116,38 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # This long-running worker has no HTTP listener; do not inherit the API
-    # container's HTTP healthcheck. Queue progress is observed from worker logs.
     healthcheck:
       disable: true
     restart: unless-stopped
 
   web:
-    image: lexa-web:local
-    build:
-      context: ./apps/web
-      dockerfile: Dockerfile
-    environment:
-      NODE_ENV: production
-      PORT: "3000"
-      LEXA_API_URL: http://api:8000
+    <<: *web-common
+
+  web-2:
+    <<: *web-common
+
+  edge-lb:
+    image: haproxy:3.2-alpine
     ports:
-      - "3000:3000"
+      - "3000:80"
+    expose:
+      - "8000"
+    volumes:
+      - ./deploy/docker/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     depends_on:
       api:
         condition: service_healthy
+      api-2:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+      web-2:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
-      interval: 15s
-      timeout: 3s
-      retries: 5
-      start_period: 30s
+      test: ["CMD-SHELL", "haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
 volumes:

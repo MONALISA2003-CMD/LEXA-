@@ -12,7 +12,10 @@ from fastapi.responses import JSONResponse
 from .config import settings
 from .performance import elapsed_ms, format_server_timing, is_slow_request
 from .health import check_database, check_redis
-from .routes import auth, organization, rbac, catalog, inventory, commerce, finance, analytics, workspace_context, membership_admin, purchasing, team_chat
+from .routes import (
+    auth, organization, rbac, catalog, inventory, commerce, finance, analytics,
+    workspace_context, membership_admin, purchasing, team_chat, ai_assistant,
+)
 from .kernel import router as kernel_router
 from .workers.analytics_outbox import run_embedded_worker
 
@@ -124,6 +127,7 @@ app.include_router(finance.compliance, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(purchasing.router, prefix="/api/v1")
 app.include_router(team_chat.router, prefix="/api/v1")
+app.include_router(ai_assistant.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["system"])
