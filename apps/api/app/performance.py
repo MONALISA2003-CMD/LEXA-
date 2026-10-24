@@ -3,10 +3,48 @@ from __future__ import annotations
 
 import math
 import os
+from contextvars import ContextVar
+from dataclasses import dataclass, field
+from threading import Lock
 
 DEFAULT_SLOW_REQUEST_MS = 500
 MIN_SLOW_REQUEST_MS = 100
 MAX_SLOW_REQUEST_MS = 10_000
+
+
+@dataclass(slots=True)
+class RequestTelemetry:
+    """Per-request database counters shared across synchronous DB worker threads."""
+
+    request_id: str
+    db_duration_ms: float = 0.0
+    db_query_count: int = 0
+    slow_db_query_count: int = 0
+    _lock: Lock = field(default_factory=Lock, repr=False, compare=False)
+
+    def record_db_query(self, duration_ms: float) -> None:
+        try:
+            duration = float(duration_ms)
+        except (TypeError, ValueError):
+            duration = 0.0
+        if not math.isfinite(duration):
+            duration = 0.0
+        duration = max(0.0, duration)
+        try:
+            configured_slow_db_ms = int(os.getenv("LEXA_SLOW_DB_QUERY_MS", "100"))
+        except (TypeError, ValueError):
+            configured_slow_db_ms = 100
+        slow_db_threshold = min(10_000, max(1, configured_slow_db_ms))
+        with self._lock:
+            self.db_duration_ms = round(self.db_duration_ms + duration, 2)
+            self.db_query_count += 1
+            if duration >= slow_db_threshold:
+                self.slow_db_query_count += 1
+
+
+current_request_telemetry: ContextVar[RequestTelemetry | None] = ContextVar(
+    "lexa_request_telemetry", default=None
+)
 
 
 def slow_request_threshold_ms() -> int:
@@ -44,8 +82,6 @@ def format_server_timing(
             db_duration = 0.0
         if not math.isfinite(db_duration):
             db_duration = 0.0
-        # Query count is a useful diagnostic descriptor; no SQL or business data
-        # is exposed in response headers.
         metrics.append(
             f'db;dur={max(0.0, db_duration):.2f};desc="{max(0, int(db_query_count))} queries"'
         )

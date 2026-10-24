@@ -1,9 +1,12 @@
 import re
+import time
 
 from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
+from .performance import current_request_telemetry, elapsed_ms
 
 ENGINE_CONNECT_ARGS = {
     # Neon PgBouncer rejects PostgreSQL session GUCs in startup options.
@@ -11,6 +14,16 @@ ENGINE_CONNECT_ARGS = {
     "prepare_threshold": None,
     "connect_timeout": 10,
 }
+
+def _finish_request_query(context) -> None:
+    """Record one SQL execution without collecting SQL, parameters, or row data."""
+    telemetry = getattr(context, "_lexa_request_telemetry", None)
+    started_at = getattr(context, "_lexa_request_query_started_at", None)
+    if telemetry is None or started_at is None:
+        return
+    context._lexa_request_query_started_at = None
+    telemetry.record_db_query(elapsed_ms(started_at, time.perf_counter()))
+
 
 engine = create_engine(
     settings.sqlalchemy_database_url,
@@ -22,6 +35,25 @@ engine = create_engine(
     pool_use_lifo=True,
     connect_args=ENGINE_CONNECT_ARGS,
 )
+
+
+@event.listens_for(Engine, "before_cursor_execute")
+def _before_request_query(conn, cursor, statement, parameters, context, executemany):
+    telemetry = current_request_telemetry.get()
+    if telemetry is not None:
+        context._lexa_request_telemetry = telemetry
+        context._lexa_request_query_started_at = time.perf_counter()
+
+
+@event.listens_for(Engine, "after_cursor_execute")
+def _after_request_query(conn, cursor, statement, parameters, context, executemany):
+    _finish_request_query(context)
+
+
+@event.listens_for(Engine, "handle_error")
+def _failed_request_query(exception_context):
+    if exception_context.execution_context is not None:
+        _finish_request_query(exception_context.execution_context)
 
 def apply_application_role(connection, role: str | None = None) -> None:
     """Switch the current transaction to LEXA's least-privilege database role.

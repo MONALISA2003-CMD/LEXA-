@@ -2,6 +2,7 @@ from uuid import UUID, uuid4
 import asyncio
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -13,6 +14,7 @@ from .health import check_database, check_redis
 from .routes import auth, organization, rbac, catalog, inventory, commerce, finance, analytics, workspace_context, membership_admin, purchasing, team_chat
 from .kernel import router as kernel_router
 from .workers.analytics_outbox import run_embedded_worker
+from .performance import RequestTelemetry, current_request_telemetry, elapsed_ms, format_server_timing, is_slow_request
 
 logger = logging.getLogger("lexa.api")
 
@@ -45,20 +47,55 @@ app = FastAPI(title="LEXA API", version="1.0.0", lifespan=lifespan)
 
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
+    started_at = time.perf_counter()
     incoming = request.headers.get("X-Request-ID", "").strip()
     try:
         request_id = str(UUID(incoming)) if incoming else str(uuid4())
     except ValueError:
         request_id = str(uuid4())
     request.state.request_id = request_id
+    telemetry = RequestTelemetry(request_id=request_id)
+    telemetry_token = current_request_telemetry.set(telemetry)
     try:
         response = await call_next(request)
     except Exception:
         logger.exception("unhandled_request_error", extra={"request_id": request_id, "path": request.url.path, "method": request.method})
         response = JSONResponse(status_code=500, content={"detail": {"code": "INTERNAL_ERROR", "message": "LEXA could not complete the request.", "request_id": request_id}})
-    response.headers["X-Request-ID"] = request_id
-    return response
+    finally:
+        current_request_telemetry.reset(telemetry_token)
 
+    duration_ms = elapsed_ms(started_at, time.perf_counter())
+    response.headers["X-Request-ID"] = request_id
+    response.headers["Server-Timing"] = format_server_timing(
+        duration_ms,
+        db_duration_ms=telemetry.db_duration_ms,
+        db_query_count=telemetry.db_query_count,
+    )
+    log_fields = {
+        "request_id": request_id,
+        "method": request.method,
+        "path": request.url.path,
+        "status_code": response.status_code,
+        "duration_ms": duration_ms,
+        "db_duration_ms": telemetry.db_duration_ms,
+        "db_query_count": telemetry.db_query_count,
+        "slow_db_query_count": telemetry.slow_db_query_count,
+    }
+    if response.status_code >= 500:
+        logger.error(
+            "request_failed_5xx request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f db_duration_ms=%.2f db_query_count=%s slow_db_query_count=%s",
+            request_id, request.method, request.url.path, response.status_code,
+            duration_ms, telemetry.db_duration_ms, telemetry.db_query_count,
+            telemetry.slow_db_query_count, extra=log_fields,
+        )
+    if is_slow_request(duration_ms):
+        logger.warning(
+            "slow_request request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f db_duration_ms=%.2f db_query_count=%s slow_db_query_count=%s",
+            request_id, request.method, request.url.path, response.status_code,
+            duration_ms, telemetry.db_duration_ms, telemetry.db_query_count,
+            telemetry.slow_db_query_count, extra=log_fields,
+        )
+    return response
 
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):

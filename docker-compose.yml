@@ -19,6 +19,61 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql://lexa:lexa@postgres:5432/lexa
+      DATABASE_APP_ROLE: ""
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: local-development-only-secret-change-before-production
+      ANALYTICS_REFRESH_WORKER_ENABLED: "false"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: ./apps/web
+    environment:
+      NODE_ENV: production
+      LEXA_API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  analytics-worker:
+    build:
+      context: ./apps/api
+    command: ["python", "-m", "app.workers.analytics_outbox"]
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql://lexa:lexa@postgres:5432/lexa
+      DATABASE_APP_ROLE: ""
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: local-development-only-secret-change-before-production
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:

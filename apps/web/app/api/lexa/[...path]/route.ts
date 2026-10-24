@@ -40,6 +40,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const body = await response.arrayBuffer();
     const out = new NextResponse(body, { status: response.status, statusText: response.statusText });
     const responseType = response.headers.get("content-type");
+    const serverTiming = response.headers.get("server-timing");
+    if (serverTiming) out.headers.set("server-timing", serverTiming);
     if (responseType) out.headers.set("content-type", responseType);
     out.headers.set("cache-control", "no-store, max-age=0");
     out.headers.set("pragma", "no-cache");
@@ -55,6 +57,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       const headers = new Headers();
       if (retryAfter) headers.set("Retry-After", retryAfter);
       if (responseRequestId) headers.set("X-Request-ID", responseRequestId);
+      const errorServerTiming = response.headers.get("server-timing");
+      if (errorServerTiming) headers.set("Server-Timing", errorServerTiming);
       headers.set("Cache-Control", "no-store, max-age=0");
       headers.set("Pragma", "no-cache");
       headers.set("X-Content-Type-Options", "nosniff");
