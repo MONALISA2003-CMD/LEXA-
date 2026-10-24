@@ -17,6 +17,8 @@ from .routes import (
     workspace_context, membership_admin, purchasing, team_chat, ai_assistant,
 )
 from .kernel import router as kernel_router
+from .intelligence.routes import router as intelligence_router
+from .intelligence.document_routes import router as intelligence_documents_router
 from .workers.analytics_outbox import run_embedded_worker
 
 logger = logging.getLogger("lexa.api")
@@ -75,8 +77,6 @@ async def request_id_middleware(request: Request, call_next):
         "status_code": response.status_code,
         "duration_ms": duration_ms,
     }
-    # Keep routine traffic quiet. Slow requests and handled 5xx responses remain
-    # discoverable without logging URLs, query values, request bodies or secrets.
     if is_slow_request(duration_ms):
         logger.warning(
             "slow_request request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f",
@@ -104,12 +104,33 @@ async def security_headers_middleware(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def hold_legacy_ai_until_policy_gate_is_wired(request: Request, call_next):
+    """Fail closed while the legacy provider adapter is not wired to LEXA policy.
+
+    This prevents a configured provider key from bypassing the privacy router.
+    The question is not read by this middleware and is never sent to a provider.
+    """
+    if request.method.upper() == "POST" and request.url.path.rstrip("/") == "/api/v1/ai/assist":
+        return JSONResponse(
+            status_code=503,
+            content={"detail": {
+                "code": "AI_POLICY_GATE_REQUIRED",
+                "message": "AI responses are paused while LEXA finishes its privacy and safety checks. Your question was not sent to an external provider.",
+            }},
+        )
+    return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
+    allow_headers=[
+        "Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID",
+        "X-Document-Filename", "X-Document-Type", "X-Branch-ID",
+    ],
 )
 
 app.include_router(auth.router, prefix="/api/v1")
@@ -128,6 +149,8 @@ app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(purchasing.router, prefix="/api/v1")
 app.include_router(team_chat.router, prefix="/api/v1")
 app.include_router(ai_assistant.router, prefix="/api/v1")
+app.include_router(intelligence_router, prefix="/api/v1")
+app.include_router(intelligence_documents_router, prefix="/api/v1")
 
 
 @app.get("/", tags=["system"])
@@ -158,8 +181,6 @@ def readiness() -> dict[str, object]:
     }
     if not ready:
         if settings.app_env.strip().lower() == "production":
-            # Keep externally visible diagnostics stable and non-sensitive while
-            # distinguishing an unavailable dependency from a schema mismatch.
             payload["failure_code"] = (
                 "FEATURES_NEED_UPDATE"
                 if database_error == "LEXA_SCHEMA_NOT_READY"
@@ -174,6 +195,5 @@ def readiness() -> dict[str, object]:
                 payload["database_error_type"] = database_error
             if not cache_ok:
                 payload["cache_error_type"] = cache_error
-        response = JSONResponse(status_code=503, content=payload, headers={"Retry-After": "5"})
-        return response
+        return JSONResponse(status_code=503, content=payload, headers={"Retry-After": "5"})
     return payload

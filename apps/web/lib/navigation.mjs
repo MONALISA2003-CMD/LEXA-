@@ -12,7 +12,9 @@ export const primaryNavigation = [
   ["/customers", "Customers", "users"],
   ["/purchasing", "Purchases", "truck"],
   ["/accounting", "Finance", "wallet"],
+  ["/documents", "Documents", "receipt"],
   ["/reports", "Reports", "chart"],
+  ["/daily-brief", "Daily brief", "chart"],
   ["/team-chat", "Team chat", "chat"],
   ["/ai-assistant", "AI assistant", "brain"],
 ];
@@ -37,8 +39,10 @@ export const workspaceSearchSuggestions = [
   ["Checkout and daily closing", "/commerce"],
   ["Customers and balances", "/customers"],
   ["Purchase orders and suppliers", "/purchasing"],
+  ["Invoices, receipts and business documents", "/documents"],
   ["Money, expenses and accounting", "/accounting"],
   ["Business reports and graphs", "/reports"],
+  ["Today’s business brief", "/daily-brief"],
   ["Business intelligence", "/intelligence"],
   ["AI business assistant", "/ai-assistant"],
   ["Tax and official receipts", "/compliance"],
@@ -59,14 +63,16 @@ export function isRouteActive(pathname, href) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/** Route a plain-language search to a real LEXA module while keeping its query. */
+/** Route a plain-language search to a real application destination. */
 export function resolveBusinessSearchDestination(query) {
   const q = String(query ?? "").trim();
   if (!q) return "/";
   const lower = q.toLowerCase();
   const encoded = encodeURIComponent(q);
   if (/\b(ai assistant|ask lexa|artificial intelligence|ai help)\b/.test(lower)) return `/ai-assistant?q=${encoded}`;
+  if (/\b(invoice scan|scan invoice|supplier invoice|expense receipt|document upload|business documents|document intake)\b/.test(lower)) return `/documents?q=${encoded}`;
   if (/\b(ura|efris|tax|fiscal|compliance|tax receipt|official receipt)\b/.test(lower)) return `/compliance?q=${encoded}`;
+  if (/\b(daily brief|business brief|what needs attention|today\x27s brief)\b/.test(lower)) return `/daily-brief?q=${encoded}`;
   if (/\b(intelligence|forecast|forecasting|trend|anomaly|insight|insights|business health)\b/.test(lower)) return `/intelligence?q=${encoded}`;
   if (/\b(team|member|members|permission|role|invite|access control)\b/.test(lower)) return `/administration/members?q=${encoded}`;
   if (/\b(setup|onboarding|setup progress)\b/.test(lower)) return "/onboarding";
@@ -87,7 +93,7 @@ export function resolveBusinessSearchDestination(query) {
 /** Real page routes used by the internal-link integrity tests. */
 export const applicationRoutes = [
   "/", "/accounting", "/administration", "/administration/members", "/commerce",
-  "/compliance", "/customers", "/intelligence", "/inventory", "/invite", "/login",
+  "/compliance", "/customers", "/daily-brief", "/documents", "/intelligence", "/inventory", "/invite", "/login",
   "/onboarding", "/products", "/purchasing", "/register", "/reports", "/sales",
   "/settings", "/settings/security", "/forgot-password", "/reset-password", "/team-chat", "/workspace", "/ai-assistant",
 ];

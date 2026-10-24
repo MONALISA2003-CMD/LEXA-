@@ -9,6 +9,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Phase 3 document intelligence uses local, timeout-bounded utilities only.
+# These are needed for PDF text-layer extraction, PDF page rendering and OCR.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install the declared API dependencies from the project's canonical metadata.
 COPY pyproject.toml ./
 COPY app ./app
@@ -20,7 +26,7 @@ USER 10001:10001
 EXPOSE 8000
 
 # Keep the container health endpoint dependency-free. Full dependency readiness
-# remains available at /ready and is used by Kubernetes readiness probes.
+# remains available at /ready and is used for dependency readiness probes.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:' + __import__('os').getenv('PORT', '8000') + '/health', timeout=2)" || exit 1
 

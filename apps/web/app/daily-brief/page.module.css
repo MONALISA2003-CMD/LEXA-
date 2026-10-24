@@ -1,0 +1,25 @@
+.page { display: grid; gap: 20px; padding-bottom: 36px; }
+.summary { padding: 20px; border: 1px solid var(--line, #dfe6ef); border-radius: 16px; background: #fff; display: grid; gap: 12px; }
+.summaryHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.summaryHead h2 { margin: 0; font-size: 19px; line-height: 1.35; }
+.summaryHead p { margin: 7px 0 0; color: var(--muted, #65738a); font-size: 12px; line-height: 1.55; }
+.counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.count { padding: 12px; border: 1px solid var(--line, #dfe6ef); border-radius: 12px; background: #f8faff; min-width: 0; }
+.count span, .count strong { display: block; }
+.count span { font-size: 10px; line-height: 1.45; color: var(--muted, #65738a); }
+.count strong { font-size: 21px; margin-top: 5px; }
+.section { min-width: 0; }
+.list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.item { padding: 17px; border: 1px solid var(--line, #dfe6ef); border-radius: 15px; background: #fff; min-width: 0; }
+.itemHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.item h3 { margin: 8px 0 0; font-size: 15px; line-height: 1.35; }
+.item p { color: #53627a; margin: 9px 0 0; font-size: 12px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.metric { margin-top: 12px; padding: 12px; border-radius: 11px; background: #f6f8fc; border: 1px solid #e5ebf3; }
+.metric small, .metric strong { display: block; }
+.metric small { color: var(--muted, #65738a); font-size: 10px; }
+.metric strong { margin-top: 5px; font-size: 18px; overflow-wrap: anywhere; }
+.meta { border-top: 1px solid #edf0f5; margin-top: 12px !important; padding-top: 10px; font-size: 10px !important; color: var(--muted, #65738a) !important; }
+.links { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.empty { padding: 17px; border: 1px dashed #ccd5e3; border-radius: 14px; background: #fff; color: var(--muted, #65738a); font-size: 12px; line-height: 1.6; }
+.disclaimer { margin: 0; color: var(--muted, #65738a); font-size: 11px; line-height: 1.65; }
+@media (max-width: 760px) { .counts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .list { grid-template-columns: 1fr; } .summary { padding: 15px; } .item { padding: 15px; } .summaryHead { flex-direction: column; } }
