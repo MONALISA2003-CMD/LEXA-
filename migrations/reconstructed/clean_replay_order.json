@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "purpose": "Disposable clean-replay sequence for LEXA canonical migration chain through Phase 1 intelligence foundation (045) and Phase 3 document intelligence (046). Never run against production.",
+  "purpose": "Disposable clean-replay sequence for the canonical LEXA migration chain through migrations 047 and 048. Never run against production.",
   "baseline_commit": "a6acc0eb53660ea938a314640bf28283ae2a98a8",
-  "status": "HISTORICAL_RECOVERY_GATE_CLOSED_BY_PHASE3_APPROVAL; SEMANTIC_REPLAY_PENDING_THROUGH_046_INTELLIGENCE_DOCUMENTS",
+  "status": "HISTORICAL_RECOVERY_GATE_CLOSED_BY_PHASE3_APPROVAL; SEMANTIC_REPLAY_PENDING_THROUGH_048_PHASE7_APPROVAL_LIMITS_REVERSALS_ACCOUNTING",
   "do_not_execute_in_production": true,
   "steps": [
     {
@@ -228,9 +228,17 @@
     {
       "path": "migrations/046_intelligence_documents.sql",
       "mode": "phase3-local-document-intake-and-human-review-candidate"
+    },
+    {
+      "path": "migrations/047_analytics_forecast_history_backfill.sql",
+      "mode": "phase4-analytics-forecast-history-backfill-forward-candidate"
+    },
+    {
+      "path": "migrations/048_phase7_approval_limits_reversals_accounting.sql",
+      "mode": "phase7-approval-limits-reversals-and-supplier-journal-forward-candidate"
     }
   ],
-  "replay_only_notice": "Runs only on a fresh local/CI disposable PostgreSQL database after explicit environment opt-in. Never execute against production. A successful replay validates the selected replacement chain, not original historical-byte parity. Migrations 045 and 046 are new forward-only candidates and still require code review and runtime security assertions.",
+  "replay_only_notice": "Runs only on a fresh local/CI disposable PostgreSQL database after explicit environment opt-in. Never execute against production. A successful replay validates the selected replacement chain, not original historical-byte parity. Phase 7 migration 048 is included but still requires source review, actual disposable PostgreSQL execution, and approval-limit/accounting/security postconditions before production use.",
   "permanent_disposition_manifest": "migrations/migration_dispositions.json",
   "permanently_replaced_histories": [
     "010_phase2_catalog_intelligence",

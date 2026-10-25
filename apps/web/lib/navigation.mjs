@@ -27,6 +27,8 @@ export const secondaryNavigation = [
   ["/compliance", "Tax and receipts", "receipt"],
   ["/administration", "Business details", "building"],
   ["/administration/members", "Team access", "users"],
+  ["/purchasing/approval-limits", "Approval limits", "settings"],
+  ["/purchasing/reconciliation", "Purchasing reconciliation", "check"],
   ["/workspace", "Switch business", "switch"],
   ["/onboarding", "Finish setup", "check"],
   ["/settings", "Settings", "settings"],
@@ -40,6 +42,8 @@ export const workspaceSearchSuggestions = [
   ["Checkout and end-of-day close", "/commerce"],
   ["Customers and balances", "/customers"],
   ["Purchase orders and suppliers", "/purchasing"],
+  ["Purchasing reconciliation and ledgers", "/purchasing/reconciliation"],
+  ["Purchasing authorization limits", "/purchasing/approval-limits"],
   ["Invoices, receipts and business documents", "/documents"],
   ["Money, expenses and records", "/accounting"],
   ["Business reports and graphs", "/reports"],
@@ -74,13 +78,15 @@ export function resolveBusinessSearchDestination(query) {
   if (/\b(ai assistant|business assistant|ask lexa|artificial intelligence|ai help)\b/.test(lower)) return `/ai-assistant?q=${encoded}`;
   if (/\b(invoice scan|scan invoice|supplier invoice|expense receipt|document upload|business documents|document intake)\b/.test(lower)) return `/documents?q=${encoded}`;
   if (/\b(ura|efris|tax|fiscal|compliance|tax receipt|official receipt)\b/.test(lower)) return `/compliance?q=${encoded}`;
-  if (/\b(daily brief|business brief|business overview|what needs attention|today\x27s brief)\b/.test(lower)) return `/daily-brief?q=${encoded}`;
+  if (/\b(daily brief|business brief|business overview|what needs attention|today's brief)\b/.test(lower)) return `/daily-brief?q=${encoded}`;
   if (/\b(demand forecast|sales forecast|expected demand|product forecast|forecast stock demand|forecasting demand)\b/.test(lower)) return `/demand-forecast?q=${encoded}`;
   if (/\b(intelligence|forecast|forecasting|trend|anomaly|insight|insights|business health)\b/.test(lower)) return `/intelligence?q=${encoded}`;
   if (/\b(team|member|members|permission|role|invite|access control)\b/.test(lower)) return `/administration/members?q=${encoded}`;
   if (/\b(setup|onboarding|setup progress)\b/.test(lower)) return "/onboarding";
   if (/\b(switch business|workspace|businesses)\b/.test(lower)) return "/workspace";
   if (/\b(password|forgot password|reset password|active session|sessions|sign-in security|account security)\b/.test(lower)) return `/settings/security?q=${encoded}`;
+  if (/\b(approval limit|purchase approval|purchasing authorization|approval cap)\b/.test(lower)) return `/purchasing/approval-limits?q=${encoded}`;
+  if (/\b(purchasing reconciliation|purchase reconciliation|supplier ledger reconciliation)\b/.test(lower)) return `/purchasing/reconciliation?q=${encoded}`;
   if (/\b(setting|settings|business profile|business details|currency|branch)\b/.test(lower)) return `/administration?q=${encoded}`;
   if (/\b(customer|client|debtor|receivable|credit balance)\b/.test(lower)) return `/customers?q=${encoded}`;
   if (/\b(inventory|stock|warehouse|transfer|count|adjustment|low stock)\b/.test(lower)) return `/inventory?q=${encoded}`;
@@ -97,7 +103,7 @@ export function resolveBusinessSearchDestination(query) {
 export const applicationRoutes = [
   "/", "/accounting", "/administration", "/administration/members", "/commerce",
   "/compliance", "/customers", "/daily-brief", "/demand-forecast", "/documents", "/intelligence", "/inventory", "/invite", "/login",
-  "/onboarding", "/products", "/purchasing", "/register", "/reports", "/sales",
+  "/onboarding", "/products", "/purchasing", "/purchasing/approval-limits", "/purchasing/reconciliation", "/register", "/reports", "/sales",
   "/settings", "/settings/security", "/forgot-password", "/reset-password", "/team-chat", "/workspace", "/ai-assistant",
 ];
 

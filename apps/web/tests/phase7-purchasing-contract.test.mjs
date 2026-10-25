@@ -9,6 +9,7 @@ const web = path.resolve(here, '..');
 const page = readFileSync(path.join(web, 'app', 'purchasing', 'page.tsx'), 'utf8');
 const api = readFileSync(path.join(web, 'lib', 'api.ts'), 'utf8');
 const spec = readFileSync(path.join(web, 'e2e', 'phase7-purchasing-acceptance.spec.ts'), 'utf8');
+const allocationSpec = readFileSync(path.join(web, 'e2e', 'phase7-partial-allocations-acceptance.spec.ts'), 'utf8');
 const globalSetup = readFileSync(path.join(web, 'e2e', 'global-setup.ts'), 'utf8');
 const config = readFileSync(path.join(web, 'playwright.config.ts'), 'utf8');
 const pkg = JSON.parse(readFileSync(path.join(web, 'package.json'), 'utf8'));
@@ -32,10 +33,21 @@ test('supplier terms, effective costs, landed cost and invoice exceptions are ex
 
 test('Phase 7 E2E has explicit staging safeguards but is not run by default CI', () => {
   assert.match(pkg.scripts['test:e2e:phase7'], /phase7-purchasing-acceptance\.spec\.ts/);
-  // Keep this contract aligned with Playwright's explicit Phase 2 and Phase 5–8 matchers.
+  assert.match(pkg.scripts['test:e2e:phase7'], /phase7-reversal-acceptance\.spec\.ts/);
+  assert.match(pkg.scripts['test:e2e:phase7'], /phase7-approval-limits-acceptance\.spec\.ts/);
+  assert.match(pkg.scripts['test:e2e:phase7'], /phase7-partial-allocations-acceptance\.spec\.ts/);
+  assert.match(pkg.scripts['test:e2e:phase7:allocation'], /phase7-partial-allocations-acceptance\.spec\.ts/);
   assert.ok(config.includes('const phase5Through8AcceptancePattern = /phase(5-sales|6-inventory|7-purchasing|7-authorization|8-reports)-acceptance\\.spec\\.ts$/;'));
   assert.ok(config.includes('const phase2TransactionAcceptancePattern = /phase2-transaction-acceptance\\.spec\\.ts$/;'));
-  assert.ok(config.includes('testMatch: [phase5Through8AcceptancePattern, phase2TransactionAcceptancePattern]'));
+  assert.ok(config.includes('const phase7ReversalAcceptancePattern = /phase7-reversal-acceptance\\.spec\\.ts$/;'));
+  assert.ok(config.includes('const phase7ApprovalAcceptancePattern = /phase7-approval-limits-acceptance\\.spec\\.ts$/;'));
+  assert.ok(config.includes('const phase7AllocationAcceptancePattern = /phase7-partial-allocations-acceptance\\.spec\\.ts$/;'));
+  assert.ok(config.includes('testMatch: [phase5Through8AcceptancePattern, phase2TransactionAcceptancePattern, phase7ReversalAcceptancePattern, phase7ApprovalAcceptancePattern, phase7AllocationAcceptancePattern]'));
+  assert.match(allocationSpec, /allocationA/);
+  assert.match(allocationSpec, /allocationB/);
+  assert.match(allocationSpec, /LEXA_PHASE7_ALLOCATION_ALLOW_STAGING_WRITES/);
+  assert.match(allocationSpec, /test\.skip\(!explicitlySafe/);
+  assert.match(globalSetup, /LEXA_PHASE7_ALLOCATION_FIXTURE_JSON/);
   assert.match(config, /LEXA_PHASE7_STORAGE_STATE/);
   assert.match(spec, /LEXA_PHASE7_ALLOW_STAGING_WRITES/);
   assert.match(spec, /disposable_scope === true/);

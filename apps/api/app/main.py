@@ -12,9 +12,10 @@ from fastapi.responses import JSONResponse
 from .config import settings
 from .performance import elapsed_ms, format_server_timing, is_slow_request
 from .health import check_database, check_redis
+from .phase7_release_gate import check_phase7_release_schema
 from .routes import (
     auth, organization, rbac, catalog, inventory, commerce, finance, analytics,
-    workspace_context, membership_admin, purchasing, team_chat, ai_assistant,
+    workspace_context, membership_admin, purchasing, purchasing_approval, team_chat, ai_assistant,
 )
 from .kernel import router as kernel_router
 from .intelligence.routes import router as intelligence_router
@@ -172,6 +173,9 @@ app.include_router(finance.router, prefix="/api/v1")
 app.include_router(finance.compliance, prefix="/api/v1")
 app.include_router(tax_reference_router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
+# Register the approval wrapper first; otherwise the existing purchasing router's
+# same-path approval handler would accept requests without the monetary policy.
+app.include_router(purchasing_approval.router, prefix="/api/v1")
 app.include_router(purchasing.router, prefix="/api/v1")
 app.include_router(team_chat.router, prefix="/api/v1")
 app.include_router(ai_assistant.router, prefix="/api/v1")
@@ -194,6 +198,13 @@ def health() -> dict[str, str]:
 @app.get("/api/ready", tags=["system"], include_in_schema=False)
 def readiness() -> dict[str, object]:
     database_ok, database_error = check_database()
+    # Phase 7 routes depend on migration 048. Never report ready when this code
+    # is deployed ahead of its approval-limit/RLS/accounting schema contract.
+    if database_ok:
+        phase7_ok, phase7_error = check_phase7_release_schema()
+        if not phase7_ok:
+            database_ok = False
+            database_error = phase7_error or "LEXA_SCHEMA_NOT_READY"
     cache_ok, cache_error = check_redis()
     ready = database_ok and cache_ok
     payload: dict[str, object] = {
