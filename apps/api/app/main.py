@@ -1,7 +1,6 @@
 from uuid import UUID, uuid4
 import asyncio
 import logging
-import json
 import os
 import time
 from contextlib import asynccontextmanager
@@ -128,36 +127,22 @@ async def block_legacy_ai_assist_route(request: Request, call_next):
 
 @app.middleware("http")
 async def block_live_efris_submission(request: Request, call_next):
-    """Keep fiscalisation manual-only; this deployment has no URA connector."""
+    """Block live URA submission without consuming or inspecting request bodies.
+
+    EFRIS configuration is validated by its typed, permission-checked route.
+    This middleware only rejects live fiscalisation, which is deliberately
+    manual-only in this deployment.
+    """
     path = request.url.path.rstrip("/")
-    if request.method.upper() == "POST" and path.startswith("/api/v1/compliance/sales/") and path.endswith("/fiscalize"):
+    if (
+        request.method.upper() == "POST"
+        and path.startswith("/api/v1/compliance/sales/")
+        and path.endswith("/fiscalize")
+    ):
         return JSONResponse(status_code=409, content={"detail": {
             "code": "EFRIS_MANUAL_ONLY",
-            "message": "LEXA records tax calculations and official URA references only. Obtain the fiscal document through the official URA portal and record it in LEXA; no EFRIS submission is performed.",
+            "message": "LEXA records local tax calculations and official URA references only. Obtain required fiscal documents through the official URA portal and record the details in LEXA; no EFRIS submission is performed.",
         }})
-    # Keep manual taxpayer details editable, but reject attempts to enable a
-    # provider mode through the legacy configuration endpoint.
-    if request.method.upper() == "PUT" and path == "/api/v1/compliance/efris/config":
-        try:
-            raw_body = await request.body()
-            config_body = json.loads(raw_body or b"{}")
-        except Exception:
-            return JSONResponse(status_code=400, content={"detail": "EFRIS configuration must be valid JSON."})
-        if not isinstance(config_body, dict):
-            return JSONResponse(status_code=400, content={"detail": "EFRIS configuration must be a JSON object."})
-        if str(config_body.get("integration_mode", "MANUAL")).strip().upper() != "MANUAL":
-            return JSONResponse(status_code=409, content={"detail": {
-                "code": "EFRIS_MANUAL_ONLY",
-                "message": "Only manual URA recordkeeping is available. LEXA does not support or enable system-to-system EFRIS integration.",
-            }})
-        consumed = False
-        async def replay_body():
-            nonlocal consumed
-            if not consumed:
-                consumed = True
-                return {"type": "http.request", "body": raw_body, "more_body": False}
-            return {"type": "http.request", "body": b"", "more_body": False}
-        request._receive = replay_body
     return await call_next(request)
 
 

@@ -10,6 +10,7 @@ const repoApps = path.resolve(web, '..');
 const read = (p) => fs.readFileSync(path.resolve(web, p), 'utf8');
 const compliancePage = read('app/compliance/page.tsx');
 const apiMain = fs.readFileSync(path.join(repoApps, 'api/app/main.py'), 'utf8');
+const apiFinance = fs.readFileSync(path.join(repoApps, 'api/app/routes/finance.py'), 'utf8');
 const taxRoute = fs.readFileSync(path.join(repoApps, 'api/app/routes/tax_reference.py'), 'utf8');
 const taxCalculator = fs.readFileSync(path.join(repoApps, 'api/app/uganda_tax_2026.py'), 'utf8');
 
@@ -32,8 +33,9 @@ test('LEXA keeps official fiscal documents manual-only and blocks system-to-syst
   assert.doesNotMatch(compliancePage, /SYSTEM_TO_SYSTEM|PENDING_INTEGRATION/);
   assert.match(apiMain, /EFRIS_MANUAL_ONLY/);
   assert.match(apiMain, /path\.endswith\("\/fiscalize"\)/);
-  assert.match(apiMain, /path == "\/api\/v1\/compliance\/efris\/config"/);
-  assert.match(apiMain, /integration_mode.*MANUAL/s);
+  assert.doesNotMatch(apiMain, /request\.body|json\.loads/);
+  assert.match(apiFinance, /integration_mode\s*!=\s*["\']MANUAL["\']/);
+  assert.match(apiFinance, /EFRIS_MANUAL_ONLY/);
   assert.match(taxRoute, /MANUAL_URA_PORTAL/);
   assert.match(taxRoute, /NOT_VERIFIED_BY_LEXA/);
   assert.match(taxRoute, /external_submission.*False/);

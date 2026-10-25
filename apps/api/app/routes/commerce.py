@@ -200,7 +200,6 @@ def _channel(db: Session, tenant_id: UUID, channel_id: UUID, currency: str | Non
         raise HTTPException(400, "Payment channel currency does not match the sale currency")
     return row
 
-
 def _emit(db: Session, tenant_id: UUID, actor: UUID, action: str, event: str, aggregate_type: str, aggregate_id: UUID, payload: dict[str, Any], request_id: str | None):
     write_audit(db, tenant_id=tenant_id, actor_user_id=actor, action=action, target_type=aggregate_type, target_id=aggregate_id, correlation_id=request_id)
     emit_event(db, tenant_id=tenant_id, event_type=event, aggregate_type=aggregate_type, aggregate_id=aggregate_id, payload=jsonable_encoder(payload), actor_user_id=actor, correlation_id=request_id)
@@ -503,6 +502,11 @@ def get_sale(sale_id: UUID, ctx=Depends(require_permission("sales.read"))):
 @router.post("/sales", status_code=201)
 def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), request_id: str | None = Header(default=None, alias="X-Request-ID"), ctx=Depends(require_permission("sales.complete"))):
     db,actor,tenant_id,_=ctx
+    if not idempotency_key or not idempotency_key.strip():
+        raise HTTPException(428, detail={
+            "code": "IDEMPOTENCY_KEY_REQUIRED",
+            "message": "Retry-safe checkout requires an Idempotency-Key. Reuse the same key and unchanged sale details when retrying.",
+        })
     idem,cached,_,cached_body=_idempotency(db,tenant_id,idempotency_key,"commerce.sale.create",body.model_dump(mode="json"))
     if cached: return cached_body
     try:
@@ -619,18 +623,13 @@ def create_sale(body: SaleCreate, idempotency_key: str | None = Header(default=N
         if cogs_entry:
             _emit(db,tenant_id,actor,"accounting.entry.posted","ACCOUNTING_ENTRY_POSTED","journal_entry",cogs_entry,{"sale_id":str(sale_id),"entry_role":"COGS"},request_id)
         _emit(db,tenant_id,actor,"sale.completed","SALE_COMPLETED","sale",sale_id,{"reference":ref,"total":str(total),"paid":str(paid_now["amount_paid"]),"due":str(paid_now["amount_due"]),"accounting_journal_id":str(accounting_sale_entry)},request_id)
-        # If system-to-system EFRIS is enabled and the taxpayer is active, create
-        # an idempotent fiscalization work item in the same transaction as the sale.
-        # Queueing is not treated as proof that URA accepted an e-document.
-        fiscal_document_id = None
+        # Legacy EFRIS modes are intentionally not executed from checkout. Fiscal
+        # documents must be obtained manually from URA and recorded in LEXA only.
         efris = db.execute(text("SELECT enabled,integration_mode,registration_status FROM efris_configurations WHERE tenant_id=:t"), {"t":str(tenant_id)}).mappings().first()
-        if efris and efris["enabled"] and efris["registration_status"] == "ACTIVE" and efris["integration_mode"] == "SYSTEM_TO_SYSTEM":
-            fiscal_document_id = db.execute(text("SELECT public.create_fiscal_document_for_sale(:id,'INVOICE')"), {"id":str(sale_id)}).scalar_one()
-            _emit(db,tenant_id,actor,"fiscalization.queued","FISCALIZATION_QUEUED","fiscal_document",fiscal_document_id,{"sale_id":str(sale_id),"status":"PENDING","reason":"Queued for the configured URA system-to-system adapter"},request_id)
         result=db.execute(text("SELECT s.id,s.transaction_id,s.currency_code,s.business_date,s.status,s.subtotal,s.discount_total,s.tax_total,s.total,s.amount_paid,s.amount_due,s.created_at,s.completed_at FROM sales s WHERE s.tenant_id=:t AND s.id=:s"),{"t":str(tenant_id),"s":str(sale_id)}).mappings().one()
         result=out(result)
-        result["fiscal_document_id"] = str(fiscal_document_id) if fiscal_document_id else None
-        result["fiscalization_status"] = "PENDING" if fiscal_document_id else ("MANUAL_REQUIRED" if efris and efris["enabled"] and efris["registration_status"] == "ACTIVE" and efris["integration_mode"] == "MANUAL" else "NOT_CONFIGURED")
+        result["fiscal_document_id"] = None
+        result["fiscalization_status"] = "MANUAL_REQUIRED" if efris and efris["enabled"] and efris["registration_status"] == "ACTIVE" and efris["integration_mode"] == "MANUAL" else "NOT_CONFIGURED"
         _finish(db,idem,201,result,"sale",sale_id); db.commit(); return result
     except HTTPException:
         db.rollback(); raise

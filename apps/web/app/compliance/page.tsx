@@ -468,7 +468,7 @@ export default function CompliancePage() {
               <button type="submit" className="button button-dark" disabled={busy || savingRate}>{savingRate ? "Saving rate…" : "Save tax rate"}</button>
             </form>
             <form className="command-form" onSubmit={saveDefaultRule}>
-              <div><h3>Configure a default tax rule</h3><p>A default affects the products covered by the default scope. Do not use it where products need different tax treatments.</p></div>
+              <div><h3>Configure a default tax rule</h3><p>Do not create a default tax rule until you have confirmed the business registration, product scope, and applicable tax treatment. A default affects every product covered by its scope; do not use it where products need different tax treatments.</p></div>
               <label htmlFor="rule-name">Rule name<input id="rule-name" value={ruleDraft.name} onChange={event => setRuleDraft({ ...ruleDraft, name: event.target.value })} maxLength={160} required /></label>
               <label htmlFor="rule-rate">Saved tax rate<select id="rule-rate" value={ruleDraft.tax_rate_id} onChange={event => setRuleDraft({ ...ruleDraft, tax_rate_id: event.target.value })} required><option value="">Choose a saved rate</option>{taxRates.map(rate => <option key={rate.id} value={rate.id}>{rate.code} · {rate.name} · {rate.rate_percent}%</option>)}</select></label>
               <div className="form-grid">

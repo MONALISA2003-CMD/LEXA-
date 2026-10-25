@@ -48,8 +48,12 @@ def test_api_middleware_adds_timing_without_logging_request_contents():
     assert '"slow_request request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f"' in source
     assert '"request_failed_5xx request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f"' in source
     assert '"path": request.url.path' in source
-    assert 'request.url.query' not in source
-    assert "request.body" not in source
+    # Scope the privacy assertion to the timing/logging middleware. The separate
+    # manual-only EFRIS guard must read its own config payload to reject any
+    # attempt to activate provider submission, but that payload is not logged.
+    request_id_middleware = source.split("async def request_id_middleware", 1)[1].split("\n\n@app.middleware", 1)[0]
+    assert "request.url.query" not in request_id_middleware
+    assert "request.body" not in request_id_middleware
 
 
 def test_web_proxy_preserves_server_timing_for_success_and_upstream_5xx():

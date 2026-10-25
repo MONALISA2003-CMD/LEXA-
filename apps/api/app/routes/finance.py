@@ -529,6 +529,11 @@ def efris_config(ctx=Depends(require_permission("efris.read"))):
 def update_efris_config(body: EfrisConfigPatch, ctx=Depends(require_permission("efris.manage"))):
     db, actor, tenant_id, _ = ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
+    if body.integration_mode != "MANUAL":
+        raise HTTPException(409, detail={
+            "code": "EFRIS_MANUAL_ONLY",
+            "message": "Only manual URA recordkeeping is available. LEXA does not enable system-to-system EFRIS integration.",
+        })
     try:
         row = db.execute(text("""
           INSERT INTO efris_configurations(tenant_id,enabled,integration_mode,registration_status,tin,legal_name,effective_date)
