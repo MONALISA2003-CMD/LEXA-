@@ -23,10 +23,18 @@ def overview(start_date: date, end_date: date, currency_code: str = Query(..., m
     db, _, tenant_id, _ = ctx
     require_full_branch_scope(db, tenant_id=tenant_id, user_id=ctx[1])
     rows = db.execute(text("""SELECT * FROM analytics_daily_business_metrics WHERE tenant_id=:t AND business_date BETWEEN :f AND :to AND currency_code=:c ORDER BY business_date"""), {"t":str(tenant_id),"f":start_date,"to":end_date,"c":currency_code.upper()}).mappings().all()
+    product_margin = db.execute(text("""
+        SELECT COUNT(*)::integer AS record_count, SUM(gross_margin) AS gross_profit
+        FROM public.analytics_product_daily_metrics
+        WHERE tenant_id = :t AND business_date BETWEEN :f AND :to AND currency_code = :c
+    """), {"t": str(tenant_id), "f": start_date, "to": end_date, "c": currency_code.upper()}).mappings().one()
+    gross_profit = Decimal(str(product_margin["gross_profit"])) if product_margin["record_count"] and product_margin["gross_profit"] is not None else None
     totals = {
         "sales_total": sum((Decimal(r["sales_total"]) for r in rows), Decimal(0)),
         "returns_total": sum((Decimal(r["returns_total"]) for r in rows), Decimal(0)),
         "net_sales": sum((Decimal(r["net_sales"]) for r in rows), Decimal(0)),
+        "gross_profit": gross_profit,
+        "gross_profit_record_count": int(product_margin["record_count"] or 0),
         "payments_collected": sum((Decimal(r["payments_collected"]) for r in rows), Decimal(0)),
         "refunds_total": sum((Decimal(r["refunds_total"]) for r in rows), Decimal(0)),
         "credit_created": sum((Decimal(r["credit_created"]) for r in rows), Decimal(0)),
@@ -194,6 +202,39 @@ def branches(start_date: date, end_date: date, currency_code: str = Query(..., m
     return [out(r) for r in rows]
 
 
+
+@router.get("/branches/summary")
+def branch_summary(start_date: date, end_date: date, currency_code: str = Query(..., min_length=3, max_length=3), ctx=Depends(require_permission("analytics.read"))):
+    """Aggregate branch sales only for active branches assigned to the current user."""
+    db, actor_id, tenant_id, _ = ctx
+    if start_date > end_date:
+        raise HTTPException(status_code=422, detail="The start date must be on or before the end date.")
+    if (end_date - start_date).days + 1 > 366:
+        raise HTTPException(status_code=422, detail="Choose a reporting period of 366 days or less.")
+    currency = currency_code.strip().upper()
+    if not re.fullmatch(r"[A-Z]{3}", currency):
+        raise HTTPException(status_code=422, detail="Enter a valid three-letter currency code.")
+    rows = db.execute(text("""
+        SELECT a.branch_id::text AS branch_id, b.name AS branch_name, a.currency_code,
+               COALESCE(SUM(a.sales_total),0) AS sales_total, COALESCE(SUM(a.returns_total),0) AS returns_total,
+               COALESCE(SUM(a.net_sales),0) AS net_sales, COALESCE(SUM(a.payments_collected),0) AS payments_collected,
+               COALESCE(SUM(a.credit_created),0) AS credit_created, COALESCE(SUM(a.sale_count),0)::integer AS sale_count,
+               COUNT(DISTINCT a.business_date)::integer AS days_with_data
+        FROM public.analytics_branch_daily_metrics a
+        JOIN public.branches b ON b.tenant_id=a.tenant_id AND b.id=a.branch_id
+        WHERE a.tenant_id=:tenant_id AND a.business_date BETWEEN :start_date AND :end_date
+          AND a.currency_code=:currency_code AND b.status='ACTIVE'
+          AND EXISTS (
+            SELECT 1 FROM public.membership_branch_assignments mba
+            JOIN public.tenant_memberships tm ON tm.id=mba.membership_id AND tm.tenant_id=mba.tenant_id
+            WHERE mba.tenant_id=a.tenant_id AND mba.branch_id=a.branch_id
+              AND mba.status='ACTIVE' AND tm.user_id=:actor_id AND tm.status='ACTIVE'
+          )
+        GROUP BY a.branch_id,b.name,a.currency_code ORDER BY SUM(a.net_sales) DESC,b.name ASC
+    """), {"tenant_id":str(tenant_id),"actor_id":str(actor_id),"start_date":start_date,"end_date":end_date,"currency_code":currency}).mappings().all()
+    return [out(row) for row in rows]
+
+
 @router.get("/insights")
 def business_insights(
     start_date: date,
@@ -211,8 +252,8 @@ def business_insights(
     if start_date > end_date:
         raise HTTPException(status_code=422, detail="The start date must be on or before the end date.")
     period_days = (end_date - start_date).days + 1
-    if period_days > 93:
-        raise HTTPException(status_code=422, detail="Choose a reporting period of 93 days or less.")
+    if period_days > 366:
+        raise HTTPException(status_code=422, detail="Choose a reporting period of 366 days or less.")
     currency = currency_code.strip().upper()
     if not re.fullmatch(r"[A-Z]{3}", currency):
         raise HTTPException(status_code=422, detail="Enter a valid three-letter currency code.")

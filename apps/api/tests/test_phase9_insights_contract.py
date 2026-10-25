@@ -8,7 +8,7 @@ def test_phase9_insights_api_is_read_only_bounded_and_branch_guarded():
     route = source.split('@router.get("/insights")', 1)[1].split('@router.post("/refresh")', 1)[0]
     assert 'Depends(require_permission("analytics.read"))' in route
     assert "require_full_branch_scope" in route
-    assert "period_days > 93" in route
+    assert "period_days > 366" in route
     assert 'Literal["all", "sales", "margin", "stock", "balances"]' in route
     assert "analytics_daily_business_metrics" in route
     assert "analytics_product_daily_metrics" in route

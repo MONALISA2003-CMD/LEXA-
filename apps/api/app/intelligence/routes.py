@@ -96,6 +96,18 @@ def intelligence_capabilities(ctx=Depends(require_permission("analytics.read")))
     }
 
 
+
+@router.get("/business-date")
+def intelligence_business_date(ctx=Depends(require_permission("analytics.read"))):
+    """Return the tenant's configured business date without exposing any other business data."""
+    db, _actor_id, tenant_id, _ = ctx
+    value = db.execute(
+        text("SELECT public.lexa_business_date(now(), CAST(:tenant_id AS uuid))"),
+        {"tenant_id": str(tenant_id)},
+    ).scalar_one()
+    return {"business_date": str(value)}
+
+
 @router.get("/daily-brief")
 def intelligence_daily_brief(
     currency_code: str = Query(default="UGX", min_length=3, max_length=3),
