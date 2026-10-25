@@ -140,14 +140,12 @@ def test_phase3_api_ui_and_policy_keep_review_separate_from_business_writes():
     ai_client = (repo_root / "apps/web/lib/ai-assistant-api.ts").read_text(encoding="utf-8")
     assert "intelligence.documents.intake" in document_routes
     assert "intelligence.documents.review" in document_routes
-    assert "transaction_created\"] = False" in document_routes
+    assert 'transaction_created"] = False' in document_routes
     assert 'app.include_router(intelligence_documents_router, prefix="/api/v1")' in main
     dockerfile = (repo_root / "apps/api/Dockerfile").read_text(encoding="utf-8")
     assert "poppler-utils" in dockerfile and "tesseract-ocr" in dockerfile
     assert "AI_POLICY_GATE_REQUIRED" in main
     assert "No business transaction was created" in ui
-    # The replacement chat must stay interactive while all external execution
-    # remains server-side and subject to the central intelligence policy.
     assert "Your LEXA business assistant" in ai_ui
     assert "Private to your signed-in workspace" in ai_ui
     assert "Your business question" in ai_ui
@@ -169,9 +167,13 @@ def test_replay_manifest_appends_candidate_migrations_in_order_without_productio
     manifest_path = repo_root / "migrations/reconstructed/clean_replay_order.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     paths = [step["path"] for step in manifest["steps"]]
-    assert paths[-2:] == [
+    # Migrations 047 and 048 were added after the original Phase 3 foundation;
+    # require the full ordered suffix instead of the obsolete 045/046-only tail.
+    assert paths[-4:] == [
         "migrations/045_intelligence_foundation.sql",
         "migrations/046_intelligence_documents.sql",
+        "migrations/047_analytics_forecast_history_backfill.sql",
+        "migrations/048_phase7_approval_limits_reversals_accounting.sql",
     ]
     assert manifest["do_not_execute_in_production"] is True
     assert "disposable PostgreSQL" in manifest["replay_only_notice"]

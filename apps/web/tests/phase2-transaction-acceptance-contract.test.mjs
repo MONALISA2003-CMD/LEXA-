@@ -33,7 +33,12 @@ assert.match(setup, /\/api\/lexa\/ready/);
 assert.match(setup, /dependencies\?\.database !== 'ok'/);
 assert.match(playwright, /phase5Through8AcceptancePattern = \/phase\(5-sales/);
 assert.match(playwright, /phase2TransactionAcceptancePattern = \/phase2-transaction-acceptance/);
-assert.match(playwright, /testMatch: \[phase5Through8AcceptancePattern, phase2TransactionAcceptancePattern\]/);
+// Additional Phase 7 acceptance specs were deliberately added. Require the two
+// core matchers without forbidding future explicit, safety-gated matchers.
+assert.match(playwright, /testMatch:\s*\[[^\]]*phase5Through8AcceptancePattern[^\]]*phase2TransactionAcceptancePattern[^\]]*\]/);
+assert.match(playwright, /phase7ReversalAcceptancePattern/);
+assert.match(playwright, /phase7ApprovalAcceptancePattern/);
+assert.match(playwright, /phase7AllocationAcceptancePattern/);
 assert.match(playwright, /LEXA_PHASE2_ALLOW_STAGING_WRITES/);
 assert.match(backend, /FROM outbox_events/);
 assert.match(backend, /FROM audit_logs/);
