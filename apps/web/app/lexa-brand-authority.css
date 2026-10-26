@@ -762,3 +762,227 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   *,*::before,*::after { scroll-behavior:auto !important; animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
   .command-kpi:hover,.finance-overview-card:hover,.work-card:hover,.quick-links a:hover { transform:none !important; }
 }
+
+
+/* LEXA LIVE VISIBILITY FIX — verified against the active Vercel CSS
+   Final high-specificity contract: no legacy compact mark pretending to be the master logo.
+   The master artwork anchors the desktop shell and authentication story; the horizontal wordmark
+   is used in the narrow mobile header. Keep business data and interactions readable. */
+:root {
+  --lexa-midnight: #010D27;
+  --lexa-navy: #010D27;
+  --lexa-blue: #075FE8;
+  --lexa-cyan: #01B9BB;
+  --lexa-green: #00B77D;
+  --lexa-gold: #E1C140;
+  --lexa-red: #E91D3A;
+  --lexa-ink: #17243B;
+  --lexa-muted: #65758B;
+  --lexa-border: #DFE7F0;
+  --lexa-canvas: #F5F8FC;
+  --lexa-surface: #FFFFFF;
+}
+
+/* Desktop and open-mobile navigation use the COMPLETE official logo with descriptor. */
+.app-sidebar .app-brand {
+  height: 88px !important;
+  min-height: 88px !important;
+  margin: 0 0 16px !important;
+  padding: 0 !important;
+  border-radius: 10px !important;
+  background-color: #010D27 !important;
+  background-image: url('/lexa-master-logo.jpg') !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: contain !important;
+}
+.app-sidebar .app-brand .app-brand-logo,
+.app-sidebar .app-brand > div { display:none !important; }
+.auth-story .auth-story-brand {
+  aspect-ratio: 2.526 / 1 !important;
+  width: min(100%, 460px) !important;
+  height: auto !important;
+  background-color: #010D27 !important;
+  background-image: url('/lexa-master-logo.jpg') !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: contain !important;
+}
+.auth-story .auth-story-brand .auth-story-logo,
+.auth-story .auth-story-brand > div { display:none !important; }
+
+/* In the phone layout the sidebar is hidden until opened. Put the colourful master wordmark
+   in the persistent header instead of the retired green L/checkmark plus plain text. */
+@media (max-width: 800px) {
+  .app-topbar::before {
+    content: "" !important;
+    order: 1 !important;
+    display: block !important;
+    flex: 0 0 clamp(82px, 25vw, 108px) !important;
+    width: clamp(82px, 25vw, 108px) !important;
+    min-width: 0 !important;
+    height: 29px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    color: transparent !important;
+    font-size: 0 !important;
+    letter-spacing: 0 !important;
+    background-color: transparent !important;
+    background-image: url('/lexa-wordmark-master.jpg') !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: contain !important;
+  }
+  .app-topbar .mobile-menu { order: 0 !important; flex: 0 0 38px; }
+  .app-topbar .top-search { order: 2 !important; flex: 1 1 auto; min-width: 60px; }
+  .app-topbar .top-actions { order: 3 !important; min-width: 0; }
+}
+@media (max-width: 520px) {
+  .app-topbar::before {
+    flex-basis: clamp(82px, 25vw, 104px) !important;
+    width: clamp(82px, 25vw, 104px) !important;
+    height: 27px !important;
+    padding: 0 !important;
+    background-size: contain !important;
+  }
+  .app-topbar .top-search { min-width: 52px; }
+  .app-topbar .top-search input { min-width: 0; }
+}
+@media (max-width: 350px) {
+  .app-topbar::before {
+    flex-basis: 78px !important;
+    width: 78px !important;
+    height: 23px !important;
+  }
+}
+
+/* A clear, brand-led dashboard hierarchy: blue/cyan for analysis, gold for emphasis,
+   green for positive states. The values still come from the existing API only. */
+.app-content .command-toolbar {
+  border: 1px solid #DCE5F0 !important;
+  border-radius: 17px !important;
+  background: #FFFFFF !important;
+  box-shadow: 0 8px 26px rgba(1,13,39,.055) !important;
+}
+.app-content .command-kpi {
+  min-width: 0;
+  border: 1px solid #DFE7F0 !important;
+  border-top-width: 3px !important;
+  border-radius: 16px !important;
+  background: #FFFFFF !important;
+  box-shadow: 0 7px 22px rgba(1,13,39,.055) !important;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.app-content .command-kpi:first-child { border-top-color: #075FE8 !important; background: linear-gradient(145deg,#FFFFFF 60%,#EEF4FF) !important; }
+.app-content .command-kpi:nth-child(2) { border-top-color: #01B9BB !important; background: linear-gradient(145deg,#FFFFFF 60%,#EAF9FA) !important; }
+.app-content .command-kpi:nth-child(3) { border-top-color: #00B77D !important; background: linear-gradient(145deg,#FFFFFF 60%,#ECF9F2) !important; }
+.app-content .command-kpi:nth-child(4) { border-top-color: #E1C140 !important; background: linear-gradient(145deg,#FFFFFF 60%,#FFF9E7) !important; }
+.app-content .command-kpi strong { color: #010D27 !important; font-variant-numeric: tabular-nums; }
+.app-content .command-kpi:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(1,13,39,.10) !important; }
+.app-content .phase4-analytics-grid,.app-content .phase4-operations-grid,.app-content .phase4-lower-grid { gap: 16px; }
+.app-content .trend-panel,.app-content .top-products-panel { overflow: hidden; }
+.app-content .trend-panel { border-top: 3px solid #075FE8 !important; }
+.app-content .top-products-panel { border-top: 3px solid #01B9BB !important; }
+.app-content .trend-chart-wrap { border-radius: 13px; }
+.app-content .chart-summary-row { color: #314760 !important; }
+.app-content .chart-summary-row small { color: #65758B !important; }
+.app-content .sales-trend-svg { min-height: 205px; background: linear-gradient(180deg,#FFFFFF 0%,#FBFCFF 100%) !important; }
+.app-content .chart-grid-line { stroke: #E5ECF5 !important; }
+.app-content .chart-axis-label { fill: #61728A !important; }
+.app-content .chart-series-sales { stroke: #075FE8 !important; }
+.app-content .chart-series-collected { stroke: #087F91 !important; stroke-dasharray: 7 5 !important; }
+.app-content .chart-series-sales-dot { fill: #075FE8 !important; }
+.app-content .chart-series-collected-dot { fill: #087F91 !important; }
+.app-content .product-comparison-track { background: #E9EEF6 !important; }
+.app-content .product-comparison-track:not(.expense-comparison-track):not(.payment-method-track):not(.stock-value-track):not(.customer-balance-track) span { background: linear-gradient(90deg,#075FE8,#01B9BB) !important; }
+.app-content .expense-comparison-track span { background: #C58C13 !important; }
+.app-content .payment-method-track span { background: #087F91 !important; }
+.app-content .stock-value-track span { background: #00A875 !important; }
+.app-content .customer-balance-track span { background: #C58C13 !important; }
+.app-content .chart-data-details summary { color: #0753C8 !important; }
+.app-content .chart-empty-state { border-color: #CFDDEE !important; background: #F8FAFE !important; }
+
+/* Primary action is blue; green stays meaningful for success, completion and healthy operations. */
+.app-shell .button-dark,
+.app-shell .primary,
+.auth-page .auth-submit,
+.auth-page .button-dark {
+  color: #FFFFFF !important;
+  background: #075FE8 !important;
+  border-color: #075FE8 !important;
+  box-shadow: 0 6px 17px rgba(7,95,232,.18) !important;
+}
+.app-shell .button-dark:hover:not(:disabled),
+.app-shell .primary:hover:not(:disabled),
+.auth-page .auth-submit:hover:not(:disabled),
+.auth-page .button-dark:hover:not(:disabled) {
+  background: #064FC4 !important;
+  border-color: #064FC4 !important;
+  box-shadow: 0 9px 22px rgba(7,95,232,.23) !important;
+}
+.app-shell .button-soft,.app-shell .secondary,.auth-page .button-soft {
+  color: #173052 !important;
+  background: #FFFFFF !important;
+  border-color: #D6E1EF !important;
+}
+.app-shell .button-soft:hover:not(:disabled),.app-shell .secondary:hover:not(:disabled),.auth-page .button-soft:hover:not(:disabled) {
+  color: #0753C8 !important;
+  background: #F3F7FF !important;
+  border-color: #AFC6E8 !important;
+}
+.app-shell .app-nav-item.active {
+  color: #FFFFFF !important;
+  background: linear-gradient(105deg,rgba(7,95,232,.28),rgba(1,185,187,.15)) !important;
+  box-shadow: inset 3px 0 0 #E1C140,0 5px 14px rgba(0,0,0,.09) !important;
+}
+.app-shell .app-nav-item.active .app-nav-icon { color: #75E6E2 !important; }
+.app-shell .period-button.active,.app-shell .period-button[aria-pressed="true"] {
+  color: #064FC4 !important; border-color: #075FE8 !important; background: #EAF2FF !important;
+}
+.app-shell .data-table th { color: #40536E !important; background: #F0F5FC !important; border-color: #DFE7F0 !important; }
+.app-shell .data-table tbody tr:hover { background: #F3F7FF !important; }
+.app-shell .data-table td a { color: #0753C8 !important; }
+
+/* Explicit visual contract for specialised CSS-module screens. */
+.app-shell .app-content [class*="privacyBar__"],
+.app-shell .app-content [class*="chatShell__"],
+.app-shell .app-content [class*="documentList__"],
+.app-shell .app-content [class*="documentDetail__"],
+.app-shell .app-content [class*="summary__"],
+.app-shell .app-content [class*="card__"],
+.app-shell .app-content [class*="item__"] {
+  border-color: #DFE7F0 !important;
+  box-shadow: 0 7px 24px rgba(1,13,39,.055) !important;
+}
+.app-shell .app-content [class*="userMessage__"] { background: #EAF2FF !important; border-color: #C8D9F4 !important; }
+.app-shell .app-content [class*="documentItemActive__"],
+.app-shell .app-content [class*="documentItem__"]:hover { background: #EFF5FF !important; }
+.app-shell .app-content [class*="documentGlyph__"],
+.app-shell .app-content [class*="privacyIcon__"],
+.app-shell .app-content [class*="welcomeMark__"] { color:#075FE8 !important; background:#EAF2FF !important; }
+
+@media (max-width: 800px) {
+  .app-content .phase4-analytics-grid,
+  .app-content .phase4-operations-grid,
+  .app-content .phase4-lower-grid { grid-template-columns: minmax(0,1fr) !important; }
+  .app-content .command-kpis { grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap:10px !important; }
+  .app-content .command-kpi { min-height:126px; padding:14px !important; }
+  .app-content .sales-trend-svg { min-height:175px; }
+}
+@media (max-width: 520px) {
+  .app-content .command-kpis { grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap:9px !important; }
+  .app-content .command-kpi { min-height:122px; padding:12px !important; }
+  .app-content .phase4-analytics-grid,.app-content .phase4-operations-grid,.app-content .phase4-lower-grid { gap:12px !important; }
+  .app-content .chart-summary-row { gap:7px 10px; }
+  .app-content .sales-trend-svg { min-height:155px; }
+  .app-content .product-comparison-bars { padding:13px !important; }
+  .app-content .product-comparison-row { grid-template-columns:minmax(85px,1fr) minmax(60px,.9fr); gap:8px 10px; }
+}
+@media (max-width: 350px) {
+  .app-content .command-kpis { grid-template-columns: minmax(0,1fr) !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-content .command-kpi { transition: none !important; }
+  .app-content .command-kpi:hover { transform:none !important; }
+}

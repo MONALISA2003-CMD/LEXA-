@@ -71,3 +71,8 @@ The archive also includes exact unmodified marker files at `apps/web/package.jso
 ## 8. Verification boundary
 
 This package can be inspected and contract-checked as an overlay. After upload, GitHub Actions must run the whole frontend test suite, TypeScript check and Next.js production build; Vercel then needs a visual check at the canonical production URL on desktop and a mobile viewport. Do not call production visually verified until that review is complete.
+
+
+## Live visibility correction (2026-10-26)
+
+The active Vercel CSS was inspected. The mobile header still rendered the retired compact L mark plus plain word text, the sidebar used a cropped wordmark only, and primary buttons still resolved to the old green gradient. The `LEXA LIVE VISIBILITY FIX` block is deliberately last in the shared stylesheet and has a matching regression test to keep the visible runtime consistent with the new master brand.
