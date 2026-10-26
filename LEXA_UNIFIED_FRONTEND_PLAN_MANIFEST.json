@@ -1,0 +1,124 @@
+{
+  "package": "LEXA_UNIFIED_FRONTEND_PLAN_IMPLEMENTATION_2026-10-26.zip",
+  "generated_from": "LEXA_LIVE_BRAND_VISIBILITY_FIX_2026-10-26.zip",
+  "generated_at": "2026-10-26",
+  "source_commit_reviewed": "d36330e362424c0f64480f66aec8df7d0aeb6427",
+  "purpose": "Frontend-only unified LEXA brand, dashboard and module visual system overlay",
+  "scope": [
+    "master brand assets",
+    "shared shell",
+    "dashboard",
+    "charts",
+    "forms",
+    "tables",
+    "status",
+    "mobile",
+    "specialised module styles",
+    "contract tests"
+  ],
+  "excluded": [
+    "backend behavior",
+    "database schema or data",
+    "authz logic",
+    "payment processing",
+    "URA/EFRIS API",
+    "production migrations"
+  ],
+  "files": [
+    {
+      "path": "LEXA_UNIFIED_FRONTEND_PLAN_UPLOAD_GUIDE.md",
+      "bytes": 2695,
+      "sha256": "416aeaf1997dd66df25177a41eca78a7e6c6bfef8f27a1c697ae2ab315a78f30"
+    },
+    {
+      "path": "apps/api/app/main.py",
+      "bytes": 10293,
+      "sha256": "42d56a5b55a8fd83da502dec3873200c86d44af4018c8e912d9f42e52e9b069b"
+    },
+    {
+      "path": "apps/web/app/layout.tsx",
+      "bytes": 901,
+      "sha256": "53d8d6d4159d060d9bdc5c5dc20c11f996895765bce15c95e710c3bcaeabd25a"
+    },
+    {
+      "path": "apps/web/app/lexa-brand-authority.css",
+      "bytes": 69184,
+      "sha256": "a80afff2d79f5696baf3a2de4b0857146c99ab82081801d2954f7e58d51d42a0"
+    },
+    {
+      "path": "apps/web/package.json",
+      "bytes": 1847,
+      "sha256": "0db24aef94cb4b956cae6b6fb869072cffdab86f084a7ea883414705d85595f4"
+    },
+    {
+      "path": "apps/web/public/lexa-app-mark.png",
+      "bytes": 41390,
+      "sha256": "72f586d8a70bb470b4ee86cc3b100823127be427216e6ffab1a12a12c769d85b"
+    },
+    {
+      "path": "apps/web/public/lexa-logo-light.svg",
+      "bytes": 350,
+      "sha256": "432353b484b2461bc1e1cdb8138b6fd1977648ba0065bff51fb6b4e453568208"
+    },
+    {
+      "path": "apps/web/public/lexa-logo.svg",
+      "bytes": 350,
+      "sha256": "432353b484b2461bc1e1cdb8138b6fd1977648ba0065bff51fb6b4e453568208"
+    },
+    {
+      "path": "apps/web/public/lexa-mark.svg",
+      "bytes": 331,
+      "sha256": "e4e1927c2a4cd16a28215f54f21822aa6c19d19a7c95621836cc208593f9bc4b"
+    },
+    {
+      "path": "apps/web/public/lexa-master-logo.jpg",
+      "bytes": 168652,
+      "sha256": "0e52e36ba45c67062863f2242e59513a1a63b1ce424b7179a9c923d9ef5fb94e"
+    },
+    {
+      "path": "apps/web/public/lexa-wordmark-master.jpg",
+      "bytes": 112941,
+      "sha256": "6f04765a69b5b9ae87b0a8b535198bf47281263771d80814c80acceadc915f18"
+    },
+    {
+      "path": "apps/web/tests/phase10-brand-authority.test.mjs",
+      "bytes": 2001,
+      "sha256": "add0fef17f14832d26f0b43ebe6efe304bc470e6fa3d72eaa167bf18d1fc8ac9"
+    },
+    {
+      "path": "apps/web/tests/phase11-master-brand-dashboard.test.mjs",
+      "bytes": 3084,
+      "sha256": "6eaca2c49dc64288b2e2d6637f89f29c96ffef34eb06b9d5b7339b59c96631e5"
+    },
+    {
+      "path": "apps/web/tests/phase12-live-brand-visibility.test.mjs",
+      "bytes": 2981,
+      "sha256": "8c1fbb57495003490f14f5731ad8d8b5ad7b4632abe17e9da1c435c45ed2ff7a"
+    },
+    {
+      "path": "apps/web/tests/phase13-unified-frontend-plan.test.mjs",
+      "bytes": 3779,
+      "sha256": "9a74a3b4e547fecc2efc55b08123d0f07804ee28eac0f184b5049356e30726b6"
+    },
+    {
+      "path": "apps/web/tests/phase8-foundation-polish.test.mjs",
+      "bytes": 2980,
+      "sha256": "84261d8cd140fb2f8ecee1aefcbeb1fa627c3d7927c9a940d91fe4993bf26d4c"
+    },
+    {
+      "path": "docs/LEXA_MASTER_BRAND_AND_UI_SYSTEM.md",
+      "bytes": 7187,
+      "sha256": "0bbced7dd86380de838b397d17320307814ec787cf12e91913f6416aed3a7b1d"
+    },
+    {
+      "path": "docs/LEXA_UNIFIED_FRONTEND_BRAND_AND_WORKFLOW_SYSTEM.md",
+      "bytes": 8957,
+      "sha256": "48b1e0298fee8a79f49fe698a98f7094aa86a38ec0501c37abb9163f9acdf053"
+    },
+    {
+      "path": "migrations/001_phase1_foundation.sql",
+      "bytes": 1953,
+      "sha256": "2eb36ca0d51535bad127dc9be707cc5c8fe4ab8a1cd6b118bfa150505963690b"
+    }
+  ]
+}
