@@ -1,0 +1,314 @@
+/*
+ * LEXA Brand Authority — shared visual system
+ * Governed by the supplied master LEXA wordmark: Sales · Inventory · Business Management.
+ * Loaded after globals.css so every route inherits one coherent, accessible identity.
+ */
+:root {
+  --lexa-midnight: #010D27;
+  --lexa-navy: #010D27;
+  --lexa-navy-soft: #0A1B3A;
+  --lexa-blue: #075FE8;
+  --lexa-cyan: #01B9BB;
+  --lexa-green: #00B77D;
+  --lexa-green-deep: #087F5B;
+  --lexa-gold: #E1C140;
+  --lexa-red: #E91D3A;
+  --lexa-ink: #17243B;
+  --lexa-muted: #65758B;
+  --lexa-border: #DFE7F0;
+  --lexa-canvas: #F5F8FC;
+  --lexa-surface: #FFFFFF;
+  --lexa-shadow-card: 0 7px 24px rgba(1, 13, 39, .055);
+  --lexa-shadow-raised: 0 16px 42px rgba(1, 13, 39, .11);
+  color: var(--lexa-ink);
+  background: var(--lexa-canvas);
+}
+
+html { background: var(--lexa-canvas); }
+body { color: var(--lexa-ink); background: var(--lexa-canvas); }
+::selection { color: #FFFFFF; background: rgba(7, 95, 232, .84); }
+
+/* Application identity: use the master wordmark crop, never the retired checkmark brand. */
+.app-sidebar {
+  color: #E8EEF8;
+  background: linear-gradient(180deg, #010D27 0%, #04142F 72%, #071C35 100%);
+  border-right: 1px solid rgba(255,255,255,.075);
+}
+.app-brand {
+  width: 100%;
+  height: 68px;
+  min-height: 68px;
+  flex: 0 0 auto;
+  display: block;
+  padding: 0;
+  margin: 0 0 15px;
+  overflow: hidden;
+  border-radius: 8px;
+  background-color: var(--lexa-midnight);
+  background-image: url('/lexa-wordmark-master.jpg');
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: min(100%, 232px) auto;
+}
+.app-brand .app-brand-logo,
+.app-brand > div { display: none !important; }
+.app-brand:focus-visible { outline: 3px solid var(--lexa-gold); outline-offset: 4px; }
+
+.workspace-switch {
+  color: #F4F7FC;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 13px;
+  background: rgba(255,255,255,.045);
+  transition: border-color .18s ease, background .18s ease;
+}
+.workspace-switch small { color: #B3C0D3; letter-spacing: .12em; }
+.workspace-switch:hover { border-color: rgba(1,185,187,.52); background: rgba(255,255,255,.075); }
+.app-nav { gap: 4px; }
+.app-nav-item {
+  min-height: 44px;
+  border-radius: 10px;
+  transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+}
+.app-nav-item:hover:not(.active) { color: #FFFFFF; background: rgba(255,255,255,.075); }
+.app-nav-item.active {
+  color: #FFFFFF;
+  background: linear-gradient(105deg, rgba(1,185,187,.22), rgba(0,183,125,.17));
+  box-shadow: inset 3px 0 0 var(--lexa-cyan), 0 5px 14px rgba(0,0,0,.08);
+}
+.app-nav-item.active .app-nav-icon { color: #72E7D7; }
+.sidebar-more-toggle { border-radius: 10px; }
+.sidebar-more-toggle:hover { background: rgba(255,255,255,.075); }
+.nav-divider { border-color: rgba(255,255,255,.11); }
+.sidebar-foot { color: #B7C5D9; border-color: rgba(255,255,255,.10); }
+.status-dot:not(.warning) { background: var(--lexa-green); }
+.status-dot.warning { background: var(--lexa-gold); }
+
+.app-main { min-width: 0; background: transparent; }
+.app-topbar {
+  background: rgba(255,255,255,.94);
+  border-bottom: 1px solid rgba(223,231,240,.94);
+  box-shadow: 0 2px 12px rgba(1,13,39,.025);
+  backdrop-filter: blur(16px);
+}
+.app-content {
+  width: 100%;
+  max-width: 1660px;
+  margin-inline: auto;
+  color: var(--lexa-ink);
+}
+.standard-page-header h1,
+.workspace-header h1,
+.customer-toolbar h2 {
+  color: var(--lexa-midnight);
+  letter-spacing: -.045em;
+  text-wrap: balance;
+}
+.standard-page-header .page-eyebrow,
+.workspace-breadcrumb,
+.page-eyebrow { color: var(--lexa-green-deep); }
+.standard-page-context { border-radius: 999px; }
+
+/* One coherent surface language across dashboard, sales, products, inventory, purchasing,
+   accounting, reporting, intelligence, administration, documents, compliance and settings. */
+.app-content .panel,
+.app-content .command-panel,
+.app-content .workspace-section,
+.app-content .workspace-card,
+.app-content .module-card {
+  border-color: var(--lexa-border);
+  box-shadow: var(--lexa-shadow-card);
+}
+.app-content .panel,
+.app-content .command-panel,
+.app-content .workspace-section { border-radius: 17px; }
+.app-content .panel-head h2,
+.app-content .section-head h2,
+.app-content .workspace-section h2 { color: var(--lexa-navy); letter-spacing: -.026em; text-wrap: balance; }
+.app-content .panel-subtitle,
+.app-content .workspace-section p { line-height: 1.62; }
+.app-content .panel:hover,
+.app-content .command-panel:hover,
+.app-content .workspace-section:hover {
+  border-color: #C9E5DA;
+  box-shadow: var(--lexa-shadow-raised);
+}
+
+/* Dashboard hierarchy: generous spacing and restrained brand colours around real figures. */
+.command-toolbar {
+  gap: 14px;
+  border: 1px solid var(--lexa-border);
+  border-radius: 17px;
+  background: rgba(255,255,255,.94);
+  box-shadow: var(--lexa-shadow-card);
+}
+.command-toolbar > div:first-child strong { color: var(--lexa-navy); letter-spacing: -.02em; }
+.command-toolbar > div:first-child span { line-height: 1.62; }
+.command-kpis { gap: 13px; }
+.command-kpi {
+  min-width: 0;
+  border: 1px solid #DCE7E7;
+  border-radius: 17px;
+  box-shadow: var(--lexa-shadow-card);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.command-kpi strong { color: var(--lexa-navy); font-variant-numeric: tabular-nums; letter-spacing: -.045em; }
+.command-kpi small { line-height: 1.5; }
+.command-kpi:nth-child(1) { background: linear-gradient(145deg, #FFFFFF 54%, #E7F8F0); }
+.command-kpi:nth-child(2) { background: linear-gradient(145deg, #FFFFFF 54%, #E8F8F7); }
+.command-kpi:nth-child(3) { background: linear-gradient(145deg, #FFFFFF 54%, #EEF2FF); }
+.command-kpi:nth-child(4) { background: linear-gradient(145deg, #FFFFFF 54%, #FFF9E8); }
+.command-kpi:hover { transform: translateY(-2px); border-color: #B8E2D2; box-shadow: var(--lexa-shadow-raised); }
+.command-kpi:nth-child(1) .command-kpi-icon { color: var(--lexa-green-deep) !important; }
+.command-kpi:nth-child(2) .command-kpi-icon { color: #087F91 !important; }
+.command-kpi:nth-child(3) .command-kpi-icon { color: var(--lexa-blue) !important; }
+.command-kpi:nth-child(4) .command-kpi-icon { color: #946E00 !important; }
+.finance-overview-card,
+.work-card,
+.quick-links a,
+.top-product-row {
+  border-radius: 14px;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease, transform .18s ease;
+}
+.finance-overview-card:hover,
+.work-card:hover,
+.quick-links a:hover { border-color: #B8E2D2; box-shadow: 0 9px 24px rgba(1,13,39,.07); }
+
+/* Actions use a single accessible primary treatment rather than competing rainbow buttons. */
+.button-dark,
+.primary,
+.auth-submit {
+  color: #FFFFFF;
+  border-color: #087F5B;
+  background: linear-gradient(105deg, #087F5B, #00A979 68%, #01AEB0);
+  box-shadow: 0 6px 17px rgba(0,143,103,.17);
+}
+.button-dark:hover:not(:disabled),
+.primary:hover:not(:disabled),
+.auth-submit:hover:not(:disabled) {
+  filter: saturate(1.04);
+  box-shadow: 0 9px 22px rgba(0,143,103,.23);
+}
+.button-soft,
+.secondary {
+  color: var(--lexa-navy);
+  border-color: #D9E3ED;
+  background: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(1,13,39,.025);
+  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.button-soft:hover:not(:disabled),
+.secondary:hover:not(:disabled) { color: var(--lexa-green-deep); border-color: #A7D8C5; background: #F5FCF8; }
+.button-danger,
+.button-danger-soft { border-color: #F1C9D0; }
+.period-button.active,
+.period-button[aria-pressed="true"] { color: #086345; border-color: #16A777; background: #E8F8F0; }
+
+/* Data tables and record lists: tidy headers, predictable borders, readable hover state. */
+.table-wrap {
+  max-width: 100%;
+  border: 1px solid var(--lexa-border);
+  border-radius: 14px;
+  background: #FFFFFF;
+}
+.data-table th { color: #50647A; background: #F3F8F7; font-size: 11px; font-weight: 800; }
+.data-table td { border-color: #E9EEF4; overflow-wrap: anywhere; }
+.data-table td a { color: #086C50; text-underline-offset: 3px; }
+.data-table td a:hover { text-decoration: underline; }
+.data-table tbody tr { transition: background .12s ease; }
+.data-table tbody tr:hover { background: #F5FBF8; }
+.empty-state, .empty-inline, .chart-empty-state, .data-state { overflow-wrap: anywhere; }
+.notice, .inline-message, .status-banner { border-radius: 13px; overflow-wrap: anywhere; }
+
+/* Sign-in, registration, password recovery and reset: the full master art is the authority. */
+.auth-story {
+  color: #F6F8FC;
+  background: radial-gradient(ellipse at 12% 8%, rgba(1,185,187,.17), transparent 38%),
+    radial-gradient(ellipse at 90% 90%, rgba(7,95,232,.18), transparent 40%), #010D27;
+}
+.auth-story-brand {
+  display: block;
+  flex: 0 0 auto;
+  width: min(100%, 460px);
+  height: auto;
+  aspect-ratio: 2 / 1;
+  overflow: hidden;
+  border-radius: 8px;
+  background-color: var(--lexa-midnight);
+  background-image: url('/lexa-master-logo.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+.auth-story-brand .auth-story-logo,
+.auth-story-brand > div { display: none !important; }
+.auth-story-kicker { color: #F2D779; }
+.auth-story-foot { color: #C7D2E6; }
+.auth-panel { background: var(--lexa-canvas); }
+.auth-card {
+  border-color: var(--lexa-border);
+  border-radius: 22px;
+  box-shadow: 0 22px 64px rgba(1,13,39,.085);
+}
+.auth-card-heading h2 { color: var(--lexa-navy); letter-spacing: -.035em; }
+.section-label { color: var(--lexa-green-deep); }
+.auth-stepper [aria-current="step"],
+.auth-stepper .active { border-color: var(--lexa-green); }
+.auth-form-v2 input:focus-visible,
+.auth-form-v2 select:focus-visible,
+.auth-form-v2 textarea:focus-visible { border-color: var(--lexa-cyan); }
+
+/* Brand legacy assets are redirected to image-derived official derivatives. */
+/* Keyboard focus uses a clear high-contrast ring; colour alone never carries status. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline-color: rgba(1,185,187,.92);
+}
+.app-nav-item:focus-visible,
+.sidebar-more-toggle:focus-visible,
+.sidebar-signout:focus-visible,
+.workspace-switch:focus-visible,
+.mobile-nav a:focus-visible,
+.mobile-nav button:focus-visible { outline-color: var(--lexa-gold); }
+
+@media (max-width: 1100px) {
+  .app-content { padding-inline: clamp(16px, 2.2vw, 24px); }
+  .app-brand { background-size: min(100%, 218px) auto; }
+}
+@media (max-width: 800px) {
+  .app-brand { height: 60px; min-height: 60px; margin-bottom: 10px; background-size: min(100%, 214px) auto; }
+  .command-toolbar { align-items: stretch; }
+  .command-kpi { padding: 16px; }
+  .auth-story { min-height: auto; gap: 22px; padding: 28px; }
+  .auth-story-brand { width: min(100%, 340px); }
+  .auth-story-copy h1 { text-wrap: balance; }
+}
+@media (max-width: 520px) {
+  .app-content { padding-inline: 13px; }
+  .app-brand { height: 54px; min-height: 54px; background-size: min(100%, 200px) auto; }
+  .app-content .panel,
+  .app-content .command-panel,
+  .app-content .workspace-section { border-radius: 14px; }
+  .command-toolbar { padding: 14px; border-radius: 14px; }
+  .command-toolbar .toolbar-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .command-toolbar .toolbar-actions > * { width: 100%; justify-content: center; }
+  .command-kpis { grid-template-columns: minmax(0, 1fr); }
+  .auth-story { padding: 22px 18px; }
+  .auth-story-brand { width: min(100%, 300px); }
+  .auth-card { border-radius: 17px; }
+  .table-wrap { border-radius: 12px; }
+}
+@media (max-height: 760px) and (min-width: 801px) {
+  .auth-story-brand { width: min(100%, 330px); }
+  .auth-story { gap: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-nav-item, .workspace-switch, .command-kpi, .finance-overview-card,
+  .work-card, .quick-links a, .button-soft, .secondary, .data-table tbody tr {
+    transition: none !important;
+  }
+  .command-kpi:hover, .finance-overview-card:hover, .work-card:hover,
+  .quick-links a:hover { transform: none; }
+}

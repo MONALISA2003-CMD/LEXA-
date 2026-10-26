@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./lexa-brand-authority.css";
 
 export const metadata: Metadata = {
-  title: "LEXA | Your business, clearly.",
-  description: "Sales, stock, customers and money in one clear place.",
+  title: "LEXA | Sales · Inventory · Business Management",
+  description: "LEXA brings sales, inventory and business management together in one clear workspace.",
   icons: {
     icon: [
-      { url: "/lexa-mark.svg", type: "image/svg+xml" },
-      { url: "/lexa-icon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/lexa-icon.png", sizes: "512x512", type: "image/png" },
+      { url: "/lexa-app-mark.png", sizes: "512x512", type: "image/png" },
+      { url: "/lexa-app-mark.png", sizes: "192x192", type: "image/png" },
     ],
-    apple: "/lexa-icon-180.png",
+    apple: "/lexa-app-mark.png",
   },
 };
 
