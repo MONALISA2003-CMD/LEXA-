@@ -1,0 +1,162 @@
+name: LEXA ZIP Extractor
+
+# Install this file separately at .github/workflows/lexa-zip-extract.yml.
+# Then upload LEXA-cleaned-fixed.zip (or LEXA-cleaned.zip) to the repository root.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'LEXA-cleaned-fixed.zip'
+      - 'LEXA-cleaned.zip'
+  workflow_dispatch:
+
+# A source replacement must be able to create a commit and dispatch CI.
+# Repository Actions settings can further restrict these permissions.
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: lexa-zip-extractor-main
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    name: Validate archive, replace canonical source, and run CI
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name != 'push' || !contains(github.event.head_commit.message || '', '[lexa-extractor]')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the exact triggering commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Select and validate the uploaded archive
+        id: archive
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git switch --force-create main "$EVENT_SHA"
+          test "$(git rev-parse HEAD)" = "$EVENT_SHA"
+          test -z "$(git status --porcelain)" || { echo '::error::Checkout is not clean; refusing to replace source.'; exit 1; }
+
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            mapfile -t candidates < <(
+              git diff-tree --no-commit-id --name-only -r "$EVENT_SHA" \
+                | grep -E '^LEXA-cleaned(-fixed)?\.zip$' || true
+            )
+            if [[ ${#candidates[@]} -ne 1 ]]; then
+              echo "::error::Expected exactly one changed root archive (LEXA-cleaned-fixed.zip or LEXA-cleaned.zip); found ${#candidates[@]}."
+              exit 1
+            fi
+            archive_path="${candidates[0]}"
+          else
+            if [[ -f LEXA-cleaned-fixed.zip ]]; then
+              archive_path='LEXA-cleaned-fixed.zip'
+            elif [[ -f LEXA-cleaned.zip ]]; then
+              archive_path='LEXA-cleaned.zip'
+            else
+              echo '::error::No supported archive found at the repository root. Upload LEXA-cleaned-fixed.zip or LEXA-cleaned.zip first.'
+              exit 1
+            fi
+          fi
+
+          [[ "$archive_path" == 'LEXA-cleaned-fixed.zip' || "$archive_path" == 'LEXA-cleaned.zip' ]] || {
+            echo '::error::Only the two approved root-level archive filenames are accepted.'; exit 1;
+          }
+          test -s "$archive_path" || { echo "::error::Archive is missing or empty: $archive_path"; exit 1; }
+          checksum="$(sha256sum "$archive_path" | awk '{print $1}')"
+          echo "path=$archive_path" >> "$GITHUB_OUTPUT"
+          echo "sha256=$checksum" >> "$GITHUB_OUTPUT"
+          echo "archive_path=$archive_path"
+          echo "archive_sha256=$checksum"
+
+      - name: Preserve this separately installed extractor
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .github/workflows/lexa-zip-extract.yml || {
+            echo '::error::The extractor workflow must be installed separately at .github/workflows/lexa-zip-extract.yml before uploading the ZIP.'
+            exit 1
+          }
+          cp .github/workflows/lexa-zip-extract.yml "$RUNNER_TEMP/lexa-zip-extract.yml"
+
+      - name: Verify and replace the complete source tree
+        shell: bash
+        env:
+          ARCHIVE_PATH: ${{ steps.archive.outputs.path }}
+          ARCHIVE_SHA256: ${{ steps.archive.outputs.sha256 }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # The checked-in replacement script performs checksum verification,
+          # rejects traversal/absolute/duplicate paths and symlinks, checks the
+          # required canonical files, stages the archive, then preserves .git.
+          python scripts/replace_from_archive.py \
+            --archive "$GITHUB_WORKSPACE/$ARCHIVE_PATH" \
+            --sha256 "$ARCHIVE_SHA256" \
+            --expected-head "$EVENT_SHA" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --apply
+
+          # The extractor is intentionally not bundled inside the source ZIP.
+          mkdir -p .github/workflows
+          install -m 0644 "$RUNNER_TEMP/lexa-zip-extract.yml" .github/workflows/lexa-zip-extract.yml
+
+      - name: Commit the canonical source replacement
+        id: commit
+        shell: bash
+        env:
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # The replacement step leaves HEAD on main at EVENT_SHA.
+          # Ensure no one advanced main while this replacement was being prepared.
+          remote_head="$(git ls-remote origin refs/heads/main | awk 'NR == 1 {print $1}')"
+          if [[ "$remote_head" != "$EVENT_SHA" ]]; then
+            echo "::error::main advanced during extraction (expected $EVENT_SHA, found ${remote_head:-unknown}). No push was attempted; upload/run again against the latest main."
+            exit 1
+          fi
+
+          git add --all
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo '::error::No source changes were produced; refusing an empty commit.'
+            exit 1
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: extract canonical LEXA source [lexa-extractor]'
+          new_sha="$(git rev-parse HEAD)"
+          if ! git push origin HEAD:refs/heads/main; then
+            echo '::error::GitHub rejected the source push. In Settings → Actions → General, check whether workflow permissions allow read/write access to repository contents; branch protection may also block direct pushes. No force-push was attempted.'
+            exit 1
+          fi
+          echo "commit_sha=$new_sha" >> "$GITHUB_OUTPUT"
+          echo "Source replacement committed: $new_sha"
+
+      - name: Dispatch the canonical CI workflow
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Commits created with GITHUB_TOKEN do not normally trigger another
+          # push workflow, so dispatch CI explicitly after the commit succeeds.
+          if ! gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/dispatches" \
+            --method POST \
+            -f ref=main; then
+            echo '::error::The source commit was pushed, but the CI workflow could not be dispatched. Open Actions → LEXA Main Build CI and run it manually on main.'
+            exit 1
+          fi
+          echo 'Dispatched .github/workflows/ci.yml for main.'
